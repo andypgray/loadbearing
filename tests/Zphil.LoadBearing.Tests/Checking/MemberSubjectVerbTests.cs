@@ -13,7 +13,8 @@ namespace Zphil.LoadBearing.Tests.Checking;
 ///     The member modal verbs over the fast path (GRAMMAR §4.6, §5.7): per-verb pass/fail for the ten
 ///     one-flag verbs (naming, accessibility, static/abstract/virtual, and the <c>Must</c> escape hatch —
 ///     the two §5.7 mutability verbs carry real semantics and their own files), the
-///     projection kind filter, <c>Returning</c> at the definition level (exact / open-generic / void /
+///     projection kind filter, the contrast that keeps a <c>*</c> inside an affix literal where the glob
+///     family expands it (§4.2), <c>Returning</c> at the definition level (exact / open-generic / void /
 ///     multi-anchor), the deterministic <c>(DeclaringType.FullName, SymbolId)</c> ordering, the member
 ///     escape hatches reaching real extracted facts end-to-end, the empty
 ///     member-subject failure, the ratchet round-trip, the closed-generic check-time backstop, and the
@@ -174,6 +175,40 @@ public sealed class MemberSubjectVerbTests
         FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithNameMatching("*Walk*")
                 .MustHaveSuffix("Async"))
             .ShouldBe(["M:App.Members.Widget.Walk"]);
+    }
+
+    // The next two pin the one thing that separates a member affix from a member glob: a `*` inside an
+    // affix is a literal character, because only the *NameMatching family reaches the glob matcher.
+    // Every `*`-free affix reads the same under either rule, so the contrast against the glob spelling
+    // is the only honest way to state it — `*` is not a legal identifier character, so no codebase can
+    // declare the name the literal reading looks for.
+
+    [Fact]
+    public void MemberWithSuffixAdjective_ReadsStarAsLiteral_WhereWithNameMatchingGlobs()
+    {
+        // The literal reading selects no member at all, which is the empty-member-subject failure.
+        RuleResult result = Checker.Run(MembersModel, arch =>
+                arch.Rule("member/x")
+                    .Enforce(arch.Namespace("App.Members.*").Methods.WithSuffix("*Async").MustBePublic())
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptyMemberSubjectMessage);
+
+        Pass(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithNameMatching("*Async")
+            .MustBePublic());
+    }
+
+    [Fact]
+    public void MemberMustHaveSuffixVerb_ReadsStarAsLiteral_WhereMustHaveNameMatchingGlobs()
+    {
+        // RunAsync does not end with the six characters "*Async", so the literal reading flags it.
+        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithSuffix("Async")
+                .MustHaveSuffix("*Async"))
+            .ShouldBe(["M:App.Members.Widget.RunAsync"]);
+
+        Pass(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithSuffix("Async")
+            .MustHaveNameMatching("*Async"));
     }
 
     // ── accessibility verbs ───────────────────────────────────────────────────────────────────────────

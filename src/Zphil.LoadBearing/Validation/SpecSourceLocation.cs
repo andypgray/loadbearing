@@ -1,16 +1,14 @@
 namespace Zphil.LoadBearing.Validation;
 
 /// <summary>
-///     The spec-source position of an anchor — the file name and 1-based line where a rule, scope, or
-///     member anchor was authored, captured via <c>[CallerFilePath]</c>/<c>[CallerLineNumber]</c> on the
-///     anchor factories (GRAMMAR §8).
+///     Where in the spec source a validation error's <c>arch.Rule</c>, <c>arch.Scope</c> or
+///     <c>arch.Member</c> call was written: a file name and a 1-based line, so each error is somewhere to
+///     jump to. The file name alone, never a directory.
 /// </summary>
-/// <remarks>
-///     Diagnostics metadata only: it never enters the reified model or any render target, so the model
-///     stays location-free and deterministic by construction. Rendered <em>file name only</em> — never
-///     the machine-specific full compile-time path — so goldens stay byte-identical across build
-///     machines (fixture specs build in temp directories).
-/// </remarks>
+// Diagnostics metadata only: it never enters the model or any render target, so the model stays
+// location-free and deterministic. File name only — never the machine-specific full compile-time
+// path — so goldens stay byte-identical across build machines (fixture specs build in temp
+// directories).
 public sealed class SpecSourceLocation
 {
     internal SpecSourceLocation(string file, int line)
@@ -19,10 +17,10 @@ public sealed class SpecSourceLocation
         Line = line;
     }
 
-    /// <summary>The bare source file name (no directory) the anchor was authored in.</summary>
+    /// <summary>Gets the name of the source file the call was written in, without a directory.</summary>
     public string File { get; }
 
-    /// <summary>The 1-based line of the anchor factory call.</summary>
+    /// <summary>Gets the 1-based line the call was written on.</summary>
     public int Line { get; }
 
     // Strip to the bare file name at the capture seam so no machine-specific directory is ever retained.
@@ -39,7 +37,7 @@ public sealed class SpecSourceLocation
         return new SpecSourceLocation(file, line);
     }
 
-    /// <summary>The rendered <c>file:line</c> prefix form (file name only).</summary>
+    /// <summary>Returns <c>file:line</c>, the form a validation error message opens with.</summary>
     public override string ToString()
     {
         return $"{File}:{Line}";

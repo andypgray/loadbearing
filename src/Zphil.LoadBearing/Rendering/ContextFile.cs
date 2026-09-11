@@ -1,14 +1,11 @@
 namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
-///     One agent-context file a render produces: the target <c>AGENTS.md</c> path and the exact
-///     managed-block body that belongs in it.
+///     One agent-context file a render produces: the <c>AGENTS.md</c> to write and the exact
+///     managed-block body that belongs in it. The body is already merged, so a directory hosting both a
+///     layer card and a scope card yields one file carrying both and there is nothing left to combine:
+///     splice the body into the file, or compare it against what is there to detect drift.
 /// </summary>
-/// <remarks>
-///     The body is already merged — a directory hosting both a layer card and a scope card yields
-///     one file with both cards in it — so a consumer only has to splice it or compare it against what
-///     is committed.
-/// </remarks>
 public sealed class ContextFile
 {
     internal ContextFile(string path, string body)
@@ -17,9 +14,14 @@ public sealed class ContextFile
         Body = body;
     }
 
-    /// <summary>The absolute path of the <c>AGENTS.md</c> this body belongs in.</summary>
+    /// <summary>
+    ///     Gets the absolute path of the <c>AGENTS.md</c> this body belongs in.
+    /// </summary>
     public string Path { get; }
 
-    /// <summary>The composed managed-block body, LF-internal and provenance line first.</summary>
+    /// <summary>
+    ///     Gets the composed managed-block body: the provenance line first, then the cards. Its line endings are always
+    ///     LF, and <c>ManagedBlock.Splice</c> converts them to the ones the target file already uses.
+    /// </summary>
     public string Body { get; }
 }

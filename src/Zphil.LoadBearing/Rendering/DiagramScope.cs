@@ -3,36 +3,44 @@ using Zphil.LoadBearing.Internal;
 namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
-///     The project filter a <see cref="GraphDiagramRenderer" /> render is drawn through: an optional
-///     allow-list and an optional deny-list of project-name globs. Empty <see cref="Only" /> means every
-///     project; <see cref="Exclude" /> always wins. Patterns match the project (assembly) name as a single
-///     token through <see cref="Wildcard" /> — <c>*</c> spans dots here, because a project name is one name
-///     and not a dotted namespace path.
+///     The project filter a diagram is drawn through: an allow-list and a deny-list of project-name
+///     globs. An empty <see cref="Only" /> means every project, and <see cref="Exclude" /> always wins. A
+///     pattern is matched against the project (assembly) name as one whole token, case-sensitively, with
+///     <c>*</c> standing for any run of characters, dots included, so <c>MyApp.*</c> reaches
+///     <c>MyApp.Web.Api</c>. Filtering is how a large solution keeps a drawing legible, and how a
+///     committed diagram stays put while sample or fixture projects come and go.
 /// </summary>
-/// <remarks>
-///     Diagrams stop reading above roughly twenty nodes, and that guardrail is a product option rather
-///     than a caveat: a solution whose fixture or sample projects outnumber its shipping ones names the
-///     six it wants drawn and the committed artifact stays stable while the rest churn.
-/// </remarks>
 public sealed class DiagramScope
 {
-    /// <summary>Creates a scope from an allow-list and a deny-list of project-name globs.</summary>
+    /// <summary>
+    ///     Creates a filter from an allow-list and a deny-list of project-name globs. Neither list may be
+    ///     null; pass two empty ones, or use <see cref="Everything" />, to filter nothing.
+    /// </summary>
     public DiagramScope(IReadOnlyList<string> only, IReadOnlyList<string> exclude)
     {
         Only = Guard.NotNull(only, nameof(only));
         Exclude = Guard.NotNull(exclude, nameof(exclude));
     }
 
-    /// <summary>Every project, filtered by nothing.</summary>
+    /// <summary>
+    ///     Gets every project, filtered by nothing.
+    /// </summary>
     public static DiagramScope Everything { get; } = new([], []);
 
-    /// <summary>The allow-list globs; empty means every project is in scope.</summary>
+    /// <summary>
+    ///     Gets the allow-list globs; empty means every project is in scope.
+    /// </summary>
     public IReadOnlyList<string> Only { get; }
 
-    /// <summary>The deny-list globs; a match here drops the project whatever <see cref="Only" /> says.</summary>
+    /// <summary>
+    ///     Gets the deny-list globs; a match here drops the project whatever <see cref="Only" /> says.
+    /// </summary>
     public IReadOnlyList<string> Exclude { get; }
 
-    /// <summary>True when <paramref name="projectName" /> survives both lists.</summary>
+    /// <summary>
+    ///     Whether <paramref name="projectName" /> survives both lists: true when no <see cref="Exclude" />
+    ///     pattern matches it and either <see cref="Only" /> is empty or one of its patterns does.
+    /// </summary>
     public bool Includes(string projectName)
     {
         Guard.NotNull(projectName, nameof(projectName));

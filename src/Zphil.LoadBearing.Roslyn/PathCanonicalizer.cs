@@ -1,28 +1,17 @@
 namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>
-///     A managed <c>realpath</c>: resolves a path to a symlink-free, fully-qualified spelling so that
-///     paths of different provenance can be compared.
+///     A managed <c>realpath</c>: resolves a path to a symlink-free, fully-qualified spelling so that paths
+///     obtained different ways can be compared as strings. A workspace's document paths keep whatever
+///     spelling the solution was opened with, while a path from another tool may already be
+///     symlink-resolved; on a symlinked root (macOS's <c>/var</c> against <c>/private/var</c>, a symlinked
+///     home directory, a Windows junction) the two never match, and a prefix test silently misses.
+///     Canonicalize both sides once and they agree.
 /// </summary>
-/// <remarks>
-///     <para>
-///         <c>git rev-parse --show-toplevel</c> returns a canonical (symlink-resolved) path, but
-///         <see cref="System.IO.Path.GetFullPath(string)" /> — and MSBuildWorkspace's document paths — keep
-///         whatever spelling the solution was opened with. On a symlinked root (macOS's <c>/var</c> →
-///         <c>/private/var</c>, a symlinked home, a Windows junction) the two disagree, and a scope
-///         tripwire's prefix match silently misses. Canonicalizing once at the discovery seam makes the
-///         git-derived and workspace-derived paths agree.
-///     </para>
-///     <para>
-///         Lives in <c>.Roslyn</c> (net-current) rather than Core, because
-///         <see cref="System.IO.FileSystemInfo.ResolveLinkTarget(bool)" /> is net6+ and Core is
-///         netstandard2.0. The resolution is a fixed-point walk:
-///         <see cref="System.IO.Path.GetFullPath(string)" /> first, then repeatedly find the deepest
-///         symlinked ancestor, follow it to its final target, and reattach the remainder until no symlink
-///         remains. It is a no-op on ordinary (non-symlinked) paths and falls back to <c>GetFullPath</c>
-///         when the path does not exist — callers keep their own existence checks.
-///     </para>
-/// </remarks>
+// It lives in this package rather than in Core because FileSystemInfo.ResolveLinkTarget is net6+ and
+// Core is netstandard2.0. The resolution is a fixed-point walk: GetFullPath first, then repeatedly find
+// the deepest symlinked ancestor, follow it to its final target and reattach the remainder, until no
+// symlink is left.
 public static class PathCanonicalizer
 {
     // Belt-and-braces bound so a pathological reparse graph (mutually recursive symlinks) can never
@@ -31,8 +20,11 @@ public static class PathCanonicalizer
     private const int MaxIterations = 40;
 
     /// <summary>
-    ///     Returns <paramref name="path" /> made absolute and symlink-free. A no-op on non-symlinked
-    ///     paths; falls back to <see cref="System.IO.Path.GetFullPath(string)" /> on nonexistent input.
+    ///     Returns <paramref name="path" /> made absolute and symlink-free, following a symlinked directory anywhere
+    ///     along it rather than only at the end. A path with no symlinks in it comes back exactly as
+    ///     <see cref="System.IO.Path.GetFullPath(string)" /> would return it. A path that does not exist is still made
+    ///     absolute and a symlinked directory above it is still followed; nothing here reports whether the path exists,
+    ///     so callers keep their own existence checks. An empty path is returned unchanged.
     /// </summary>
     public static string Resolve(string path)
     {

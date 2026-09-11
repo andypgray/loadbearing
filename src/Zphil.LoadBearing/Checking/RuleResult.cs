@@ -3,11 +3,17 @@ using Zphil.LoadBearing.Hosting;
 
 namespace Zphil.LoadBearing.Checking;
 
-/// <summary>One rule's evaluation outcome.</summary>
-/// <remarks>
-///     <see cref="Violations" /> is ordered ordinal by source/subject then target FullName. An
-///     inert-target warning leaves the rule <see cref="RuleStatus.Passed" /> (GRAMMAR §4.1).
-/// </remarks>
+/// <summary>
+///     What checking one rule produced: its <see cref="Status" />, the violations that failed it, the
+///     violations a baseline tolerated, any warnings, and the counts a burndown report reads. One of
+///     these sits in <see cref="CheckReport.Results" /> for every rule the run covered.
+///     <see cref="Violations" /> and <see cref="Grandfathered" /> are each ordered the same way on every
+///     run, so two runs over unchanged code list them identically, and a warning leaves the rule
+///     <see cref="RuleStatus.Passed" />.
+/// </summary>
+// Both lists come out of ArchChecker's one report comparer — ordinal by (source|subject FullName,
+// target FullName|package name, member SymbolId, target|subject ProjectName) — so the red list and
+// the grandfathered list agree, and a grown pair interleaves in report order rather than trailing.
 public sealed class RuleResult
 {
     private static readonly IReadOnlyDictionary<Violation, BaselineEntry> NothingGrown =
@@ -47,122 +53,132 @@ public sealed class RuleResult
         GrownEntries = grownEntries ?? NothingGrown;
     }
 
-    /// <summary>The rule that was evaluated.</summary>
+    /// <summary>Gets the rule that was checked: its ID, posture, reason, fix and the sentence it renders as.</summary>
     public ArchRule Rule { get; }
 
-    /// <summary>The evaluation status.</summary>
+    /// <summary>Gets the outcome: passed, failed, or skipped for want of a verdict.</summary>
     public RuleStatus Status { get; }
 
-    /// <summary>The red (failing) violations, ordered deterministically; empty unless <see cref="Status" /> is Failed.</summary>
+    /// <summary>
+    ///     Gets the violations that failed the rule, in report order. Empty unless <see cref="Status" /> is
+    ///     <see cref="RuleStatus.Failed" />: the ones a baseline tolerated are in
+    ///     <see cref="Grandfathered" /> instead. A tolerated pair that has grown past the site count its
+    ///     baseline entry records is here rather than there, and <see cref="GrownEntries" /> names the entry
+    ///     it went past.
+    /// </summary>
     public IReadOnlyList<Violation> Violations { get; }
 
-    /// <summary>The non-fatal warnings (e.g. an inert forbidden-set target).</summary>
+    /// <summary>
+    ///     Gets the warnings raised while checking the rule — a forbidden target that matched no types, or a
+    ///     changed file inside a quarantined or a cautioned scope. A warning never fails the rule and never
+    ///     changes the exit code; empty when there are none.
+    /// </summary>
     public IReadOnlyList<CheckWarning> Warnings { get; }
 
     /// <summary>
-    ///     Why the run reached no verdict for this rule — a tripwire with no diff context, or a solution
-    ///     filter that left its subject out of the checked universe — or null when it was evaluated.
+    ///     Gets why the run reached no verdict for this rule — a scope's tripwire run with no
+    ///     <c>--diff-base</c>, or a subject lying entirely in projects a <c>.slnf</c> solution filter left
+    ///     unchecked. Written to be printed as it stands, and null unless <see cref="Status" /> is
+    ///     <see cref="RuleStatus.Skipped" />.
     /// </summary>
     public string? SkipReason { get; }
 
     /// <summary>
-    ///     The grandfathered (baselined) violations — they pass, so they are kept separate from
-    ///     <see cref="Violations" />. Empty for every non-Migrate rule.
+    ///     Gets the violations the rule's captured baseline tolerates: each is reported, in report order,
+    ///     and none of them fails the rule — the debt still to be paid down. Empty for a rule that takes no
+    ///     baseline, and for one whose baseline has yet to be captured, since until it is every violation
+    ///     fails.
     /// </summary>
     public IReadOnlyList<Violation> Grandfathered { get; }
 
     /// <summary>
-    ///     How many <em>sites</em> the grandfathered violations carry between them — the burndown at the
-    ///     grain the ratchet measures, which is at least <see cref="Grandfathered" />'s count and is
-    ///     computable whether or not any entry has recorded a site count yet. Summed once here, so every
-    ///     renderer and the report's roll-up read one figure and cannot disagree about the same run.
+    ///     Gets how many source sites <see cref="Grandfathered" />'s violations carry between them. One
+    ///     violation covers every site of the same pair, so this is at least
+    ///     <see cref="Grandfathered" />'s own count and is the finer measure of the same remaining debt;
+    ///     it is available whether or not any baseline entry has a recorded count of its own.
     /// </summary>
     public int GrandfatheredSiteCount { get; }
 
     /// <summary>
-    ///     The count of baseline entries no current violation matched — debt that was fixed and is now
-    ///     awaiting <c>loadbearing baseline --accept-reductions</c>. Zero for non-Migrate rules.
+    ///     Gets how many entries in the rule's captured baseline no current violation matched — debt that
+    ///     has since been fixed, which <c>loadbearing baseline --accept-reductions</c> retires. Matching is
+    ///     on identity alone, so a tolerated pair that has grown is matched and live rather than stale, even
+    ///     though it now fails the rule. Zero for a rule that takes no baseline.
     /// </summary>
-    /// <remarks>
-    ///     Counts identity, and only identity. A grandfathered pair that grew is matched and live, so it
-    ///     is never stale — it is red, and a reduction sweep that treated it as fixed would delete the
-    ///     very entry recording the debt.
-    /// </remarks>
     public int StaleBaselineEntries { get; }
 
     /// <summary>
-    ///     The count of matched edge entries whose observed site count came in <em>below</em> the one
-    ///     they record — a real reduction, which passes and awaits
-    ///     <c>loadbearing baseline --accept-reductions</c> to lower the recorded count.
+    ///     Gets how many matched baseline entries now cover fewer sites than they record — a real reduction.
+    ///     Each still passes, and <c>loadbearing baseline --accept-reductions</c> lowers the recorded count.
     /// </summary>
     public int ShrunkBaselineEntries { get; }
 
     /// <summary>
-    ///     The count of matched edge entries that record no site count, so they grandfather their pair at
-    ///     any size. Subject entries never count here: they carry no measure at all, so nothing an author
-    ///     could do would clear them from this total.
+    ///     Gets how many matched baseline entries record no site count, so each tolerates its pair however
+    ///     many sites it grows to, until a capture records one. Entries that key a subject rather than a
+    ///     pair never count here: they carry no site measure at all, so nothing an author could do would
+    ///     clear them from this total.
     /// </summary>
     public int UncountedBaselineEntries { get; }
 
     /// <summary>
-    ///     The stored baseline entry behind each <em>grown</em> violation — a grandfathered pair carrying
-    ///     more sites than its entry records, which is red (it is in <see cref="Violations" />) while
-    ///     still naming the allowance it exceeded.
+    ///     Gets, for each violation that has grown, the baseline entry it went past: a tolerated pair now
+    ///     carrying more sites than its entry records, which fails the rule and so appears in
+    ///     <see cref="Violations" /> rather than in <see cref="Grandfathered" />, while still naming the
+    ///     allowance it exceeded. Look one up with the very instance taken from <see cref="Violations" /> —
+    ///     the keys are those instances, compared by reference. Empty when nothing grew.
     /// </summary>
-    /// <remarks>
-    ///     Keyed by the violation object itself, and reference-keyed at that: <see cref="Violation" />
-    ///     overrides neither <c>Equals</c> nor <c>GetHashCode</c>, so the default comparer is reference
-    ///     identity, which is what a lookup from a rendered violation needs. A dictionary rather than a
-    ///     list index-aligned with <see cref="Violations" />, because both render loops walk the
-    ///     violations without carrying an index — and only some of them are grown.
-    /// </remarks>
+    // Reference-keyed because Violation overrides neither Equals nor GetHashCode, so the default comparer
+    // is reference identity — which is what a lookup from a rendered violation needs. A dictionary rather
+    // than a list index-aligned with Violations, because both render loops walk the violations without
+    // carrying an index, and only some of them are grown.
     public IReadOnlyDictionary<Violation, BaselineEntry> GrownEntries { get; }
 
-    /// <summary>The count of grown entries — the size of <see cref="GrownEntries" />.</summary>
+    /// <summary>
+    ///     Gets how many violations have grown past their baseline entry — the size of <see cref="GrownEntries" />.
+    /// </summary>
     public int GrownBaselineEntries => GrownEntries.Count;
 
-    /// <summary>Whether a baseline section exists for this (Migrate) rule; false when uncaptured or non-Migrate.</summary>
+    /// <summary>
+    ///     Gets whether a baseline has been captured for this rule. False for a rule that takes no baseline,
+    ///     and false while a rule that takes one has yet to be captured with the CLI's <c>baseline</c> verb
+    ///     — until then every violation fails.
+    /// </summary>
     public bool BaselineCaptured { get; }
 
     /// <summary>
-    ///     The stored baseline entries that grandfathered <see cref="Grandfathered" />, <b>index-aligned</b>
-    ///     with it: <c>GrandfatheredEntries[i]</c> is the baseline entry — carrying its
-    ///     <see cref="BaselineEntry.Because" /> attribution, if any — that blessed
-    ///     <c>Grandfathered[i]</c>. The two lists always share length and order. Empty for every
-    ///     non-ratcheted rule and whenever <see cref="Grandfathered" /> is empty.
+    ///     Gets the baseline entries that tolerated <see cref="Grandfathered" />, one for one and in the
+    ///     same order: the entry at index <c>i</c> is the one that blessed the violation at index <c>i</c>,
+    ///     and carries the reason recorded with it (<see cref="BaselineEntry.Because" />) if it has one. The
+    ///     two lists always share length and order. Empty whenever <see cref="Grandfathered" /> is.
     /// </summary>
     public IReadOnlyList<BaselineEntry> GrandfatheredEntries { get; }
 
     /// <summary>
-    ///     How many types the rule's subject actually materialized to — a member-subject rule reports the
-    ///     members' declaring types, so this and <see cref="SubjectGeneratedTypes" /> share a unit. Zero for
-    ///     a rule that reached no subject at all: errored, skipped, tripwire, or empty-subject.
+    ///     Gets how many types the rule's subject actually matched. A rule over members counts the types
+    ///     that declare them, so this and <see cref="SubjectGeneratedTypes" /> share a unit. Zero for a rule
+    ///     that reached no subject at all: one that errored, one the run reached no verdict for, a scope's
+    ///     tripwire, or a subject that matched nothing.
     /// </summary>
     public int SubjectTypes { get; }
 
     /// <summary>
-    ///     How many of <see cref="SubjectTypes" /> a generator emitted
+    ///     Gets how many of <see cref="SubjectTypes" /> a generator emitted
     ///     (<see cref="ITypeInfo.IsGenerated" />) — the rule's own answer to whether it is aimed at code
-    ///     anyone can act on.
+    ///     anyone can act on. Reported for a rule that passed as readily as for one that failed.
     /// </summary>
-    /// <remarks>
-    ///     Reported for passing and failing rules alike, and it carries no advice — this states a fact
-    ///     about the subject and leaves the judgement where it belongs.
-    /// </remarks>
     public int SubjectGeneratedTypes { get; }
 
     /// <summary>
-    ///     Whether the Migrate ratchet has burned to zero on a rule this run actually measured, so the
-    ///     posture can move to Enforce: a captured baseline with nothing grandfathered, nothing new, and
-    ///     nothing awaiting acceptance.
+    ///     Gets whether the rule's debt has burned to zero on a run that actually measured it, so its
+    ///     posture could move from <see cref="Posture.Migrate" /> to <see cref="Posture.Enforce" />: a
+    ///     captured baseline with nothing tolerated, nothing failing and nothing awaiting acceptance. The
+    ///     CLI's <c>status</c> verb reports it as a suggestion. False for every other posture, and false for
+    ///     a rule the run reached no verdict for.
     /// </summary>
-    /// <remarks>
-    ///     False for every other posture, deliberately — a burned-to-zero Quarantine containment reads plain,
-    ///     because Quarantine→Migrate is a human decision and is never suggested. False too for a rule the run
-    ///     reached no verdict on: a narrowing skip keeps <see cref="BaselineCaptured" /> truthful and zeroes
-    ///     the counts, which is burned-to-zero's exact shape, so promoting on it would suggest enforcing a
-    ///     rule whose subject a filter had merely erased.
-    /// </remarks>
+    // The Skipped conjunct is load-bearing: a narrowing skip keeps BaselineCaptured truthful and zeroes
+    // the counts, which is burned-to-zero's exact shape, so without it this would suggest enforcing a
+    // rule whose subject a solution filter had merely erased.
     public bool Promotable =>
         Rule.Posture == Posture.Migrate
         && Status != RuleStatus.Skipped

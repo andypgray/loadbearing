@@ -134,7 +134,7 @@ FAIL di/no-captive-dependencies — Singleton-registered types must not inject s
   because: A singleton is created once and holds every dependency it injects for the whole process, so a scoped or transient service injected into it is captured past its lifetime and shared across all callers.
   citation: https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines
   fix: Resolve the scoped or transient service per unit of work inside an IServiceScopeFactory scope, as ScopedDispatchRunner does; take only singleton-safe dependencies in the constructor.
-  src/Meridian.Interchange/Dispatch/OutboxDispatcher.cs:16 — Meridian.Interchange.Dispatch.OutboxDispatcher injects Meridian.Interchange.Outbox.IOutboxStore
+  src/Meridian.Interchange/Dispatch/OutboxDispatcher.cs:15 — Meridian.Interchange.Dispatch.OutboxDispatcher injects Meridian.Interchange.Outbox.IOutboxStore
 ```
 
 `di/no-captive-dependencies` reads the capture from the registrations, where `IOutboxStore` is registered scoped. `di/hosted-services-scope-their-work` reads the same edit from the hierarchy, because `IOutboxStore` is its named target and the dispatcher derives from `BackgroundService`. The two overlap on this dependency, and neither replaces the other. The registration rule also catches a captured scoped `IOutboxProcessor`, or a transient partner client, that the hierarchy rule never names. The hierarchy rule also catches `IOptionsSnapshot<InterchangeOptions>`, which is framework-registered and never spelled in a source-level registration, so it stays invisible to the registration rule: swap the parameter to that snapshot type and only the hierarchy rule fires. Revert the parameter and `check` is exit 0 again.
@@ -321,7 +321,7 @@ FAIL di/hosted-services-scope-their-work — Types derived from `BackgroundServi
   because: A BackgroundService is a singleton; a captured scoped IOptionsSnapshot or scoped store outlives its scope; resolve per work item from an IServiceScopeFactory scope.
   citation: https://learn.microsoft.com/dotnet/core/extensions/scoped-service
   fix: Inject IServiceScopeFactory, create a scope per iteration, resolve scoped services inside it; see OutboxDispatcher and ScopedDispatchRunner.
-  src/Meridian.Interchange/Dispatch/OutboxDispatcher.cs:15 — Meridian.Interchange.Dispatch.OutboxDispatcher references Microsoft.Extensions.Options.IOptionsSnapshot<TOptions>
+  src/Meridian.Interchange/Dispatch/OutboxDispatcher.cs:14 — Meridian.Interchange.Dispatch.OutboxDispatcher references Microsoft.Extensions.Options.IOptionsSnapshot<TOptions>
 ```
 
 Rename `IOutboxProcessor.ProcessPendingAsync` to `ProcessPending` (with its implementation and the one call site in `ScopedDispatchRunner`, so it compiles). Both the interface and the class now declare a `Task`-returning method without the suffix, so the rule fires on both:

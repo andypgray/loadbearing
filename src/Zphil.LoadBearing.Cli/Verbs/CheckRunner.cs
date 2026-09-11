@@ -54,7 +54,9 @@ internal sealed class CheckRunner(
         if (request is { Json: true, HookJson: true })
             throw new UserErrorException(
                 "--json and --hook-json both own stdout; pass one. --json writes the check document for a "
-                + "client that parses it, --hook-json the PostToolUse document for a Claude Code hook.");
+                + "client that parses it, --hook-json the hook document for a Claude Code hook.");
+
+        string hookEvent = ResolveHookEvent(request);
 
         if (!request.HookJson) return (await ExecuteAsync(request, output, error, ct)).Code;
 
@@ -63,9 +65,30 @@ internal sealed class CheckRunner(
         // has no business touching.
         var composed = new StringWriter();
         (int code, int warnings) = await ExecuteAsync(request, composed, composed, ct);
-        WriteHookOutput(composed.ToString(), code, warnings);
+        WriteHookOutput(composed.ToString(), code, warnings, hookEvent);
 
         return code;
+    }
+
+    // Which event the hook document names, refusing the two ways of asking for one that cannot work. An
+    // event without --hook-json shapes no document at all, and an event Claude Code does not fire drops the
+    // context on the floor at the far end — both silent failures of exactly the kind a hook cannot afford,
+    // since nothing downstream of a hook reports that its context went nowhere.
+    private static string ResolveHookEvent(CheckRequest request)
+    {
+        if (request.HookEvent is not { } named) return HookReportRenderer.DefaultEvent;
+
+        string events = string.Join(", ", HookReportRenderer.Events);
+        if (!request.HookJson)
+            throw new UserErrorException(
+                $"--hook-event names the event the --hook-json document answers ({events}), so it needs "
+                + "--hook-json beside it; pass both, or neither.");
+
+        if (!HookReportRenderer.Events.Contains(named, StringComparer.Ordinal))
+            throw new UserErrorException(
+                $"--hook-event '{named}' is not an event whose context reaches the agent; pass one of: {events}.");
+
+        return named;
     }
 
     // The check proper, over whichever pair of channels the caller handed it: the report and the human
@@ -124,11 +147,12 @@ internal sealed class CheckRunner(
     }
 
     // Hook mode's whole observable. A clean run (exit 0) with something to say hands the composed report to
-    // the agent as PostToolUse additional context, which is the one exit-0 channel Claude Code turns into a
-    // transcript message; a clean run with nothing to say writes nothing, because a hook that speaks on every
-    // edit is a hook people turn off. Every other exit code writes the report verbatim — that is what the
-    // wrapper puts on stderr to block with, and it is why the composed text is not the JSON's only home.
-    private void WriteHookOutput(string composed, int exitCode, int warnings)
+    // the agent as additional context for the event named by --hook-event, which is the one exit-0 channel
+    // Claude Code turns into a transcript message; a clean run with nothing to say writes nothing, because a
+    // hook that speaks whenever it runs is a hook people turn off. Every other exit code writes the report
+    // verbatim — that is what the wrapper puts on stderr to block with, and it is why the composed text is
+    // not the JSON's only home.
+    private void WriteHookOutput(string composed, int exitCode, int warnings, string hookEvent)
     {
         if (exitCode != 0)
         {
@@ -138,7 +162,7 @@ internal sealed class CheckRunner(
 
         if (warnings == 0) return;
 
-        output.WriteLine(HookReportRenderer.Document(composed.TrimEnd('\r', '\n')));
+        output.WriteLine(HookReportRenderer.Document(composed.TrimEnd('\r', '\n'), hookEvent));
     }
 
     // The human filter stamp, written by the runner rather than by Core's shared HumanReportRenderer so an

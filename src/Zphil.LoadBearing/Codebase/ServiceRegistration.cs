@@ -1,35 +1,31 @@
 namespace Zphil.LoadBearing.Codebase;
 
 /// <summary>
-///     A container-registration fact (GRAMMAR §4.7): a service type registered with a <see cref="Lifetime" />,
-///     optionally naming a distinct implementation type, read from a source-visible registration call
-///     (<c>AddSingleton</c> / <c>AddScoped</c> / <c>AddTransient</c> and their <c>TryAdd*</c> twins,
-///     <c>AddHostedService</c>, <c>AddDbContext</c>, <c>AddHttpClient&lt;TClient&gt;</c>). <see cref="Sites" />
-///     lists the distinct <c>file:line</c> positions of the recognized registration calls, deduped by
-///     (file, line).
+///     One dependency-injection registration the source spells out: a service type registered with a
+///     <see cref="Lifetime" />, and where the call names one, the implementation type behind it. Read them
+///     from <see cref="CodebaseModel.ServiceRegistrations" />. The calls recognized are
+///     <c>AddSingleton</c>, <c>AddScoped</c> and <c>AddTransient</c> with their <c>TryAdd</c> forms,
+///     <c>AddHostedService</c>, <c>AddDbContext</c>, <c>AddDbContextPool</c> and <c>AddHttpClient</c>.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The service and implementation are carried as <b>fully-qualified name strings</b>, deliberately
-///         <em>not</em> as <see cref="TypeNode" /> instances and never denormalized onto the type model:
-///         registration is many-to-many, so <c>arch.Registered(lifetime)</c> membership (the union of service
-///         and implementation FQNs at that lifetime) is resolved at evaluation against these facts. The FQNs
-///         are definition-level in the same form as <see cref="TypeNode.FullName" /> (open generics carry
-///         their declared type-parameter names), so a registration FQN compares equal to a declared node's
-///         <see cref="TypeNode.FullName" />.
+///         A call is recognized by the method it resolves to and never by its name alone: it must come from
+///         <c>Microsoft.Extensions.DependencyInjection</c> and take an <c>IServiceCollection</c> first. So a
+///         look-alike of your own is not counted, while a helper of your own whose body calls the real thing
+///         is. Everything registered another way is simply absent — assembly scanning, keyed overloads, a
+///         raw <c>ServiceDescriptor</c>, <c>Configure</c> and <c>AddOptions</c>, reflection, framework
+///         defaults, and registration helpers compiled into a package, which leave no source to read.
 ///     </para>
 ///     <para>
-///         <see cref="ImplementationFullName" /> is null for a registration that names no implementation type
-///         — a factory (<c>AddSingleton&lt;T&gt;(sp =&gt; …)</c>) or instance form. For
-///         <c>AddHostedService&lt;T&gt;</c> the service is the synthesized <c>IHostedService</c> and the
-///         implementation is <c>T</c>; when <c>IHostedService</c> is not resolvable in the compilation the
-///         fact degrades to implementation-only, carrying <c>T</c> in <see cref="ServiceFullName" /> with a
-///         null <see cref="ImplementationFullName" />. Registrations the source does not spell with a
-///         recognized call are invisible (the honesty boundary of §4.7): <c>Configure</c>/<c>AddOptions</c>,
-///         keyed-service overloads, raw <c>ServiceDescriptor</c>/<c>TryAddEnumerable</c>, assembly scanning,
-///         reflection, framework defaults, and wrapper extensions compiled into packages.
+///         The two type names are fully qualified in the same form <see cref="TypeNode.FullName" /> takes,
+///         so either compares equal to a declared type's name. An open generic is recorded as its
+///         definition, so <c>AddSingleton(typeof(IRepo&lt;&gt;), typeof(Repo&lt;&gt;))</c> records
+///         <c>IRepo&lt;T&gt;</c> and <c>Repo&lt;T&gt;</c>.
 ///     </para>
 /// </remarks>
+// Service and implementation are carried as fully-qualified name strings, never as TypeNode instances and
+// never denormalized onto the type model: registration is many-to-many, so arch.Registered membership is
+// resolved at evaluation against these facts (GRAMMAR §4.7).
 public sealed class ServiceRegistration
 {
     internal ServiceRegistration(
@@ -41,19 +37,33 @@ public sealed class ServiceRegistration
         Sites = sites;
     }
 
-    /// <summary>The lifetime the registration was made with.</summary>
+    /// <summary>
+    ///     Gets the lifetime the registration was made with. <c>AddSingleton</c>, <c>AddScoped</c> and
+    ///     <c>AddTransient</c> each name their own; <c>AddHostedService</c> registers as a singleton,
+    ///     <c>AddHttpClient</c> as transient, and <c>AddDbContext</c> as scoped unless the call passes a
+    ///     <c>ServiceLifetime</c> of its own. Such an argument is honoured only when it is a literal: where it
+    ///     is computed, the call records no fact at all rather than a guess.
+    /// </summary>
     public Lifetime Lifetime { get; }
 
-    /// <summary>The service type's fully-qualified name (definition-level, the <see cref="TypeNode.FullName" /> form).</summary>
+    /// <summary>
+    ///     Gets the service type's fully-qualified name. For <c>AddHostedService&lt;T&gt;</c> the service is
+    ///     <c>Microsoft.Extensions.Hosting.IHostedService</c> even though nothing in the source spells it; where
+    ///     the compilation cannot resolve that interface, <c>T</c> is recorded here instead and
+    ///     <see cref="ImplementationFullName" /> is null.
+    /// </summary>
     public string ServiceFullName { get; }
 
     /// <summary>
-    ///     The implementation type's fully-qualified name, or null when the registration names no distinct
-    ///     implementation type (a factory or instance form, or the <c>AddHostedService</c> unresolvable-service
-    ///     fallback).
+    ///     Gets the implementation type's fully-qualified name, or null where the call names no distinct
+    ///     implementation — a factory such as <c>AddSingleton&lt;T&gt;(sp =&gt; ...)</c>, an instance
+    ///     registration, or the <c>AddHostedService</c> case above.
     /// </summary>
     public string? ImplementationFullName { get; }
 
-    /// <summary>The distinct registration-call sites, ordered by (file, line).</summary>
+    /// <summary>
+    ///     Gets each distinct registration call, ordered by file then line. Two calls recording the same fact on
+    ///     one line count as one site.
+    /// </summary>
     public IReadOnlyList<SourceLocation> Sites { get; }
 }

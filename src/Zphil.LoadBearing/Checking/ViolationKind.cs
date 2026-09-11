@@ -1,93 +1,95 @@
 namespace Zphil.LoadBearing.Checking;
 
-/// <summary>What a <see cref="Violation" /> is about — which of its nullable slots are populated (GRAMMAR §4.3).</summary>
+/// <summary>
+///     What a <see cref="Violation" /> is about, and so which of its slots carry a value. Each member
+///     below names the ones its kind fills; every other slot is null, and <c>Sites</c> is where the
+///     evidence is.
+/// </summary>
 public enum ViolationKind
 {
     /// <summary>
-    ///     A forbidden or non-permitted reference edge: <c>Source</c> references <c>Target</c>, with
-    ///     the edge's reference <c>Sites</c>. One per (rule, source, target).
+    ///     A reference the rule forbids, or one it does not permit: <c>Source</c> references <c>Target</c>,
+    ///     with every place the reference is written in <c>Sites</c>. One violation per rule, source and
+    ///     target, however many sites they share.
     /// </summary>
     Reference,
 
     /// <summary>
-    ///     A subject failing a shape/naming/inheritance/attribute/escape verb: <c>Subject</c> with its
-    ///     declaration <c>Sites</c>. One per (rule, subject).
+    ///     A type failing a verb about the type itself: its shape, its name, what it inherits or is
+    ///     attributed with, where it lives, or a <c>Must</c> predicate of the spec's own. <c>Subject</c>
+    ///     is the type and <c>Sites</c> its declarations. One violation per rule and subject.
     /// </summary>
     Shape,
 
     /// <summary>
-    ///     A banned member access (GRAMMAR §4.5): <c>Source</c> uses <c>Member</c>, with the member-use
-    ///     edge's <c>Sites</c>. One per (rule, source, member) — per-overload edges yield per-overload
-    ///     violations (GRAMMAR §4.3).
+    ///     A use of a banned member: <c>Source</c> uses <c>Member</c>, with every place it is used in
+    ///     <c>Sites</c>. One violation per rule, source and member; a ban covers every overload of the name,
+    ///     and each overload actually used reports separately.
     /// </summary>
     MemberUse,
 
     /// <summary>
-    ///     A declared member failing a member shape/naming/escape verb (GRAMMAR §4.6): <c>SubjectMember</c>
-    ///     with its declaration <c>Sites</c>. One per (rule, member) — keyed by the member's own DocId, so a
-    ///     renamed or newly-added member is a NEW red.
+    ///     A declared member failing a verb about members: <c>SubjectMember</c> is the member and
+    ///     <c>Sites</c> its declaration. One violation per rule and member, keyed by the member itself — so
+    ///     renaming a grandfathered member, or adding a new one that breaks the rule, is a new violation
+    ///     rather than an already-blessed one.
     /// </summary>
     MemberShape,
 
     /// <summary>
-    ///     A forbidden construction edge (GRAMMAR §4.5): <c>Source</c> constructs <c>Target</c> (the constructed
-    ///     type) with an object-creation expression, carrying every <c>new</c> <c>Sites</c>. One per (rule,
-    ///     source, constructed) — overload-indifferent, since all constructor overloads of the constructed type
-    ///     collapse to one identity and the sites are evidence, not identity (GRAMMAR §4.3).
+    ///     A <c>new</c> the rule forbids: <c>Source</c> constructs <c>Target</c>, with every object-creation
+    ///     expression in <c>Sites</c>. One violation per rule, source and constructed type; which constructor
+    ///     overload was used makes no difference.
     /// </summary>
     Construction,
 
     /// <summary>
-    ///     A forbidden constructor-injection edge (GRAMMAR §4.7): <c>Source</c> injects <c>Target</c> (the
-    ///     injected parameter type) through a declared constructor parameter, carrying every parameter
-    ///     <c>Sites</c>. One per (rule, source, injected) — constructor-overload- and parameter-name-indifferent,
-    ///     since every constructor parameter typed on the injected type collapses to one identity and the
-    ///     parameter sites are evidence, not identity (GRAMMAR §4.3).
+    ///     A constructor parameter the rule forbids: <c>Source</c> injects <c>Target</c> through a declared
+    ///     constructor parameter, with every such parameter in <c>Sites</c>. One violation per rule, source
+    ///     and injected type; neither the constructor overload nor the parameter's name makes a difference.
     /// </summary>
     Injection,
 
     /// <summary>
-    ///     A forbidden catch edge (GRAMMAR §4.8): <c>Source</c> catches <c>Target</c> (the caught exception
-    ///     type) in a <c>catch</c> clause, carrying every <c>catch</c> <c>Sites</c>. One per (rule, source,
-    ///     caught) — a bare <c>catch</c> rides as <c>System.Exception</c>, and every catch clause of one caught
-    ///     type within a source collapses to one identity since the sites are evidence, not identity (§4.3).
+    ///     A <c>catch</c> the rule forbids: <c>Source</c> catches <c>Target</c>, with every clause in
+    ///     <c>Sites</c>. A bare <c>catch</c> counts as catching <c>System.Exception</c>. One violation per
+    ///     rule, source and caught type, however many clauses.
     /// </summary>
     Catch,
 
     /// <summary>
-    ///     A non-permitted throw edge (GRAMMAR §4.8): <c>Source</c> throws <c>Target</c> (the thrown exception
-    ///     type) with a <c>throw</c> statement or expression, carrying every <c>throw</c> <c>Sites</c>. One per
-    ///     (rule, source, thrown) — every throw of one type within a source collapses to one identity since the
-    ///     sites are evidence, not identity (GRAMMAR §4.3).
+    ///     A <c>throw</c> the rule forbids, or one it does not permit: <c>Source</c> throws <c>Target</c>,
+    ///     with every <c>throw</c> statement or expression in <c>Sites</c>. One violation per rule, source
+    ///     and thrown type.
     /// </summary>
     Throw,
 
     /// <summary>
-    ///     A forbidden exposure edge (GRAMMAR §4.9): <c>Source</c> exposes <c>Target</c> (the exposed type) in a
-    ///     public signature position, carrying every declaration <c>Sites</c>. One per (rule, source, exposed) —
-    ///     every signature position of one exposed type within a source collapses to one identity since the sites
-    ///     are evidence, not identity (§4.3).
+    ///     A public signature the rule forbids: <c>Source</c> exposes <c>Target</c> in a public signature
+    ///     position, with every such declaration in <c>Sites</c>. One violation per rule, source and exposed
+    ///     type.
     /// </summary>
     Expose,
 
     /// <summary>
-    ///     A subject project failing a packaging or escape verb (GRAMMAR §4.10): <c>SubjectProject</c> with
-    ///     the offending fact's declaration <c>Sites</c> — which may be a props file above the project, and
-    ///     may be empty where the fact has no site to point at. One per (rule, project), except
-    ///     <c>MustReferenceNoPackages</c>, which mints one per declared package reference with
-    ///     <c>Package</c> naming it and the package's own declaration as the site. Those per-package
-    ///     violations deliberately share one identity — the project's — because the law is about the
-    ///     project and a baseline entry blessing it must not have to be re-written each time the package
-    ///     list changes.
+    ///     A project failing a verb about projects: <c>SubjectProject</c> is the project, and <c>Sites</c>
+    ///     points at where the offending fact is declared — which may be a shared props file above the
+    ///     project, and may be empty where the fact has nowhere to point. One violation per rule and project,
+    ///     except <c>MustReferenceNoPackages</c>, which reports one per declared package reference with
+    ///     <c>Package</c> naming it and the package's own declaration as the site.
     /// </summary>
     ProjectShape,
 
-    /// <summary>The subject selection matched no types, so the rule fails by default (GRAMMAR §4.1). Carries <c>Detail</c>.</summary>
+    /// <summary>
+    ///     The rule's subject matched no types at all, which fails the rule rather than passing it
+    ///     vacuously. <c>Detail</c> names what was empty, and <c>Sites</c> is empty.
+    /// </summary>
     EmptySubject,
 
     /// <summary>
-    ///     Evaluation could not proceed (unrepresentable type, closed-generic noun, throwing predicate). Carries
-    ///     <c>Detail</c>.
+    ///     The rule could not be evaluated: a type that cannot be represented, a closed generic where a
+    ///     definition was required, or a predicate that threw. <c>Detail</c> carries the explanation,
+    ///     and <c>Sites</c> is empty.
     /// </summary>
     RuleError
 }

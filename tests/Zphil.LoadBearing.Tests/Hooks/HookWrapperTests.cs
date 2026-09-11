@@ -11,8 +11,9 @@ namespace Zphil.LoadBearing.Tests.Hooks;
 ///     Runs the committed hook wrappers as real child processes and holds them to the contract they
 ///     publish: the exit-code mapping a Claude Code hook depends on (clean → 0 with whatever the check
 ///     wrote passed through on stdout, a red rule → 2 with the report on stderr, LoadBearing's own error →
-///     1 under a <c>loadbearing config error:</c> prefix), the
-///     PostToolUse payload filter that keeps a docs edit from paying for a check, and the working-tree
+///     1 under a <c>loadbearing config error:</c> prefix), the turn-end behaviour a <c>Stop</c> payload
+///     buys — the unchanged-tree skip, the per-prompt round cap, the worktree the session is actually in —
+///     the PostToolUse payload filter that keeps a docs edit from paying for a check, and the working-tree
 ///     guard that spends a check only on the tree the edit actually landed in. A stub <c>loadbearing</c>
 ///     first on <c>PATH</c> supplies the exit code and the output, and records that it ran, so the mapping
 ///     is measured without a workspace load.
@@ -30,8 +31,15 @@ namespace Zphil.LoadBearing.Tests.Hooks;
 ///         <em>by git</em>, and telling those apart is the whole of what the guard does.
 ///     </para>
 ///     <para>
+///         Every row runs with <c>LOADBEARING_HOOK_STATE_DIR</c> inside its own sandbox, so a turn-end
+///         verdict is written where the row can read it back and never into the machine's temp root. The
+///         skip rows are the ones that need a real repository underneath them for a second reason: the
+///         verdict records the HEAD and the changed-code listing it covered, and a skip is exactly the
+///         claim that both still hold.
+///     </para>
+///     <para>
 ///         The <c>sh</c> arm is the gate proper — every CI OS has a POSIX shell, Git Bash supplying it on
-///         Windows. The <c>pwsh</c> arm runs the same twelve cases where PowerShell 7 is installed and
+///         Windows. The <c>pwsh</c> arm runs the same cases where PowerShell 7 is installed and
 ///         skips with a named reason where it is not — the shape that keeps the arm portable across
 ///         machines that have PowerShell 7 and machines that do not.
 ///     </para>
@@ -63,7 +71,7 @@ public sealed class HookWrapperTests
     ///     spend a check has to happen first, so the guards are inside the region the twin gate compares.
     /// </summary>
     private const string ContractRegionStart =
-        "# The PostToolUse payload on stdin names the edited file. Read it once, because stdin does not";
+        "# The hook payload on stdin says which event fired and what it touched. Read it whole and once,";
 
     private const string InvocationPlaceholder = "<invocation>";
 
@@ -272,6 +280,253 @@ public sealed class HookWrapperTests
     [Theory]
     [InlineData(Sh)]
     [InlineData(Pwsh)]
+    public void StopPayload_RedRule_BlocksWithExitTwoAndTheReportOnStderr(string interpreter)
+    {
+        HookSandbox sandbox = Arrange();
+        InitialiseRepository(sandbox);
+        string session = NewSession();
+
+        HookRun run = Fire(interpreter, sandbox, StopPayload(sandbox, session), stubExit: 1);
+
+        // Same 2 the per-edit shape blocks with, and at the turn boundary it means something stronger: the
+        // agent said it was done and the hook refuses the stop, with the report as the reason to keep going.
+        run.Result.ExitCode.ShouldBe(2);
+        run.Result.StandardError.NormalizedLines()
+            .ShouldContain(CannedReport);
+        // Both files are written before the wrapper exits, because the next stop's decisions are theirs: the
+        // verdict is what a skip would have to trust, and the count is what the cap reads.
+        ReadState(sandbox, session, "verdict")
+            .ShouldStartWith("red");
+        ReadState(sandbox, session, "rounds")
+            .Trim()
+            .ShouldBe("p1 1");
+    }
+
+    [Theory]
+    [InlineData(Sh)]
+    [InlineData(Pwsh)]
+    public void StopPayload_CleanRunWithWarnings_PassesTheDocumentThrough(string interpreter)
+    {
+        HookSandbox sandbox = Arrange();
+        InitialiseRepository(sandbox);
+        string session = NewSession();
+
+        HookRun run = Fire(interpreter, sandbox, StopPayload(sandbox, session), stubExit: 0);
+
+        // A tripwire warning has no verdict to change and everything to say. Exit 0 with the document on
+        // stdout is how Claude Code turns it into one continuation of the turn rather than a block.
+        run.Result.ExitCode.ShouldBe(0);
+        run.Result.StandardOutput.NormalizedLines()
+            .ShouldContain(CannedReport);
+        run.Result.StandardError.ShouldBeEmpty();
+        ReadState(sandbox, session, "verdict")
+            .ShouldStartWith("green");
+        // Counted like a block: a continuation is a continuation, and the cap exists to bound them all.
+        ReadState(sandbox, session, "rounds")
+            .Trim()
+            .ShouldBe("p1 1");
+    }
+
+    [Theory]
+    [InlineData(Sh)]
+    [InlineData(Pwsh)]
+    public void StopPayload_CleanSilentRun_StaysSilent(string interpreter)
+    {
+        HookSandbox sandbox = Arrange();
+        InitialiseRepository(sandbox);
+        string session = NewSession();
+
+        HookRun run = Fire(interpreter, sandbox, StopPayload(sandbox, session), stubExit: 0, quiet: true);
+
+        // The everyday turn: the check is clean, the hook says nothing, and the stop stands.
+        run.Result.ExitCode.ShouldBe(0);
+        run.Result.StandardOutput.ShouldBeEmpty();
+        run.Result.StandardError.ShouldBeEmpty();
+        ReadState(sandbox, session, "verdict")
+            .ShouldStartWith("green");
+        File.Exists(StatePath(sandbox, session, "rounds"))
+            .ShouldBeFalse(
+                "A silent green ends the continuations, so the count goes rather than standing to be read "
+                + "by a later prompt that has nothing to do with it.");
+    }
+
+    [Theory]
+    [InlineData(Sh)]
+    [InlineData(Pwsh)]
+    public void StopPayload_UnchangedGreenTree_SkipsTheCheck(string interpreter)
+    {
+        HookSandbox sandbox = Arrange();
+        InitialiseRepository(sandbox);
+        WriteProbe(sandbox);
+        string session = NewSession();
+        string payload = StopPayload(sandbox, session);
+
+        Fire(interpreter, sandbox, payload, stubExit: 0, quiet: true);
+        ShouldHaveRunIn(sandbox.ProjectDirectory, "The first stop has no verdict to trust, so it checks.");
+        File.Delete(Path.Combine(sandbox.ProjectDirectory, Sentinel));
+
+        HookRun second = Fire(interpreter, sandbox, payload, stubExit: 0, quiet: true);
+
+        // The whole reason a question-and-answer turn is free. Nothing about the tree has moved since the
+        // green verdict — same HEAD, same changed-code listing, nothing written since — so there is no
+        // question left for a check to answer, and a hook that ran one anyway would cost the turn a minute.
+        second.Result.ExitCode.ShouldBe(0);
+        second.Result.StandardOutput.ShouldBeEmpty();
+        ShouldNotHaveRunIn(
+            sandbox.ProjectDirectory,
+            "A second stop over an unchanged tree with a green verdict must not spend a check at all.");
+    }
+
+    [Theory]
+    [InlineData(Sh)]
+    [InlineData(Pwsh)]
+    public void StopPayload_EditedTree_ChecksAgain(string interpreter)
+    {
+        HookSandbox sandbox = Arrange();
+        InitialiseRepository(sandbox);
+        string probe = WriteProbe(sandbox);
+        string session = NewSession();
+        string payload = StopPayload(sandbox, session);
+
+        Fire(interpreter, sandbox, payload, stubExit: 0, quiet: true);
+        File.Delete(Path.Combine(sandbox.ProjectDirectory, Sentinel));
+        // An edit to a file already in the listing is invisible to the listing: untracked before, untracked
+        // after. Its timestamp is the only thing that moved, which is why the verdict is compared against
+        // one. Backdated so the two writes cannot land in the same tick of a coarse filesystem clock.
+        Backdate(StatePath(sandbox, session, "verdict"));
+        File.AppendAllText(probe, "\n// edited after the verdict\n");
+
+        Fire(interpreter, sandbox, payload, stubExit: 0, quiet: true);
+
+        ShouldHaveRunIn(
+            sandbox.ProjectDirectory,
+            "A file the verdict covered was written after it, so the verdict no longer speaks for the tree "
+            + "and the check has to run again.");
+    }
+
+    [Theory]
+    [InlineData(Sh)]
+    [InlineData(Pwsh)]
+    public void StopPayload_RedVerdict_NeverSkips(string interpreter)
+    {
+        HookSandbox sandbox = Arrange();
+        InitialiseRepository(sandbox);
+        WriteProbe(sandbox);
+        string session = NewSession();
+        string payload = StopPayload(sandbox, session);
+
+        Fire(interpreter, sandbox, payload, stubExit: 1);
+        File.Delete(Path.Combine(sandbox.ProjectDirectory, Sentinel));
+
+        HookRun second = Fire(interpreter, sandbox, payload, stubExit: 1);
+
+        // The skip is an optimisation over a verdict that was clean. A red one is the state the hook exists
+        // to keep saying out loud, and a tree that has not changed is precisely a tree still carrying it.
+        second.Result.ExitCode.ShouldBe(2);
+        ShouldHaveRunIn(
+            sandbox.ProjectDirectory, "A red verdict is never skipped, however unchanged the tree is.");
+    }
+
+    [Theory]
+    [InlineData(Sh)]
+    [InlineData(Pwsh)]
+    public void StopPayload_AtTheRoundCap_StopsBlocking(string interpreter)
+    {
+        HookSandbox sandbox = Arrange();
+        InitialiseRepository(sandbox);
+        string session = NewSession();
+        string payload = StopPayload(sandbox, session);
+
+        for (var round = 0; round < 3; round++)
+            Fire(interpreter, sandbox, payload, stubExit: 1)
+                .Result.ExitCode.ShouldBe(2, $"Round {round + 1} is inside the cap and still blocks.");
+
+        HookRun capped = Fire(interpreter, sandbox, payload, stubExit: 1);
+
+        // A rule the agent cannot satisfy would otherwise be a loop the user watches. At the cap the hook
+        // says so on stderr and exits 1, which is not a block: the user reads it and the turn ends.
+        capped.Result.ExitCode.ShouldBe(1);
+        capped.Result.StandardError.NormalizedLines()
+            .ShouldStartWith("loadbearing: still red after 3 rounds; not blocking again.");
+        capped.Result.StandardError.NormalizedLines()
+            .ShouldContain(CannedReport);
+
+        HookRun nextPrompt = Fire(interpreter, sandbox, StopPayload(sandbox, session, promptId: "p2"), stubExit: 1);
+
+        // The count is per prompt, so the next thing the user asks for starts with its own three rounds
+        // rather than inheriting a stand-down from the work before it.
+        nextPrompt.Result.ExitCode.ShouldBe(2);
+    }
+
+    [Theory]
+    [InlineData(Sh)]
+    [InlineData(Pwsh)]
+    public void StopPayload_InAWorktreeSession_ChecksTheWorktree(string interpreter)
+    {
+        HookSandbox sandbox = Arrange();
+        InitialiseRepository(sandbox);
+        string worktree = AddLinkedWorktree(sandbox);
+
+        HookRun run = Fire(
+            interpreter, sandbox, StopPayload(sandbox, NewSession(), cwd: worktree), stubExit: 0, quiet: true);
+
+        // The per-edit guard skips a worktree because the edit belongs to a tree the hook does not speak
+        // for. At a stop the worktree *is* the session's tree, so the answer inverts: check it, and check it
+        // there. The config values are root-relative, which is what lets one wrapper serve both trees.
+        run.Result.ExitCode.ShouldBe(0);
+        ShouldHaveRunIn(worktree, "A session inside a linked worktree must have its own tree checked.");
+        ShouldNotHaveRunIn(
+            sandbox.ProjectDirectory,
+            "and checked there — a verdict about the main checkout would be about code this session never "
+            + "touched.");
+    }
+
+    [Theory]
+    [InlineData(Sh)]
+    [InlineData(Pwsh)]
+    public void SubagentStopPayload_BehavesAsStop(string interpreter)
+    {
+        HookSandbox sandbox = Arrange();
+        InitialiseRepository(sandbox);
+        string session = NewSession();
+
+        HookRun run = Fire(
+            interpreter, sandbox, StopPayload(sandbox, session, eventName: "SubagentStop"), stubExit: 1);
+
+        // A worker claiming to be done is the same claim at a smaller scale, and its edits are in the tree
+        // by the time it makes it. One branch serves both events rather than two that could drift.
+        run.Result.ExitCode.ShouldBe(2);
+        run.Result.StandardError.NormalizedLines()
+            .ShouldContain(CannedReport);
+        ReadState(sandbox, session, "verdict")
+            .ShouldStartWith("red");
+    }
+
+    [Theory]
+    [InlineData(Sh)]
+    [InlineData(Pwsh)]
+    public void StopPayload_UnwritableStateDir_HonoursStopHookActive(string interpreter)
+    {
+        HookSandbox sandbox = Arrange();
+        InitialiseRepository(sandbox);
+        // A file where the state root should be: everything under it fails to open, on both interpreters.
+        string blocked = Path.Combine(sandbox.Root, "state-root-is-a-file");
+        File.WriteAllText(blocked, "not a directory");
+
+        HookRun run = Fire(
+            interpreter, sandbox, StopPayload(sandbox, NewSession(), stopHookActive: true), stubExit: 1,
+            stateDirectory: blocked);
+
+        // With nowhere to count rounds the wrapper degrades to the one round the payload itself carries:
+        // stop_hook_active says this hook has already blocked in this turn, so it stands down rather than
+        // blocking a second time on a count it cannot keep.
+        run.Result.ExitCode.ShouldBe(0);
+        run.Result.StandardError.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(Sh)]
+    [InlineData(Pwsh)]
     public void CommittedWrappers_ShareOneContractRegion(string family)
     {
         string[] wrappers = family == Sh ? CommittedShWrappers : CommittedPowerShellWrappers;
@@ -378,7 +633,8 @@ public sealed class HookWrapperTests
         int stubExit,
         string? workingDirectory = null,
         bool withProjectDirectory = true,
-        bool quiet = false)
+        bool quiet = false,
+        string? stateDirectory = null)
     {
         string interpreterPath = ShellInterpreter.Require(interpreter);
         string launchDirectory = workingDirectory ?? sandbox.Root;
@@ -402,6 +658,8 @@ public sealed class HookWrapperTests
         }
 
         startInfo.Environment["PATH"] = ShellInterpreter.PrependedPath(sandbox.StubDirectory);
+        startInfo.Environment["LOADBEARING_HOOK_STATE_DIR"] =
+            ShellInterpreter.Posix(stateDirectory ?? sandbox.StateDirectory);
         startInfo.Environment["STUB_EXIT"] = stubExit.ToString(CultureInfo.InvariantCulture);
         if (quiet) startInfo.Environment["STUB_QUIET"] = "1";
         if (withProjectDirectory)
@@ -429,11 +687,13 @@ public sealed class HookWrapperTests
             .ToString("N"));
         string projectDirectory = Path.Combine(root, "project");
         string stubDirectory = Path.Combine(root, "stub");
+        string stateDirectory = Path.Combine(root, "state");
         Directory.CreateDirectory(projectDirectory);
         Directory.CreateDirectory(stubDirectory);
+        Directory.CreateDirectory(stateDirectory);
         WriteStub(stubDirectory);
 
-        return new HookSandbox(root, projectDirectory, stubDirectory);
+        return new HookSandbox(root, projectDirectory, stubDirectory, stateDirectory);
     }
 
     /// <summary>
@@ -471,6 +731,75 @@ public sealed class HookWrapperTests
 
         // Three dollars, because the payload's own closing braces are the last thing in the literal.
         return $$$"""{"tool_input":{"file_path":"{{{escaped}}}"}}""";
+    }
+
+    /// <summary>
+    ///     A turn-end payload: the five fields the wrapper reads out of a <c>Stop</c> or
+    ///     <c>SubagentStop</c> document, with <paramref name="cwd" /> defaulting to the sandbox's project
+    ///     directory — the session's own tree, which is what the branch resolves the check's tree from.
+    /// </summary>
+    private static string StopPayload(
+        HookSandbox sandbox,
+        string sessionId,
+        string promptId = "p1",
+        bool stopHookActive = false,
+        string eventName = "Stop",
+        string? cwd = null)
+    {
+        string escaped = (cwd ?? sandbox.ProjectDirectory).Replace("\\", "\\\\");
+        string active = stopHookActive ? "true" : "false";
+
+        // Three dollars, because the payload's own closing braces are the last thing in the literal.
+        return $$$"""
+                  {"hook_event_name":"{{{eventName}}}","session_id":"{{{sessionId}}}","prompt_id":"{{{promptId}}}","stop_hook_active":{{{active}}},"cwd":"{{{escaped}}}"}
+                  """;
+    }
+
+    /// <summary>
+    ///     A session id of this row's own, so rows sharing the machine's clock cannot read each other's
+    ///     verdict — the state directory is keyed by session, as a live session's is.
+    /// </summary>
+    private static string NewSession()
+    {
+        return Guid.NewGuid()
+            .ToString("N");
+    }
+
+    private static string StatePath(HookSandbox sandbox, string sessionId, string name)
+    {
+        return Path.Combine(sandbox.StateDirectory, "loadbearing-hook", sessionId, name);
+    }
+
+    private static string ReadState(HookSandbox sandbox, string sessionId, string name)
+    {
+        string path = StatePath(sandbox, sessionId, name);
+        File.Exists(path)
+            .ShouldBeTrue($"The wrapper should have written its {name} file at {path}.");
+
+        return File.ReadAllText(path);
+    }
+
+    /// <summary>
+    ///     An untracked <c>src/Probe.cs</c> in the sandbox: one code file for the changed-code listing to
+    ///     carry, and one timestamp for the skip to compare against.
+    /// </summary>
+    private static string WriteProbe(HookSandbox sandbox)
+    {
+        string probe = Path.Combine(sandbox.ProjectDirectory, "src", "Probe.cs");
+        Directory.CreateDirectory(Path.GetDirectoryName(probe)!);
+        File.WriteAllText(probe, "public sealed class Probe;\n");
+
+        return probe;
+    }
+
+    /// <summary>
+    ///     Pushes <paramref name="path" />'s write time ten seconds into the past, so a write made straight
+    ///     afterwards is unambiguously newer than it whatever the filesystem's timestamp granularity.
+    /// </summary>
+    private static void Backdate(string path)
+    {
+        File.SetLastWriteTimeUtc(path, File.GetLastWriteTimeUtc(path)
+            .AddSeconds(-10));
     }
 
     private static void ShouldHaveRunIn(string directory, string because)
@@ -518,7 +847,11 @@ public sealed class HookWrapperTests
             + "exit /b %STUB_EXIT%\r\n");
     }
 
-    private readonly record struct HookSandbox(string Root, string ProjectDirectory, string StubDirectory);
+    private readonly record struct HookSandbox(
+        string Root,
+        string ProjectDirectory,
+        string StubDirectory,
+        string StateDirectory);
 
     private readonly record struct HookRun(
         ChildProcess.ProcessResult Result,

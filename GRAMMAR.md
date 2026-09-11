@@ -462,13 +462,23 @@ Edge cases, pinned by tests:
 | `MyApp.Legacy*` | `MyApp.Legacy`, `MyApp.LegacyBilling` | `MyApp.Legacy.Billing` |
 | `*` | everything | — |
 
-**Type- and member-name globs** (`WithSuffix`/`WithPrefix`/`WithNameMatching`, their member
-twins, and the naming verbs — §5.2/§5.3/§5.7) share one matcher, distinct from namespace
-patterns and pinned by its own edge-case tests: matching is case-sensitive ordinal; `*`
-matches any run of characters including the empty run (`*Async` matches `Async`); a pattern
-with no `*` is an exact name match; a lone `*` matches every name. Name globs have no
-dot-segment structure and no subtree operator, so §8 item 16 never applies to them — only
-the blank check (item 15) does.
+**Type- and member-name globs** (`WithNameMatching` and `MustHaveNameMatching`, both with their
+member twins — §5.2/§5.3/§5.7) share one matcher, distinct from namespace patterns and pinned by
+its own edge-case tests: matching is case-sensitive ordinal; `*` matches any run of characters
+including the empty run (`*Async` matches `Async`); a pattern with no `*` is an exact name match;
+a lone `*` matches every name.
+
+**Affixes are literal text**, not globs (§5.2/§5.3/§5.7): `WithSuffix`/`WithPrefix`,
+`MustHaveSuffix`/`MustHavePrefix` and their member twins compare the whole argument against the
+end or the start of the simple name, ordinal and case-sensitive, so a `*` in it is a literal.
+Over a codebase declaring `OrderController`, `WithSuffix("*Controller")` selects nothing while
+`WithNameMatching("*Controller")` selects it. The rendered fragment does not show the difference,
+because it synthesizes the glob spelling out of the affix — `MustHaveSuffix("Handler")` renders
+"must be named `*Handler`" (§5.3) — so an affix carrying a `*` of its own renders as a sentence
+that reads like a pattern while matching literally.
+
+Neither kind has dot-segment structure or a subtree operator, so §8 item 16 never applies to
+them; only the blank check (item 15) does, and it covers globs and affixes alike.
 
 **`Named` is the exact form** (§5.2): a name, not a pattern. It is matched ordinal and
 case-sensitive against the whole simple name (a `*` in it is a literal), so the glob semantics
@@ -1136,7 +1146,7 @@ partition. Pinned semantics:
 | `.WithSuffix("Controller")` | "named `*Controller`" |
 | `.WithPrefix("Legacy")` | "named `Legacy*`" |
 | `.WithNameMatching("*Repo*")` | "whose name matches `*Repo*`" |
-| `.Named("Program")` | "named `Program`" — the exact simple name, ordinal (§4.2); "named `A` or `B`" for several. The wildcard-free member of the `WithSuffix`/`WithPrefix` family, whose fragments already say *named* |
+| `.Named("Program")` | "named `Program`" — the exact simple name, ordinal (§4.2); "named `A` or `B`" for several. It belongs to the `WithSuffix`/`WithPrefix` family, whose fragments already say *named*, as the member whose fragment carries no `*`; all three match their argument literally |
 | `.Implementing(typeof(IHandler<>))` / `.Implementing("MyApp.Web.IHandler<T>")` | "implementing `IHandler<T>`" — the string form renders byte-identically (string anchors, below) |
 | `.DerivedFrom(typeof(ControllerBase))` / `.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")` | "derived from `ControllerBase`" |
 | `.AttributedWith(typeof(ApiControllerAttribute))` / `.AttributedWith("ModelContextProtocol.Server.McpServerToolAttribute")` | "attributed with `[ApiController]`" — `Attribute` suffix stripped, bracketed; the string form renders byte-identically (string anchors, below) |
@@ -1703,8 +1713,8 @@ carries its sugar overload too, or the verb silently stops compiling after the s
 3. Missing `Because` on any rule or scope, whichever posture the scope carries.
 4. Missing both `Dragons` and `DragonsDoc` on a scope, quarantined or cautioned; the message names
    the posture.
-5. Blank/whitespace prose anywhere; prose fields are single-line (no `\r`/`\n`, no leading
-   markdown-structural characters — long-form prose links out via `DragonsDoc`). The walk covers
+5. Blank/whitespace prose anywhere; prose fields are single-line (no `\r`/`\n` — long-form prose
+   links out via `DragonsDoc`). The walk covers
    a rule's `Because`, `Fix` and `Citation`, a Migrate's `from:`, a scope's `Dragons` and
    `DragonsDoc`, and every escape-hatch description. A layer's `Purpose` is prose like any other
    and is reported on the layer's spec-wide terms, named by layer and with no location:

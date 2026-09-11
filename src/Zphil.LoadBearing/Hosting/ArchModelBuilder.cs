@@ -8,22 +8,36 @@ using Zphil.LoadBearing.Validation;
 namespace Zphil.LoadBearing.Hosting;
 
 /// <summary>
-///     Finalizes one or more specs into a walkable <see cref="ArchitectureModel" />: mint a fresh
-///     <see cref="Arch" />, run each spec's <see cref="IArchitectureSpec.Define" />, run the whole
-///     validation catalog (throwing an aggregate <see cref="SpecValidationException" /> on any
-///     error), then desugar scopes and project the read model (GRAMMAR §7, §8).
+///     Turns <see cref="IArchitectureSpec" /> implementations into an <see cref="ArchitectureModel" />:
+///     runs each spec's <c>Define</c> against one shared <see cref="Arch" />, reports everything wrong
+///     with the result together, and hands back the finished model. The way in for anything hosting
+///     LoadBearing — the CLI, the test adapter, a tool of your own.
 /// </summary>
 public static class ArchModelBuilder
 {
-    /// <summary>Builds a model from the given specs (one shared <see cref="Arch" />).</summary>
-    /// <exception cref="SpecValidationException">The specs failed one or more validation checks.</exception>
+    /// <summary>
+    ///     Builds the model from the given specs. They share one <see cref="Arch" />, so their rule, scope
+    ///     and layer names must be unique across all of them, and each spec's <c>Define</c> runs in the order
+    ///     given. Nothing is checked against any code here: the result is the spec as data.
+    /// </summary>
+    /// <exception cref="SpecValidationException">
+    ///     Something in the specs is wrong. Every mistake found is in
+    ///     <see cref="SpecValidationException.Errors" />, not only the first.
+    /// </exception>
     public static ArchitectureModel Build(params IArchitectureSpec[] specs)
     {
         return Build((IEnumerable<IArchitectureSpec>)specs);
     }
 
-    /// <summary>Builds a model from the given specs (one shared <see cref="Arch" />).</summary>
-    /// <exception cref="SpecValidationException">The specs failed one or more validation checks.</exception>
+    /// <summary>
+    ///     Builds the model from the given specs. They share one <see cref="Arch" />, so their rule, scope
+    ///     and layer names must be unique across all of them, and each spec's <c>Define</c> runs in the order
+    ///     the sequence yields it. Nothing is checked against any code here: the result is the spec as data.
+    /// </summary>
+    /// <exception cref="SpecValidationException">
+    ///     Something in the specs is wrong. Every mistake found is in
+    ///     <see cref="SpecValidationException.Errors" />, not only the first.
+    /// </exception>
     public static ArchitectureModel Build(IEnumerable<IArchitectureSpec> specs)
     {
         var arch = new Arch();

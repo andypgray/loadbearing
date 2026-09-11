@@ -1,15 +1,14 @@
 namespace Zphil.LoadBearing.Codebase;
 
 /// <summary>
-///     A directed reference edge <c>Source → Target</c>: <see cref="Source" />'s declaration source
-///     binds a name to <see cref="Target" /> as a type or to any member of it (GRAMMAR §4.1).
-///     <see cref="Sites" /> lists the distinct <c>file:line</c> positions where the reference occurs,
-///     deduped by (file, line).
+///     One type referencing another: <see cref="Source" />'s own source names <see cref="Target" /> as a
+///     type, or uses one of its members. Read them from <see cref="CodebaseModel.Edges" />.
 /// </summary>
 /// <remarks>
-///     <see cref="Source" /> and <see cref="Target" /> are the same <see cref="TypeNode" /> instances
-///     held by <see cref="CodebaseModel.Types" /> (reference equality, not just name equality).
-///     Self-edges (source and target the same type) are never produced.
+///     A type never references itself here, and both ends are the very type instances
+///     <see cref="CodebaseModel.Types" /> lists, so compare them by reference rather than by name. Types are
+///     recorded at their definition: source naming <c>IHandler&lt;Order&gt;</c> gives an edge to
+///     <c>IHandler&lt;T&gt;</c> and another to <c>Order</c>, never one to the construction itself.
 /// </remarks>
 public sealed class ReferenceEdge
 {
@@ -20,12 +19,15 @@ public sealed class ReferenceEdge
         Sites = sites;
     }
 
-    /// <summary>The referencing type.</summary>
+    /// <summary>Gets the referencing type.</summary>
     public TypeNode Source { get; }
 
-    /// <summary>The referenced type.</summary>
+    /// <summary>Gets the referenced type.</summary>
     public TypeNode Target { get; }
 
-    /// <summary>The distinct reference sites, ordered by (file, line).</summary>
+    /// <summary>
+    ///     Gets each distinct place the reference occurs, ordered by file then line. Two references to the same
+    ///     target on one line count as one site.
+    /// </summary>
     public IReadOnlyList<SourceLocation> Sites { get; }
 }

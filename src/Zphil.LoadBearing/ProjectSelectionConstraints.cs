@@ -6,25 +6,28 @@ using static Zphil.LoadBearing.Internal.Guard;
 namespace Zphil.LoadBearing;
 
 /// <summary>
-///     The v1 project modal-constraint vocabulary (GRAMMAR §4.10) as extension methods that turn a
-///     <see cref="ProjectSelection" /> into a terminal <see cref="Constraint" />.
+///     The verbs that finish a <see cref="ProjectSelection" /> — the packaging rules: what a project
+///     targets, what it takes from the package feed, whether its restore is pinned, and whether it
+///     ships. Each returns the <see cref="Constraint" /> to hand to <c>Enforce</c> or <c>Migrate</c>.
+///     What they read is what MSBuild evaluation answered after SDK defaults and every import, not
+///     what the project file's own text says, so a setting a shared props file above the project
+///     supplies is a fact these verbs see — and a violation is sited at the declaration that won the
+///     evaluation, regularly that props file rather than the project itself. Every verb passes a
+///     project whose fact nothing evaluated: a rule that failed on an unmeasured project would be
+///     reporting gaps in the load as architecture violations.
 /// </summary>
-/// <remarks>
-///     These are the packaging laws — what a project targets, what it takes from the feed, how its
-///     restore is pinned, and whether it ships — asserted over the artifact facts an evaluation reported
-///     rather than over anything read out of a project file's XML. Polarity is lexical, exactly like the
-///     type-side verbs (GRAMMAR §2), and every verb holds to one honesty rule: a fact nothing evaluated
-///     is <see langword="null" />, and unknown always passes. A rule that reds on an unevaluated project
-///     would be reporting the load's own gaps as architecture violations.
-/// </remarks>
+// Negation lives in the verb name, never in a Not() combinator (GRAMMAR §2), and every verb here
+// holds §4.10's tri-state honesty rule: a fact nothing evaluated is null, and unknown passes.
 public static class ProjectSelectionConstraints
 {
     /// <summary>
-    ///     The subject projects may target only these frameworks — "must target only `netstandard2.0`",
-    ///     or "must target only `netstandard2.0` or `net8.0`" for several. Monikers are compared ordinally
-    ///     against the short forms the model normalizes to (a classic project's <c>v4.8</c> reads
-    ///     <c>net48</c>). A project whose frameworks nothing evaluated passes. The <c>(first, more)</c>
-    ///     shape makes a zero-framework call uncompilable.
+    ///     States that every selected project must target only these frameworks, such as
+    ///     <c>arch.Projects.Packable().MustOnlyTarget("netstandard2.0")</c> or
+    ///     <c>MustOnlyTarget("netstandard2.0", "net8.0")</c>. A project declaring any framework outside
+    ///     the list fails the check. Monikers are compared case-sensitively against the short forms the
+    ///     model normalizes to, so a classic project's <c>v4.8</c> reads <c>net48</c>. A project whose
+    ///     frameworks nothing evaluated passes. At least one moniker is required, and a blank one is
+    ///     reported when the spec is loaded.
     /// </summary>
     public static Constraint MustOnlyTarget(this ProjectSelection subject, string first, params string[] more)
     {
@@ -34,13 +37,12 @@ public static class ProjectSelectionConstraints
     }
 
     /// <summary>
-    ///     The subject projects must declare no <c>PackageReference</c> at all, with one violation per
-    ///     package a project does declare. Deliberately zero-arity: the <c>(first, more)</c> shape exists
-    ///     for the verbs where an empty operand list is meaningless, and here the empty list <em>is</em>
-    ///     the law — so it takes its own verb rather than a list nobody can write. The rendered
-    ///     parenthetical is the honesty boundary: the model holds what a project declares, so packages
-    ///     arriving transitively through a project reference are not seen and this verb does not claim
-    ///     otherwise.
+    ///     States that every selected project must declare no <c>PackageReference</c> at all, such as
+    ///     <c>arch.Projects.Named("MyApp.Domain").MustReferenceNoPackages()</c>. Each package a project
+    ///     declares is one violation, sited at its own declaration, and all of them share the project's
+    ///     identity, so a single baseline entry covers the whole list and does not move when the list
+    ///     does. Only what a project declares itself is seen: a package arriving through a project
+    ///     reference is not, and the rule's sentence in the generated agent context says so.
     /// </summary>
     public static Constraint MustReferenceNoPackages(this ProjectSelection subject)
     {
@@ -48,9 +50,10 @@ public static class ProjectSelectionConstraints
     }
 
     /// <summary>
-    ///     The subject projects' restore must write a lock file
-    ///     (<c>RestorePackagesWithLockFile</c>) — the supply-chain law that keeps a resolved package graph
-    ///     from drifting between machines. A project nothing evaluated passes.
+    ///     States that every selected project's restore must write a lock file — the evaluated
+    ///     <c>RestorePackagesWithLockFile</c> — so a resolved package graph cannot drift between machines.
+    ///     A project that evaluates it false fails the check, and a project whose value nothing evaluated
+    ///     passes.
     /// </summary>
     public static Constraint MustLockPackages(this ProjectSelection subject)
     {
@@ -58,9 +61,10 @@ public static class ProjectSelectionConstraints
     }
 
     /// <summary>
-    ///     The subject projects must not produce a package. The SDK defaults <c>IsPackable</c> on, so this
-    ///     is the verb that makes an internal project's opt-out checkable rather than assumed. A project
-    ///     nothing evaluated passes.
+    ///     States that no selected project may produce a NuGet package — the evaluated
+    ///     <c>IsPackable</c>. The SDK defaults it on, so this is the verb that makes an internal project's
+    ///     opt-out checkable rather than assumed. A project that evaluates it true fails the check, and a
+    ///     project whose value nothing evaluated passes.
     /// </summary>
     public static Constraint MustNotBePackable(this ProjectSelection subject)
     {
@@ -68,9 +72,21 @@ public static class ProjectSelectionConstraints
     }
 
     /// <summary>
-    ///     The project constraint-position escape hatch. The predicate is stored, never evaluated at spec
-    ///     build; the required <paramref name="description" /> completes "must …". A blank description
-    ///     fails spec build (validation §8 item 5).
+    ///     States that every selected project must satisfy a predicate of your own, for what the project verbs
+    ///     cannot say:
+    ///     <c>
+    ///         arch.Projects.Must(p =&gt; p.ProjectReferences.Count &lt;= 3, description:
+    ///         "reference three projects or fewer")
+    ///     </c>
+    ///     . The predicate reads the facts on
+    ///     <see cref="IProjectInfo" /> and runs against each selected project when the check runs, never
+    ///     when the spec is loaded; each project it returns <see langword="false" /> for fails the check,
+    ///     reported without a site, because no one declaration in a project is the one a predicate failed
+    ///     on. A fact nothing evaluated is <see langword="null" /> there, so a predicate that reads null
+    ///     as false asserts something nothing measured. <paramref name="description" /> is required and
+    ///     completes the phrase "must ..." as a bare-infinitive verb phrase; it is rendered verbatim in
+    ///     the generated agent context and in the check report, and nothing checks that it describes what
+    ///     the predicate does. A blank or multi-line description is reported when the spec is loaded.
     /// </summary>
     public static Constraint Must(
         this ProjectSelection subject, Func<IProjectInfo, bool> predicate, string description)

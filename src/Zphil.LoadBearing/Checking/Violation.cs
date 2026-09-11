@@ -4,18 +4,21 @@ using Zphil.LoadBearing.Codebase;
 namespace Zphil.LoadBearing.Checking;
 
 /// <summary>
-///     One concrete way a rule is broken (GRAMMAR §4.3). <see cref="Kind" /> governs which of the
-///     nullable slots are populated — <see cref="ViolationKind" /> documents the mapping per kind.
+///     One concrete way a rule was broken: a reference between two types, a use of a banned member, a
+///     type, member or project of the wrong shape, a subject that matched nothing, or an error that
+///     stopped the rule being evaluated. <see cref="Kind" /> says which, and therefore which of the
+///     properties below carry a value and which are null; <see cref="Sites" /> carries the source
+///     positions that evidence it. A rule's failing violations are in
+///     <see cref="RuleResult.Violations" /> and its tolerated ones in
+///     <see cref="RuleResult.Grandfathered" />.
 /// </summary>
-/// <remarks>
-///     The constructor takes only what every violation has — its kind and its evidence — and each factory
-///     below names the slots its own kind populates, through an object initializer. That is why the slots
-///     carry a private setter rather than being get-only: <c>init</c> is unavailable on this target
-///     framework (no <c>IsExternalInit</c>), and every factory is a member of this class, so the setters
-///     reach exactly as far as they must and a violation is read-only to every consumer. A new slot
-///     therefore touches no existing factory, and no factory threads a run of nulls past slots of the
-///     same type where a transposition would compile.
-/// </remarks>
+// The constructor takes only what every violation has — its kind and its evidence — and each factory
+// below names the slots its own kind populates, through an object initializer. That is why the slots
+// carry a private setter rather than being get-only: init is unavailable on this target framework (no
+// IsExternalInit), and every factory is a member of this class, so the setters reach exactly as far
+// as they must and a violation is read-only to every consumer. A new slot therefore touches no
+// existing factory, and no factory threads a run of nulls past slots of the same type where a
+// transposition would compile.
 public sealed class Violation
 {
     private Violation(ViolationKind kind, IReadOnlyList<SourceLocation> sites)
@@ -24,51 +27,61 @@ public sealed class Violation
         Sites = sites;
     }
 
-    /// <summary>The violation kind.</summary>
+    /// <summary>Gets what kind of violation this is, and so which of the properties below carry a value.</summary>
     public ViolationKind Kind { get; }
 
     /// <summary>
-    ///     The referencing type (Reference kind — for the inbound verbs this is where the edit happens), the
-    ///     constructing type (Construction kind), the injecting type (Injection kind), the catching type
-    ///     (Catch kind), the throwing type (Throw kind), or the exposing type (Expose kind).
+    ///     Gets the type at the near end of the offending edge: the one that references, constructs,
+    ///     injects, catches, throws or exposes, depending on <see cref="Kind" />. This is where the edit
+    ///     goes, for the inbound verbs as much as the outbound ones. Null for every kind that is not an
+    ///     edge.
     /// </summary>
     public TypeNode? Source { get; private set; }
 
     /// <summary>
-    ///     The referenced type (Reference kind), the constructed type (Construction kind), the injected
-    ///     parameter type (Injection kind), the caught exception type (Catch kind), the thrown exception
-    ///     type (Throw kind), or the exposed type (Expose kind).
+    ///     Gets the type at the far end of the offending edge: the referenced type, the constructed type,
+    ///     the injected parameter type, the caught or the thrown exception type, or the exposed type,
+    ///     depending on <see cref="Kind" />. Null for every kind that is not an edge.
     /// </summary>
     public TypeNode? Target { get; private set; }
 
-    /// <summary>The offending subject type (Shape kind).</summary>
+    /// <summary>
+    ///     Gets the type that failed a verb about the type itself (its shape, its name, what it inherits
+    ///     or is attributed with, where it lives, or a <c>Must</c> predicate); null for every other kind.
+    /// </summary>
     public TypeNode? Subject { get; private set; }
 
-    /// <summary>The banned member the source used (MemberUse kind); null otherwise.</summary>
+    /// <summary>Gets the banned member the source used; null for every kind but a member use.</summary>
     public MemberReference? Member { get; private set; }
 
-    /// <summary>The offending declared member (MemberShape kind); null otherwise.</summary>
+    /// <summary>Gets the declared member that failed a member rule; null for every other kind.</summary>
     public MemberNode? SubjectMember { get; private set; }
 
-    /// <summary>The offending subject project (ProjectShape kind, GRAMMAR §4.10); null otherwise.</summary>
+    /// <summary>Gets the project that failed a packaging or targeting rule; null for every other kind.</summary>
     public ProjectNode? SubjectProject { get; private set; }
 
     /// <summary>
-    ///     The offending declared package reference — populated only by the per-package
-    ///     <c>MustReferenceNoPackages</c> violations, and null on every other ProjectShape and every other
-    ///     kind. Its presence is what parts "this project is wrong" from "this project declares this
-    ///     package".
+    ///     Gets the declared package reference that counts against the rule. Populated only by the
+    ///     per-package violations of <c>MustReferenceNoPackages</c>, one for each package the project
+    ///     declares, and null on every other project violation and every other kind: its presence is what
+    ///     parts "this project is wrong" from "this project declares this package".
     /// </summary>
     public PackageReference? Package { get; private set; }
 
-    /// <summary>The reference or declaration sites carrying the violation; empty for EmptySubject/RuleError.</summary>
+    /// <summary>
+    ///     Gets the source positions that evidence the violation: the sites of the offending edge, or the
+    ///     declarations of the offending type, member or project fact. For a project fact that is the
+    ///     declaration that won the build's evaluation, regularly a props file above the project file, and
+    ///     the project file itself where nothing declared the property. Empty when the subject matched
+    ///     nothing and when the rule errored, neither of which has anywhere to point.
+    /// </summary>
     public IReadOnlyList<SourceLocation> Sites { get; }
 
     /// <summary>
-    ///     Free text for EmptySubject/RuleError; on a Reference violation minted by the
-    ///     circular-references verb, the circle the pair lies on ("circular references among the A and B
-    ///     layers"), which the JSON channel alone reads — never the human report and never SARIF; null
-    ///     otherwise.
+    ///     Gets the explanatory text of a violation that has no code to point at: why the subject matched
+    ///     nothing, or what stopped the rule being evaluated. On a reference violation from
+    ///     <c>MustNotHaveCircularReferences</c> it instead names the circle the pair lies on ("circular
+    ///     references among the A and B layers"), which <c>--json</c> output alone prints. Null otherwise.
     /// </summary>
     public string? Detail { get; private set; }
 
@@ -106,16 +119,21 @@ public sealed class Violation
         }
     }
 
-    /// <summary>This violation's stable baseline identity (GRAMMAR §4.3).</summary>
+    /// <summary>
+    ///     Returns the entry that identifies this violation in a baseline file — what decides whether a
+    ///     captured baseline grandfathers it — or null for a violation no baseline can ever hold.
+    /// </summary>
     /// <remarks>
-    ///     An edge key for the dependency kinds — (<see cref="Source" />, <see cref="Target" />) symbol
-    ///     IDs, or (<see cref="Source" /> symbol ID, <see cref="Member" />'s member DocId) for a
-    ///     MemberUse — and a subject key for a Shape (<see cref="Subject" />) or a MemberShape
-    ///     (<see cref="SubjectMember" />'s member DocId, GRAMMAR §4.6). Each kind's collapse rule — why
-    ///     every overload, parameter, catch clause, throw or signature position of one type pair shares
-    ///     a single identity — is documented on <see cref="ViolationKind" />.
-    ///     <see cref="ViolationKind.EmptySubject" /> and <see cref="ViolationKind.RuleError" /> have no
-    ///     stable identity and return null, so they can never be grandfathered.
+    ///     An edge key for the edge kinds, pairing <see cref="Source" />'s symbol ID with
+    ///     <see cref="Target" />'s, or with <see cref="Member" />'s for a banned member use. A subject key
+    ///     otherwise: <see cref="Subject" />'s symbol ID for a type, <see cref="SubjectMember" />'s for a
+    ///     member, and <see cref="SubjectProject" />'s for a project — so all of one project's per-package
+    ///     violations share the single entry that blesses the project, and the entry survives the package
+    ///     list changing. Every overload, parameter, catch clause, throw and signature position of one pair
+    ///     rides under one identity, its sites being evidence rather than identity; an edge entry also
+    ///     records how many sites it covered when it was captured, and a pair that has since grown past that
+    ///     count fails the rule instead of being grandfathered. Null for a subject that matched nothing and
+    ///     for a rule that errored: those have no stable identity.
     /// </remarks>
     public BaselineEntry? BaselineIdentity()
     {

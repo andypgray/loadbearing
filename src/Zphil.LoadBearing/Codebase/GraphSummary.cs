@@ -6,12 +6,13 @@ namespace Zphil.LoadBearing.Codebase;
 // netstandard2.0 TFM; see Zphil.LoadBearing.csproj). Every list is ordinal-ordered for reproducibility.
 
 /// <summary>
-///     The extracted codebase, summarized for onboarding: its projects with their namespace inventories,
-///     the observed cross-project reference edges, the external references grouped by namespace root, and
-///     the types more than one project declares — the deterministic pre-spec survey the derive flow orients
-///     on. Produced by <see cref="GraphSummarizer" /> over a <see cref="CodebaseModel" />. Grouped counts
-///     only, never per-site dumps (the minimal-token posture; sites arrive later from <c>check</c> on
-///     drafted rules).
+///     A survey of an extracted codebase, needing no architecture spec: the projects with their namespace
+///     inventories, the reference edges observed between them, the external references grouped by
+///     namespace root, and the names more than one place declares. Produced by
+///     <see cref="GraphSummarizer" /> over a <see cref="CodebaseModel" />, and what the CLI's <c>graph</c>
+///     verb prints and <c>graph --json</c> serializes — what to read when orienting on an unfamiliar
+///     solution or working out which rules are worth writing. Grouped counts only: no list of sites
+///     appears here, and the sites arrive from <c>check</c> once a rule names them.
 /// </summary>
 public sealed class GraphSummary
 {
@@ -29,36 +30,45 @@ public sealed class GraphSummary
         ShadowedTypes = shadowedTypes;
     }
 
-    /// <summary>The projects, ordered by name (ordinal) — the <see cref="CodebaseModel.Projects" /> order.</summary>
+    /// <summary>
+    ///     Gets the surveyed projects, ordered by name (ordinal).
+    /// </summary>
     public IReadOnlyList<ProjectSummary> Projects { get; }
 
-    /// <summary>The observed cross-project reference edges, ordered by (source, target) (ordinal).</summary>
+    /// <summary>
+    ///     Gets the reference edges observed between projects, ordered by (source, target) (ordinal). These are the
+    ///     references the code actually makes, which is not the same list as the references the projects declare.
+    /// </summary>
     public IReadOnlyList<ProjectEdgeSummary> ProjectEdges { get; }
 
-    /// <summary>The external references grouped by namespace root, ordered by (source, root) (ordinal).</summary>
+    /// <summary>
+    ///     Gets the references out to types no project of the solution declares, grouped by namespace root and ordered
+    ///     by (source, root) (ordinal).
+    /// </summary>
     public IReadOnlyList<ExternalEdgeSummary> ExternalEdges { get; }
 
     /// <summary>
-    ///     The types more than one project declares, ordered by full name (ordinal), and empty for the
-    ///     overwhelming common case — the survey's coverage statement about its own project attribution.
+    ///     Gets the types more than one project declares, ordered by full name (ordinal). Empty in the common case, and
+    ///     reading it is how you know whether the per-project figures above can be taken at face value.
     /// </summary>
     public IReadOnlyList<MultiplyDeclaredTypeSummary> MultiplyDeclaredTypes { get; }
 
     /// <summary>
-    ///     The full names a project declares that a referenced assembly also supplies, ordered by full name
-    ///     (ordinal), and empty for the overwhelming common case — the survey's coverage statement about the
-    ///     one place a name does not identify a type.
+    ///     Gets the full names a project declares that a referenced assembly also supplies, ordered by full name
+    ///     (ordinal). Empty in the common case, and the one place in the survey where a name does not identify a single
+    ///     type.
     /// </summary>
     public IReadOnlyList<ShadowedTypeSummary> ShadowedTypes { get; }
 }
 
 /// <summary>
-///     One project in the survey: its name, whether the solution declares it, its declared forward project
-///     references (verbatim from the <see cref="ProjectNode" />), the count of its solution-declared types,
-///     how many of those a generator emitted, its namespace inventory, and — for a multi-targeted project —
-///     the frameworks it was extracted from and the one its shared types' facts came from. Comparing
-///     <see cref="ProjectReferences" /> against the <see cref="GraphSummary.ProjectEdges" /> surfaces
-///     declared-but-unobserved references (the dead-reference signal).
+///     One project in the survey: its name, whether the solution declares it, the project references it
+///     declares, how many types it declares and how many of those a generator emitted, its namespace
+///     inventory, the packages it declares, whether it packs and locks its restore, and — for a project
+///     that compiles once per framework — the frameworks it was extracted from and the one its shared
+///     types' facts came from. Comparing <see cref="ProjectReferences" /> against
+///     <see cref="GraphSummary.ProjectEdges" /> is how a reference that is declared but never used shows
+///     up.
 /// </summary>
 public sealed class ProjectSummary
 {
@@ -88,72 +98,75 @@ public sealed class ProjectSummary
         LocksPackages = locksPackages;
     }
 
-    /// <summary>The project (assembly) name.</summary>
+    /// <summary>
+    ///     Gets the project (assembly) name.
+    /// </summary>
     public string Name { get; }
 
-    /// <summary>The names of the projects this project declares a reference to, ordinal-ordered.</summary>
+    /// <summary>
+    ///     Gets the names of the projects this project declares a reference to, ordinal-ordered.
+    /// </summary>
     public IReadOnlyList<string> ProjectReferences { get; }
 
-    /// <summary>The count of this project's solution-declared (non-external) types.</summary>
+    /// <summary>
+    ///     Gets the count of this project's solution-declared (non-external) types.
+    /// </summary>
     public int Types { get; }
 
     /// <summary>
-    ///     How many of <see cref="Types" /> a generator emitted (<see cref="ITypeInfo.IsGenerated" />) — a
-    ///     subset of that count, never a separate population. It is the survey's answer to what a
-    ///     project-anchored subject would sweep before a rule is written: a project whose two counts are
-    ///     close is one where <c>arch.Project(…)</c> aims most of a rule at code nobody can fix, and
-    ///     <c>.Authored()</c> is the narrowing that says so.
+    ///     Gets how many of <see cref="Types" /> a generator emitted (<see cref="ITypeInfo.IsGenerated" />), a subset
+    ///     of that count, never a separate population. A project whose two counts are close is one where
+    ///     <c>arch.Project(…)</c> would aim most of a rule at code nobody can edit, and <c>Authored()</c> is the
+    ///     narrowing that leaves it out.
     /// </summary>
     public int Generated { get; }
 
-    /// <summary>The distinct namespaces of this project's declared types with per-namespace counts, ordinal by namespace.</summary>
+    /// <summary>
+    ///     Gets the distinct namespaces of this project's declared types with a count for each, ordinal by namespace.
+    /// </summary>
     public IReadOnlyList<NamespaceCount> Namespaces { get; }
 
     /// <summary>
-    ///     <see cref="ProjectNode.SolutionMember" /> verbatim: whether the solution declares this project,
-    ///     <see langword="false" /> for a passenger a reference edge dragged in, <see langword="null" /> when
-    ///     membership was not read. The survey is where a passenger is meant to be investigated, so it is
-    ///     reported here rather than filtered out.
+    ///     Gets whether the solution declares this project, <see langword="false" /> for one a reference edge dragged
+    ///     in rather than the solution naming it, or <see langword="null" /> when membership was not read. Such a
+    ///     passenger is reported rather than filtered out: the survey is where it is meant to be noticed.
     /// </summary>
     public bool? SolutionMember { get; }
 
     /// <summary>
-    ///     <see cref="ProjectNode.TargetFrameworks" /> verbatim: every framework this project declares,
-    ///     ordinal-ordered and normalized to the short moniker. Empty only where nothing was evaluated to
-    ///     answer with.
+    ///     Gets every framework this project declares, ordinal-ordered and normalized to the short moniker
+    ///     (<c>net48</c>, <c>net8.0</c>). Empty only where nothing was evaluated to answer with.
     /// </summary>
     public IReadOnlyList<string> TargetFrameworks { get; }
 
     /// <summary>
-    ///     <see cref="ProjectNode.FactsFollow" /> verbatim: the framework whose facts this project's shared
-    ///     types carry, or <see langword="null" /> when its frameworks share no type. It is the survey's
-    ///     answer to what a rule anchored on this project is actually checked against — one compilation of
-    ///     several, with every other framework's conditional code outside the model.
+    ///     Gets the framework whose facts this project's shared types carry, or <see langword="null" /> when its
+    ///     frameworks collapsed no type. It says what a rule about this project is actually checked against: one
+    ///     compilation of several, with every other framework's conditional code outside the model.
     /// </summary>
     public string? FactsFollow { get; }
 
     /// <summary>
-    ///     The names of the packages this project declares, ordinal-ordered — the declaration sites the
-    ///     model holds are dropped here, on the survey's grouped-counts posture, and arrive from
-    ///     <c>check</c> once a rule names them.
+    ///     Gets the names of the packages this project declares, ordinal-ordered. Names alone, the survey being grouped
+    ///     counts throughout; <see cref="ProjectNode.PackageReferences" /> carries the <c>file:line</c> each was
+    ///     declared at.
     /// </summary>
     public IReadOnlyList<string> PackageReferences { get; }
 
     /// <summary>
-    ///     <see cref="ProjectNode.IsPackable" /> verbatim: whether the project produces a package, or
-    ///     <see langword="null" /> where there is no answer. The survey is where the four projects a
-    ///     solution actually ships are told apart from the many that merely compile.
+    ///     Gets whether the project produces a package, or <see langword="null" /> where there is no answer. This is
+    ///     where the handful of projects a solution actually ships are told apart from the many that merely compile.
     /// </summary>
     public bool? IsPackable { get; }
 
     /// <summary>
-    ///     <see cref="ProjectNode.LocksPackages" /> verbatim: whether restoring this project writes a lock
-    ///     file, or <see langword="null" /> where nothing evaluated it.
+    ///     Gets whether restoring this project writes a lock file, or <see langword="null" /> where nothing evaluated
+    ///     it.
     /// </summary>
     public bool? LocksPackages { get; }
 }
 
-/// <summary>A namespace and the number of a project's solution-declared types that reside in it.</summary>
+/// <summary>A namespace and how many of a project's declared types reside in it.</summary>
 public sealed class NamespaceCount
 {
     internal NamespaceCount(string @namespace, int types, int generated)
@@ -163,25 +176,28 @@ public sealed class NamespaceCount
         Generated = generated;
     }
 
-    /// <summary>The namespace; the empty/global namespace renders as <c>(global)</c>.</summary>
+    /// <summary>
+    ///     Gets the namespace; the global namespace renders as <c>(global)</c>.
+    /// </summary>
     public string Namespace { get; }
 
-    /// <summary>The count of the project's declared types in this namespace.</summary>
+    /// <summary>
+    ///     Gets the count of the project's declared types in this namespace.
+    /// </summary>
     public int Types { get; }
 
     /// <summary>
-    ///     How many of <see cref="Types" /> a generator emitted — a subset of that count. A namespace where
-    ///     the two are equal is wholly generator output, which is the shape that must never become a layer
-    ///     glob: a compiled view tier collects under one namespace nobody typed.
+    ///     Gets how many of <see cref="Types" /> a generator emitted — a subset of that count. A namespace where the
+    ///     two are equal is wholly generator output, which is the shape that must never become a layer glob: a compiled
+    ///     view tier collects under one namespace nobody typed.
     /// </summary>
     public int Generated { get; }
 }
 
 /// <summary>
-///     An observed cross-project reference edge, grouped source-project → target-project.
-///     <see cref="References" /> counts the distinct type-pairs (each <see cref="ReferenceEdge" /> is one
-///     source-type → target-type pair). Same-project edges are deliberately excluded — the survey drives
-///     cross-boundary rules, where a same-project reference is never a violation candidate.
+///     A reference edge observed from one project into another, with the number of distinct type pairs
+///     behind it. References within a single project are left out; the survey is about the crossings
+///     between projects, which is what a layering or boundary rule is written about.
 /// </summary>
 public sealed class ProjectEdgeSummary
 {
@@ -192,22 +208,27 @@ public sealed class ProjectEdgeSummary
         References = references;
     }
 
-    /// <summary>The referencing project.</summary>
+    /// <summary>
+    ///     Gets the referencing project.
+    /// </summary>
     public string Source { get; }
 
-    /// <summary>The referenced project (never external).</summary>
+    /// <summary>
+    ///     Gets the referenced project (never external).
+    /// </summary>
     public string Target { get; }
 
-    /// <summary>The number of distinct type-pairs observed from <see cref="Source" /> into <see cref="Target" />.</summary>
+    /// <summary>
+    ///     Gets the number of distinct type-pairs observed from <see cref="Source" /> into <see cref="Target" />.
+    /// </summary>
     public int References { get; }
 }
 
 /// <summary>
-///     One type that several projects declare — a single source file compiled into more than one of them
-///     (a linked <c>&lt;Compile Include&gt;</c>, shared source, a polyfill). <c>arch.Project</c> named on
-///     any declarer selects it, but extraction attributes its facts to the first declarer — so this is what
-///     a rule author needs <em>before</em> anchoring a subject on a project: whose compilation a rule over
-///     this type answers from.
+///     One type that several projects declare — a single source file compiled into more than one of them:
+///     a linked <c>&lt;Compile Include&gt;</c>, shared source, a polyfill. <c>arch.Project</c> named on
+///     any declarer selects it, but its facts come from the first declarer alone, so this is what to read
+///     before writing a rule about a project: whose compilation a rule over this type answers from.
 /// </summary>
 public sealed class MultiplyDeclaredTypeSummary
 {
@@ -218,30 +239,32 @@ public sealed class MultiplyDeclaredTypeSummary
         FactsFollow = factsFollow;
     }
 
-    /// <summary>The type's fully-qualified name.</summary>
+    /// <summary>
+    ///     Gets the type's fully-qualified name.
+    /// </summary>
     public string Type { get; }
 
     /// <summary>
-    ///     Every project that declares it, ordinal-ordered — <see cref="FactsFollow" /> among them, so the
-    ///     entry reads as the whole roster rather than as the losers alone.
+    ///     Gets every project that declares it, ordinal-ordered, <see cref="FactsFollow" /> among them: the whole
+    ///     roster, not only the declarers whose facts were displaced.
     /// </summary>
     public IReadOnlyList<string> DeclaredBy { get; }
 
     /// <summary>
-    ///     The declarer whose facts and project attribution the type carries (the first declarer). Every
-    ///     name in <see cref="DeclaredBy" /> selects it; this is the one whose compilation its facts
-    ///     answer from.
+    ///     Gets the declarer whose facts and project attribution the type carries: the first one. Every name in
+    ///     <see cref="DeclaredBy" /> selects the type, but this is the project whose compilation its edges, members and
+    ///     hierarchy answer from.
     /// </summary>
     public string FactsFollow { get; }
 }
 
 /// <summary>
-///     One full name that means two different types: a project declares it, and a referenced assembly no
-///     project of this solution produces supplies it too — a stand-in declared under a package's own
-///     namespace, or a polyfill under a BCL one. Both are in the model, and each reference reaches whichever
-///     the referencing project actually bound, so this is what a rule author needs before writing a rule
-///     about the name: an <c>arch.Project</c> selection over <see cref="DeclaredBy" /> reaches the declared
-///     one alone, while a rule naming the type reaches both.
+///     One full name that means two different types: a project declares it, and an assembly no project of
+///     this solution produces supplies it too — a stand-in written under a package's own namespace, a
+///     polyfill under a framework one. Both are in the model, and each reference reaches whichever one the
+///     referencing project actually bound, so read this before writing a rule about the name: an
+///     <c>arch.Project</c> selection over <see cref="DeclaredBy" /> reaches the declared type alone, while
+///     a rule naming the type reaches both.
 /// </summary>
 public sealed class ShadowedTypeSummary
 {
@@ -254,28 +277,34 @@ public sealed class ShadowedTypeSummary
         BoundFromAssemblyBy = boundFromAssemblyBy;
     }
 
-    /// <summary>The shared fully-qualified name.</summary>
+    /// <summary>
+    ///     Gets the shared fully-qualified name.
+    /// </summary>
     public string Type { get; }
 
-    /// <summary>The project that declares it in source.</summary>
+    /// <summary>
+    ///     Gets the project that declares it in source.
+    /// </summary>
     public string DeclaredBy { get; }
 
-    /// <summary>The referenced assemblies supplying the same name, ordinal-ordered.</summary>
+    /// <summary>
+    ///     Gets the referenced assemblies supplying the same name, ordinal-ordered.
+    /// </summary>
     public IReadOnlyList<string> SuppliedBy { get; }
 
     /// <summary>
-    ///     The projects whose references reach the assembly's type rather than the declaration,
-    ///     ordinal-ordered — the half that makes the entry readable on its own, and the reason a scoped
-    ///     survey keeps an entry whose declarer is out of scope.
+    ///     Gets the projects whose references reach the assembly's type rather than the declaration, ordinal-ordered:
+    ///     the half that says whom the split costs, and the reason a survey narrowed to some projects keeps an entry
+    ///     whose declarer is outside them.
     /// </summary>
     public IReadOnlyList<string> BoundFromAssemblyBy { get; }
 }
 
 /// <summary>
-///     An external reference, grouped source-project → external namespace root (the first two dot-segments
-///     of the target's namespace, e.g. <c>System.Data</c>). <see cref="References" /> counts the distinct
-///     type-pairs into that root — the dangerous-external shortlist evidence, collapsed so a large BCL
-///     surface reviews as a handful of roots instead of a per-type dump.
+///     The references from one project out to types under one external namespace root — the first two
+///     dot-segments of the target's namespace, such as <c>System.Data</c> — with the number of distinct
+///     type pairs behind them. Grouping this way is what lets a large framework surface review as a
+///     handful of roots instead of a per-type list.
 /// </summary>
 public sealed class ExternalEdgeSummary
 {
@@ -286,15 +315,19 @@ public sealed class ExternalEdgeSummary
         References = references;
     }
 
-    /// <summary>The referencing project.</summary>
+    /// <summary>
+    ///     Gets the referencing project.
+    /// </summary>
     public string Source { get; }
 
     /// <summary>
-    ///     The first two dot-segments of the external target's namespace (one segment → that segment; empty →
-    ///     <c>(global)</c>).
+    ///     Gets the first two dot-segments of the external target's namespace; a one-segment namespace gives that
+    ///     segment, and the global namespace gives <c>(global)</c>.
     /// </summary>
     public string TargetNamespaceRoot { get; }
 
-    /// <summary>The number of distinct type-pairs observed from <see cref="Source" /> into this namespace root.</summary>
+    /// <summary>
+    ///     Gets the number of distinct type-pairs observed from <see cref="Source" /> into this namespace root.
+    /// </summary>
     public int References { get; }
 }

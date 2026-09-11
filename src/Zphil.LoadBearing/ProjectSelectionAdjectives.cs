@@ -6,24 +6,24 @@ using static Zphil.LoadBearing.Internal.Guard;
 namespace Zphil.LoadBearing;
 
 /// <summary>
-///     The v1 project-adjective vocabulary (GRAMMAR §4.10) as extension methods on
-///     <see cref="ProjectSelection" />.
+///     The adjectives that narrow a <see cref="ProjectSelection" /> — the solution's projects as build
+///     artifacts, from <c>arch.Projects</c>. Each returns a new selection carrying one more condition
+///     and leaves the original untouched, so one selection can be assigned to a variable and refined
+///     in several directions. Finish with a project verb such as <c>MustOnlyTarget</c>,
+///     <c>MustReferenceNoPackages</c>, <c>MustLockPackages</c> or <c>MustNotBePackable</c>.
 /// </summary>
-/// <remarks>
-///     Each appends one closed-vocabulary adjective and returns a fresh selection carrying the same
-///     <see cref="Arch" /> owner. Project selections are immutable values; each call yields a new one, so
-///     a selection can be reused and refined in different directions. These bind by receiver type — a
-///     <see cref="ProjectSelection" /> is neither a <see cref="Selection" /> nor a
-///     <see cref="MemberSelection" /> — so the identically-named type- and member-side adjectives never
-///     collide on overload resolution.
-/// </remarks>
+// These bind by receiver type — a ProjectSelection is neither a Selection nor a MemberSelection — so
+// the identically-named type- and member-side adjectives never collide on overload resolution
+// (GRAMMAR §4.10).
 public static class ProjectSelectionAdjectives
 {
     /// <summary>
-    ///     Narrows to the projects named exactly, substituting the subject head: "project
-    ///     `Zphil.LoadBearing`", or "projects `A` or `B`" for several. Ordinal, case-sensitive — a project
-    ///     name is an identifier the solution declares, so <see cref="Matching" /> is the glob form beside
-    ///     this one. The <c>(first, more)</c> shape makes a zero-name call uncompilable.
+    ///     Narrows the selection to the projects with exactly these names, such as
+    ///     <c>arch.Projects.Named("MyApp.Web")</c> or
+    ///     <c>arch.Projects.Named("MyApp.Web", "MyApp.Api")</c>, which keeps the projects carrying either
+    ///     name. The name is the one the solution lists, compared case-sensitively and taken literally, so
+    ///     a <c>*</c> in it is a literal character; <see cref="Matching" /> is the glob form beside this
+    ///     one. At least one name is required, and a blank one is reported when the spec is loaded.
     /// </summary>
     public static ProjectSelection Named(this ProjectSelection selection, string first, params string[] more)
     {
@@ -33,9 +33,12 @@ public static class ProjectSelectionAdjectives
     }
 
     /// <summary>
-    ///     Narrows to the projects whose name matches a glob: " matching `Zphil.*`", or-joined for
-    ///     several. <c>*</c> matches any run of characters; every other character is an ordinal match, and
-    ///     a project name is one token with no dot-segment structure.
+    ///     Narrows the selection to the projects whose name matches a glob, such as
+    ///     <c>arch.Projects.Matching("MyApp.Plugins.*")</c>; several globs keep the projects matching any
+    ///     one of them. Matching is case-sensitive: <c>*</c> matches any run of characters including none,
+    ///     and every other character matches itself. A project name is one token, so a <c>*</c> crosses
+    ///     dots freely and there is no subtree operator of the kind a namespace glob has. At least one
+    ///     glob is required, and a blank one is reported when the spec is loaded.
     /// </summary>
     public static ProjectSelection Matching(this ProjectSelection selection, string glob, params string[] more)
     {
@@ -45,9 +48,12 @@ public static class ProjectSelectionAdjectives
     }
 
     /// <summary>
-    ///     Narrows to the projects that produce a package, premodifying the subject head: "packable
-    ///     projects" (GRAMMAR §4.10, §6). Known-true only — a project whose <c>IsPackable</c> nothing
-    ///     evaluated is not admitted, because unknown is not a claim either way.
+    ///     Narrows the selection to the projects that produce a NuGet package, such as
+    ///     <c>arch.Projects.Packable()</c>. Packability is the evaluated <c>IsPackable</c> value, read
+    ///     after SDK defaults and every import rather than out of the project file's text. A project whose
+    ///     value nothing evaluated is left out, unknown being no claim either way — the opposite direction
+    ///     from the project verbs, which pass what they do not know, so a rule over packable projects
+    ///     speaks about measured projects alone.
     /// </summary>
     public static ProjectSelection Packable(this ProjectSelection selection)
     {
@@ -55,8 +61,11 @@ public static class ProjectSelectionAdjectives
     }
 
     /// <summary>
-    ///     Excludes another project selection; canonicalized to sentence-final, after any <c>Where</c> on
-    ///     the same selection (GRAMMAR §6).
+    ///     Narrows the selection by removing the projects another project selection names, such as
+    ///     <c>arch.Projects.Matching("MyApp.*").Except(arch.Projects.Named("MyApp.Tests"))</c>. One
+    ///     exclusion, not a list: to exclude several projects, give the exclusion several names
+    ///     (<c>Named("A", "B")</c>) or a glob. The exclusion is rendered last in the rule's sentence in
+    ///     the generated agent context, after any <see cref="Where" /> on the same selection.
     /// </summary>
     public static ProjectSelection Except(this ProjectSelection selection, ProjectSelection exclusion)
     {
@@ -64,9 +73,19 @@ public static class ProjectSelectionAdjectives
     }
 
     /// <summary>
-    ///     The project selector-position escape hatch. The predicate is stored, never evaluated at spec
-    ///     build; the required <paramref name="description" /> is what renders as a sentence-final relative
-    ///     clause (GRAMMAR §5.6). A blank description fails spec build (validation §8 item 5).
+    ///     Narrows the selection with a predicate of your own, for what the project adjectives cannot say:
+    ///     <c>
+    ///         arch.Projects.Where(p =&gt; p.ProjectReferences.Count &gt; 10, description: "with more than
+    ///         ten project references")
+    ///     </c>
+    ///     . The predicate reads the facts on <see cref="IProjectInfo" /> and
+    ///     runs against each candidate project when the check runs, never when the spec is loaded. A fact
+    ///     nothing evaluated is <see langword="null" /> there, so a predicate that reads null as false
+    ///     asserts something nothing measured. <paramref name="description" /> is required and completes
+    ///     the subject as a relative clause; it is rendered verbatim in the generated agent context in
+    ///     place of the wording an adjective would produce, last in the clause list, and nothing checks
+    ///     that it describes what the predicate does. A blank or multi-line description is reported when
+    ///     the spec is loaded.
     /// </summary>
     public static ProjectSelection Where(
         this ProjectSelection selection, Func<IProjectInfo, bool> predicate, string description)

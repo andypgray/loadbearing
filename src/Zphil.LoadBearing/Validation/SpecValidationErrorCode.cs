@@ -1,186 +1,238 @@
 namespace Zphil.LoadBearing.Validation;
 
-/// <summary>The spec-build validation catalog (GRAMMAR §8). Errors are collected and reported all at once.</summary>
+/// <summary>
+///     Which mistake in a spec was found. Every way a spec can be wrong has a code here, and
+///     <see cref="SpecValidationException" /> carries one <see cref="SpecValidationError" /> per mistake:
+///     the whole set is reported together when the spec is loaded, so a spec can be fixed in one pass
+///     rather than one error at a time.
+/// </summary>
 public enum SpecValidationErrorCode
 {
-    /// <summary>Duplicate ID over the post-desugar set, across all spec classes (§8 item 1).</summary>
+    /// <summary>
+    ///     Two rules or scopes were declared with the same ID. IDs must be unique across every spec class in
+    ///     the build, counting the rules each scope contributes of its own, <c>{scope-id}/containment</c> and
+    ///     <c>{scope-id}/tripwire</c>. Rename one of them.
+    /// </summary>
     DuplicateId,
 
-    /// <summary>A declared ID equals or extends a scope ID's reserved namespace (§8 item 1, §7).</summary>
+    /// <summary>
+    ///     A rule ID sits beneath a scope's ID: a scope reserves <c>{scope-id}/</c> for the rules it
+    ///     contributes, <c>containment</c> and <c>tripwire</c>. Give the rule an ID outside that prefix.
+    /// </summary>
     IdExtendsScope,
 
-    /// <summary>A <c>Rule</c>/<c>Scope</c> anchor with no posture verb (§8 item 2).</summary>
+    /// <summary>
+    ///     An <c>arch.Rule(id)</c> that never reached <c>Enforce</c> or <c>Migrate</c>, or an
+    ///     <c>arch.Scope(id)</c> that never reached <c>Quarantine</c> or <c>Caution</c>. Every rule and scope
+    ///     takes exactly one posture; the message names the two the declaration could have taken.
+    /// </summary>
     DanglingAnchor,
 
-    /// <summary>A rule or scope missing its required <c>Because</c> (§8 item 3).</summary>
+    /// <summary>
+    ///     A rule or scope with no <c>Because</c>. Every rule and every scope, whichever posture it carries,
+    ///     must say in one line of prose why it exists.
+    /// </summary>
     MissingBecause,
 
-    /// <summary>A scope of either posture missing both <c>Dragons</c> and <c>DragonsDoc</c> (§8 item 4).</summary>
+    /// <summary>
+    ///     A scope with neither <c>Dragons</c> nor <c>DragonsDoc</c>. Say in one line what is strange inside
+    ///     the scope, link a longer document, or do both; the message names the scope's posture.
+    /// </summary>
     MissingDragons,
 
-    /// <summary>Blank or whitespace prose anywhere, including escape-hatch descriptions (§8 item 5).</summary>
+    /// <summary>
+    ///     A prose value that is empty or only whitespace: a <c>Because</c>, a <c>Fix</c>, a
+    ///     <c>Citation</c>, a migration's <c>from</c> description, a scope's <c>Dragons</c> or
+    ///     <c>DragonsDoc</c>, a layer's <c>Purpose</c>, or the description a <c>Where</c> or a custom
+    ///     <c>Must</c> requires. Write the line or drop the call.
+    /// </summary>
     BlankProse,
 
-    /// <summary>Multi-line prose in a single-line field (§8 item 5).</summary>
+    /// <summary>
+    ///     A prose value carrying a line break. Every prose value is a single line; link a longer document
+    ///     with a scope's <c>DragonsDoc</c> instead.
+    /// </summary>
     MultiLineProse,
 
-    /// <summary>A trailer or option supplied more than once (§8 item 6).</summary>
+    /// <summary>
+    ///     The same call made twice where it is allowed at most once: two <c>Because</c>s, two
+    ///     <c>Baseline</c>s, two <c>Citation</c>s on one rule, a layer's <c>Purpose</c> twice. Keep one.
+    /// </summary>
     RepeatedTrailer,
 
-    /// <summary>An ID that does not match <c>^[a-z0-9-]+(/[a-z0-9-]+)*$</c> (§8 item 7).</summary>
+    /// <summary>
+    ///     A rule or scope ID that is not lowercase letters, digits and hyphens in segments joined by
+    ///     <c>/</c> — the message quotes the pattern, <c>^[a-z0-9-]+(/[a-z0-9-]+)*$</c>. The convention is
+    ///     <c>area/rule-name</c>.
+    /// </summary>
     MalformedId,
 
-    /// <summary><c>BoundaryOnlyVia()</c> called with zero types (§8 item 8).</summary>
+    /// <summary>
+    ///     <c>BoundaryOnlyVia()</c> called with no types. Name the types that may keep referencing into the
+    ///     quarantine, or omit the call entirely for a hermetic quarantine that nothing outside may reference.
+    /// </summary>
     EmptyBoundary,
 
-    /// <summary>Two layers declared with the same name (§8 item 9).</summary>
+    /// <summary>Two layers declared with the same name. Layer names are unique within the spec.</summary>
     DuplicateLayerName,
 
-    /// <summary>A selection minted on a different <see cref="Arch" /> instance (§8 item 10).</summary>
+    /// <summary>
+    ///     A rule or scope used a selection built on a different <see cref="Arch" />. Every selection a spec
+    ///     uses must come from the <see cref="Arch" /> its <c>Define</c> was handed. A layer's selection
+    ///     definition is checked the same way and reported against the layer, whether or not any rule names
+    ///     that layer.
+    /// </summary>
     ForeignSelection,
 
-    /// <summary>Blank or whitespace member name on an <c>arch.Member</c> used by a rule (§8 item 11).</summary>
+    /// <summary>
+    ///     An <c>arch.Member(typeof(T), name)</c> used by a rule was given an empty member name. Pass the
+    ///     name the type declares, ideally as <c>nameof(...)</c>.
+    /// </summary>
     BlankMemberName,
 
     /// <summary>
-    ///     A member not declared on its anchored type (reflection <c>DeclaredOnly</c> typo guard); when
-    ///     the member is declared on a base type the error names that base and the <c>typeof</c> to use
-    ///     (§8 item 12).
+    ///     The type named in an <c>arch.Member(typeof(T), name)</c> does not declare that member. It must be
+    ///     declared on that type itself, not inherited: when the member comes from a base type the message
+    ///     names the base and the <c>typeof</c> to write instead.
     /// </summary>
     MemberNotDeclared,
 
-    /// <summary>A <see cref="Member" /> minted on a different <see cref="Arch" /> instance (§8 item 13).</summary>
+    /// <summary>
+    ///     A rule used a member built on a different <see cref="Arch" /> — an <c>arch.Member(...)</c> from
+    ///     another model. Build it on the <see cref="Arch" /> the rule is declared on.
+    /// </summary>
     ForeignMember,
 
     /// <summary>
-    ///     A closed-generic <c>.Returning</c> anchor on a member selection (§8 item 14); member
-    ///     return-type matching is definition-level, so the error guides to the open definition
-    ///     (<c>typeof(Task&lt;&gt;)</c>).
+    ///     A <c>Returning</c> given a closed generic such as <c>typeof(Task&lt;int&gt;)</c>. Return types are
+    ///     matched by definition, so name the open definition, <c>typeof(Task&lt;&gt;)</c>, which matches
+    ///     every construction of it. A non-generic type is accepted as written.
     /// </summary>
     MemberReturningClosedGeneric,
 
     /// <summary>
-    ///     A blank or whitespace glob or affix (§8 item 15): a namespace/name pattern, or a
-    ///     suffix/prefix, left empty. A blank affix is vacuously true and a blank glob throws at check
-    ///     time — either way it is almost certainly an authoring slip. Covers the type and member sides.
+    ///     A glob, name or affix left empty: a namespace glob, a type-name glob, an exact name on
+    ///     <c>Named</c>, a project name on <c>arch.Project</c> or <c>MustResideInProject</c>, a suffix or
+    ///     prefix, a <c>MustHaveExactlyOneCounterpart</c> name template, or a string-named attribute,
+    ///     interface, base type, return type or parameter type. A blank affix is true of every name and a
+    ///     blank glob fails at check time, so neither is likely to be what was meant. Type and member sides
+    ///     alike, layer globs included.
     /// </summary>
     BlankPattern,
 
     /// <summary>
-    ///     A dead namespace subtree pattern (§8 item 16): a trailing <c>.*</c> whose literal prefix
-    ///     carries a <c>*</c> (e.g. <c>MyApp.*.Controllers.*</c>), which the subtree operator compares
-    ///     literally and so never matches. The error steers the author to anchor the subtree on a
-    ///     literal prefix. Type-name globs and affixes carry no subtree operator, so this never applies
-    ///     to them (GRAMMAR §4.2).
+    ///     A namespace glob ending in <c>.*</c> whose text before that ending also contains a <c>*</c>, such
+    ///     as <c>MyApp.*.Controllers.*</c>. Everything before a trailing <c>.*</c> is matched literally, so
+    ///     such a glob can never match: anchor the subtree on a literal prefix
+    ///     (<c>MyApp.Web.Controllers.*</c>), or drop the trailing <c>.*</c> and let the interior <c>*</c>
+    ///     match one segment. Type-name globs and affixes have no subtree form, so this never reports them.
     /// </summary>
     UnanchoredSubtreePattern,
 
     /// <summary>
-    ///     A rule given more than one posture verb, or a scope given one more than once (§8
-    ///     item 17). The stage machine (§3.2) makes the fluent double-call uncompilable, but a stored
-    ///     <c>IRuleBuilder</c>/<c>IScopeBuilder</c> reference is mutable, and a second posture call
-    ///     silently overwrites the first — this catches that stored-reference re-call.
+    ///     A rule given both <c>Enforce</c> and <c>Migrate</c>, or a scope given a posture twice. A chained
+    ///     spec cannot write this (neither posture verb is on the step that follows either), but the value
+    ///     <c>arch.Rule(id)</c> returns can be held in a variable and called again, and the second call
+    ///     silently replaces the first. Keep one posture per rule and one per scope.
     /// </summary>
     RepeatedPosture,
 
     /// <summary>
-    ///     A member-anchor expression lambda — <c>arch.Member&lt;T&gt;(x =&gt; x.M)</c> or
-    ///     <c>arch.Member(() =&gt; Type.M)</c> — that <see cref="Internal.MemberExpressionResolver" /> could
-    ///     not reduce to a declared <c>(type, name)</c> (GRAMMAR §8, the member-anchor expression class:
-    ///     one code, per-shape poison messages). Reported by
-    ///     <see cref="SpecValidator" /> before item 12 (member-not-declared), which an expression anchor —
-    ///     resolved from a real member and generic-normalized at mint — can never reach.
+    ///     An <c>arch.Member&lt;T&gt;(x =&gt; ...)</c> or <c>arch.Member(() =&gt; ...)</c> lambda that does
+    ///     not name one declared member. Each shape has its own message naming the form to write instead: a
+    ///     body that is not a member access, a method group without its parentheses (write
+    ///     <c>x =&gt; x.M()</c>), a member not reached directly on the lambda's parameter (a chained access
+    ///     <c>x =&gt; x.A.B</c>, a captured local or field), a static member reached through the instance
+    ///     form or an instance member through the parameterless one, an indexer, a compile-time constant, and
+    ///     an object creation (use <c>MustNotConstruct</c> instead).
     /// </summary>
     MemberExpressionUnresolvable,
 
     /// <summary>
-    ///     An <c>arch.Registered</c> noun used by a rule, a scope, or a layer's definition carries a
-    ///     <see cref="Lifetime" /> value outside the defined set — a cast such as <c>(Lifetime)7</c> names no
-    ///     lifetime (§8 item 19). Reported in the same all-at-once pass; membership resolution never sees it
-    ///     because the build throws first.
+    ///     An <c>arch.Registered</c> given a lifetime outside the defined set, such as a cast
+    ///     <c>(Lifetime)7</c>. The message names the value and the three that are defined:
+    ///     <c>Lifetime.Singleton</c>, <c>Lifetime.Scoped</c> and <c>Lifetime.Transient</c>.
     /// </summary>
     UndefinedLifetime,
 
     /// <summary>
-    ///     A closed-generic <c>MustAcceptParameter</c> anchor on a method selection (§8 item 20); parameter-type
-    ///     matching is definition-level, so the error guides to the open definition
-    ///     (<c>typeof(IProgress&lt;&gt;)</c>).
+    ///     A <c>MustAcceptParameter</c> given a closed generic such as <c>typeof(IProgress&lt;int&gt;)</c>.
+    ///     Parameter types are matched by definition, so name the open definition,
+    ///     <c>typeof(IProgress&lt;&gt;)</c>. A non-generic type is accepted as written.
     /// </summary>
     MemberAcceptParameterClosedGeneric,
 
     /// <summary>
-    ///     A category-invalid hierarchy anchor, both polarities (§8 item 21): a <c>Must[Not]Implement</c>
-    ///     anchor must be an interface; a <c>Must[Not]DeriveFrom</c> anchor must not be an interface; a
-    ///     <c>Must[Not]BeAttributedWith</c> anchor must derive from <see cref="System.Attribute" />
-    ///     (<c>typeof(Attribute)</c> itself is refused — the declared-attribute matcher could never match it).
-    ///     A wrong-category anchor never matches, making a positive an always-red rule and a negative an
-    ///     always-pass, so the error names the anchor's FQN and steers to the right-category verb. One code
-    ///     covers all three categories, fired over the positives' single anchor and every anchor in a
-    ///     negative's list.
+    ///     A hierarchy verb given a type of the wrong category: <c>MustImplement</c> and
+    ///     <c>MustNotImplement</c> take an interface, <c>MustDeriveFrom</c> and <c>MustNotDeriveFrom</c> take
+    ///     something that is not an interface, and <c>MustBeAttributedWith</c> and
+    ///     <c>MustNotBeAttributedWith</c> take a type deriving from <see cref="System.Attribute" /> (bare
+    ///     <c>typeof(Attribute)</c> is refused, as no declared attribute could match it). Such a type never
+    ///     matches, which makes the positive verb always fail and the negative always pass, so the message
+    ///     names the type and the verb to use instead. Reported for <c>typeof</c> only: a name given as a
+    ///     string carries no type to categorize.
     /// </summary>
     HierarchyAnchorWrongCategory,
 
     /// <summary>
-    ///     A project selection minted on a different <see cref="Arch" /> instance (§8 item 22) — the
-    ///     project-stratum sibling of <see cref="ForeignSelection" /> and <see cref="ForeignMember" />. Its
-    ///     own code rather than a widening of <see cref="ForeignSelection" /> because the message has to
-    ///     name what was foreign for the author to find it.
+    ///     A rule or scope used a project selection built on a different <see cref="Arch" />, including one
+    ///     nested inside an <c>Except</c>. Build it on the <see cref="Arch" /> the rule is declared on.
     /// </summary>
     ForeignProjectSelection,
 
     /// <summary>
-    ///     A blank or whitespace project name or name glob (§8 item 23): a <c>.Named</c> operand or a
-    ///     <c>.Matching</c> glob left empty. A blank name matches no project and a blank glob matches every
-    ///     one, so either is almost certainly an authoring slip — and the two failure shapes are far apart
-    ///     enough that neither should be discovered at check time.
+    ///     An empty project name on <c>arch.Projects.Named</c>, or an empty glob on
+    ///     <c>arch.Projects.Matching</c>. A blank name matches no project and a blank glob matches every one,
+    ///     so neither is likely to be what was meant.
     /// </summary>
     BlankProjectPattern,
 
     /// <summary>
-    ///     A blank or whitespace target framework operand on <c>MustOnlyTarget</c> (§8 item 24). A blank
-    ///     moniker matches nothing, so it silently narrows the allow-list rather than widening it — the
-    ///     rule stays green until a project targets the framework the author meant to permit.
+    ///     An empty target framework on <c>MustOnlyTarget</c>. A blank moniker matches nothing, so it narrows
+    ///     the permitted list instead of widening it and the rule stays green until some project targets the
+    ///     framework that was meant to be allowed.
     /// </summary>
     BlankTargetFramework,
 
     /// <summary>
-    ///     A <c>MustHaveExactlyOneCounterpart</c> name template carrying no <c>{Name}</c> placeholder (§8
-    ///     item 26). Substitution is ordinal, so every subject then derives the same fixed name and the
-    ///     rule states a cardinality claim rather than a correspondence — and the <c>{name}</c> typo that
-    ///     causes it would otherwise be discovered only as a whole subject set going red at check time.
+    ///     A <c>MustHaveExactlyOneCounterpart</c> name template with no <c>{Name}</c> placeholder, such as
+    ///     <c>IService</c>. Every subject would derive the same fixed name, making the rule a claim about how
+    ///     many types carry that one name rather than about correspondence. Write a template such as
+    ///     <c>I{Name}</c>; substitution is case-sensitive, so <c>{name}</c> is the usual cause.
     /// </summary>
     CounterpartTemplateWithoutPlaceholder,
 
     /// <summary>
-    ///     A family (<c>arch.Each</c>) standing anywhere but as a rule subject (§8 item 27) — an operand,
-    ///     an <c>Except</c> payload, a union operand, a layer definition, a scoped selection or a boundary.
-    ///     A partition means nothing in a position that consumes a set: every one of those reads the
-    ///     family's membership and nothing would read its cells, so the rule would silently be the union
-    ///     of them. The message names the position, because that is what the author has to move.
+    ///     An <c>arch.Each</c> family used anywhere but as a rule subject — as a verb operand, an
+    ///     <c>Except</c> payload, a union operand, a layer definition, a scoped selection or a boundary. Each
+    ///     of those positions takes a plain set and would read the family as everything in it, losing the
+    ///     division into cells that is the point of a family; the message names the position to move it out
+    ///     of. A family reached through a member projection such as <c>.Methods</c> is still a subject and is
+    ///     accepted.
     /// </summary>
     FamilyMisplaced,
 
     /// <summary>
-    ///     <c>MustNotReferenceEachOther</c> over a subject that is not a family (§8 item 28). The verb's
-    ///     targets are the subject's own cells, so a cell-free subject names nothing to forbid — and the
-    ///     verb the author meant over a plain selection has a name, which the message gives.
+    ///     <c>MustNotReferenceEachOther</c> over a subject that is not an <c>arch.Each</c> family. The verb
+    ///     forbids the family's own cells to reference one another, so a subject with no cells names nothing
+    ///     to forbid. Over a plain selection write <c>MustNotReference</c> with the target named.
     /// </summary>
     EachOtherWithoutFamily,
 
     /// <summary>
-    ///     <c>MustNotHaveCircularReferences</c> over a subject that is not a family of layers (§8 item 29).
-    ///     Two wordings share this code, because the two shapes are wrong for different reasons: a plain
-    ///     selection has no layers to reference each other at all, and a family of projects is refused
-    ///     because projects cannot have circular references — the build forbids them — so over one the law
-    ///     would hold by construction, and a rule that cannot red is a false promise.
+    ///     <c>MustNotHaveCircularReferences</c> over a subject that is not an <c>arch.Each</c> family of
+    ///     layers, in two wordings. Over a plain selection there are no layers to reference one another at
+    ///     all; over a family of projects the build itself already refuses circular project references, so
+    ///     the rule could never fail and would be a promise the check never keeps. Write
+    ///     <c>MustNotReferenceEachOther</c>, or an ordering rule that names the direction.
     /// </summary>
     CircularReferencesNeedLayerFamily,
 
     /// <summary>
-    ///     A <c>Citation</c> that is not an absolute <c>http</c>/<c>https</c> URL (§8 item 30) — a pasted
-    ///     page title, a repo-relative path, or a URI on another scheme. Every surface renders the value as
-    ///     a link and hands it on unread (the agent block autolinks it, SARIF publishes it as
-    ///     <c>helpUri</c>), so nothing downstream can report a value that is not one.
+    ///     A <c>Citation</c> that is not an absolute <c>http</c> or <c>https</c> URL — a pasted page title, a
+    ///     repository-relative path, or a URI on another scheme. Every surface renders the value as a link
+    ///     and hands it on unread (the generated agent context autolinks it, SARIF output publishes it as the
+    ///     rule's help URI), so nothing downstream could report a bad one.
     /// </summary>
     MalformedCitation
 }

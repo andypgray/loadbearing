@@ -74,12 +74,12 @@ public sealed class ReadmeAnchorGateTests
         [new SourceAnchors.AnchorKey(InterchangeRoot, "src/Meridian.Interchange/Partners/CarrierClient.cs", 15)] = new SourceAnchors.Landmark(15, "StringContent content"),
 
         // di/hosted-services-scope-their-work swaps this constructor parameter to IOptionsSnapshot; the
-        // primary-constructor declaration is committed line 15.
-        [new SourceAnchors.AnchorKey(InterchangeRoot, "src/Meridian.Interchange/Dispatch/OutboxDispatcher.cs", 15)] = new SourceAnchors.Landmark(15, "IOptions<InterchangeOptions> options"),
+        // primary-constructor declaration is committed line 14.
+        [new SourceAnchors.AnchorKey(InterchangeRoot, "src/Meridian.Interchange/Dispatch/OutboxDispatcher.cs", 14)] = new SourceAnchors.Landmark(14, "IOptions<InterchangeOptions> options"),
 
-        // di/no-captive-dependencies swaps the first constructor parameter to IOutboxStore; the
-        // primary-constructor declaration is committed line 15.
-        [new SourceAnchors.AnchorKey(InterchangeRoot, "src/Meridian.Interchange/Dispatch/OutboxDispatcher.cs", 16)] = new SourceAnchors.Landmark(15, "OutboxDispatcher(ScopedDispatchRunner runner"),
+        // di/no-captive-dependencies swaps the first constructor parameter to IOutboxStore, adding a
+        // using that shifts the declaration down; the primary-constructor declaration is committed line 14.
+        [new SourceAnchors.AnchorKey(InterchangeRoot, "src/Meridian.Interchange/Dispatch/OutboxDispatcher.cs", 15)] = new SourceAnchors.Landmark(14, "OutboxDispatcher(ScopedDispatchRunner runner"),
 
         // exceptions/no-general-catch wraps the per-message loop body in a catch-all; the inserted catch
         // is keyed to the committed loop at line 24.
@@ -124,14 +124,11 @@ public sealed class ReadmeAnchorGateTests
         (MeridianReadme, BookingsController, 77),
         (MeridianReadme, BookingsController, 78),
 
-        // Beat 2 of the storyboard writes a hypothetical inline-SQL method into BookingsController,
-        // along with the using and constructor parameter it needs; the quoted lines are that method's
-        // check output, captured by following the storyboard's own reproduce steps.
-        (Storyboard, BookingsController, 85),
-        (Storyboard, BookingsController, 86),
-        (Storyboard, BookingsController, 87),
-        (Storyboard, BookingsController, 88),
-        (Storyboard, BookingsController, 90),
+        // Beat 3 of the storyboard is a captured turn in which the agent inserted a nine-line lookup
+        // method above BookingsController's sample endpoint; the quoted line is that method's
+        // declaration, which the async-suffix ratchet reported. It is the committed sample endpoint's
+        // attribute line plus one, pinned below.
+        (Storyboard, BookingsController, 60),
 
         // The root README's hook beat quotes the block a red self-check feeds an agent: the hypothetical
         // edit is a whole new ProgressPrinter file dropped into the CLI's Rendering directory, which is
@@ -243,9 +240,9 @@ public sealed class ReadmeAnchorGateTests
     {
         // Arrange: the appended-method walkthrough adds a method to the committed BookingsController, so
         // its quoted anchors begin at the line after the committed end of file (:72 onward, over 71
-        // committed lines). This pin ties that demonstration cluster — in the Meridian README and the
-        // hooks storyboard — to the committed length: change the length here and every quoted anchor
-        // renumbers, so the quoted output and the committed file must move together.
+        // committed lines). This pin ties that demonstration cluster to the committed length: change the
+        // length here and every quoted anchor renumbers, so the quoted output and the committed file must
+        // move together.
         const int committedLength = 71;
         string path = Path.Combine(
             RepoRoot.Directory,
@@ -258,7 +255,31 @@ public sealed class ReadmeAnchorGateTests
         // Assert
         actual.ShouldBe(
             committedLength,
-            $"BookingsController.cs is {actual} lines but the appended-method walkthrough anchors assume {committedLength}; renumber the quoted output in {MeridianReadme} and {Storyboard}.");
+            $"BookingsController.cs is {actual} lines but the appended-method walkthrough anchors assume {committedLength}; renumber the quoted output in {MeridianReadme}.");
+    }
+
+    [Fact]
+    public void SampleEndpointPosition_HoldsTheStoryboardCaptureAnchor()
+    {
+        // Arrange: the storyboard's captured turn inserted its lookup method above the sample endpoint
+        // rather than at the end of the file, so its one quoted anchor is keyed to where that endpoint
+        // starts and not to the file's length. Same bargain as the pin above: move the sample endpoint
+        // and the captured output renumbers with it.
+        const int sampleAttributeLine = 59;
+        string path = Path.Combine(
+            RepoRoot.Directory,
+            $"{MeridianRoot}/{BookingsController}".Replace('/', Path.DirectorySeparatorChar));
+
+        // Act
+        string actual = File.ReadLines(path)
+            .ElementAt(sampleAttributeLine - 1)
+            .Trim();
+
+        // Assert
+        actual.ShouldBe(
+            """[HttpGet("sample")]""",
+            $"Line {sampleAttributeLine} of BookingsController.cs is '{actual}', not the sample endpoint's "
+            + $"attribute; the storyboard's captured :60 anchor renumbers with it, so requote {Storyboard}.");
     }
 
     private static IReadOnlyList<SourceAnchor> ExtractDoc(string doc)

@@ -5,20 +5,29 @@ using Zphil.LoadBearing.Codebase;
 namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
-///     Renders a <see cref="CheckReport" /> as human-readable text (stdout): one block per rule in
-///     model order, an ASCII status marker (no ANSI), the rule ID and its sentence, then — for a
-///     failed rule — its <c>because</c>/<c>fix</c> and each red violation site (solution-relative,
-///     forward-slash paths, ordered by file then line). Ends with a one-line summary.
+///     Renders a <see cref="CheckReport" /> as the plain text <c>loadbearing check</c> prints: one block
+///     per rule in model order, headed by a status word (<c>pass</c>, <c>warn</c>, <c>FAIL</c> or
+///     <c>skip</c>, with no colour codes), the rule ID and the rule's sentence. A failed rule adds its
+///     reason, its citation and fix where it has them, and a line per violation site as
+///     <c>path:line</c>, the path relative to the solution directory with forward slashes and the lines
+///     ordered by path and then by line. The report ends with a one-line summary of how many rules were
+///     checked, passed, failed and skipped.
 /// </summary>
 /// <remarks>
-///     A ratcheted rule (Migrate or Quarantine containment) also gets a grandfathered count (baselined
-///     violations pass, so they are not listed as red) and, when it fails uncaptured, the
-///     <c>baseline --init</c> bootstrap hint. This is the acceptance surface: a failing rule shows ID,
-///     because, fix, and <c>file:line</c> together.
+///     A Migrate rule and a quarantine's containment rule also report how many violations their baseline
+///     grandfathers; those pass, so they are never listed as sites. When such a rule fails and no
+///     baseline has been captured yet, the block ends with a hint to run
+///     <c>loadbearing baseline --init</c>. A rule whose subject swept generated types says so on a
+///     <c>subject:</c> line, and a tripwire that fired prints its warnings followed by the scope's
+///     dragons prose.
 /// </remarks>
 public static class HumanReportRenderer
 {
-    /// <summary>Renders the whole report (every rule block plus the summary line) to <paramref name="output" />.</summary>
+    /// <summary>
+    ///     Writes the whole report, every rule block and then the summary line, to
+    ///     <paramref name="output" />. Violation sites are rendered relative to
+    ///     <paramref name="solutionDirectory" />.
+    /// </summary>
     public static void Render(TextWriter output, CheckReport report, string solutionDirectory)
     {
         // One relativizer for the whole report: the solution directory is the same string for every site,
@@ -37,9 +46,9 @@ public static class HumanReportRenderer
     }
 
     /// <summary>
-    ///     Renders one rule's block — the exact per-rule text <see cref="Render" /> emits, with no trailing
-    ///     newline and LF line endings. This is the xUnit adapter's <c>Assert.Fail</c> body, so a failing
-    ///     rule reads identically whether it lands via <c>loadbearing check</c> or a named adapter test.
+    ///     One rule's block as <see cref="Render" /> writes it, returned with LF line endings and no
+    ///     trailing newline. This is the message the test adapter fails a test with, so a rule reads the
+    ///     same whether it was checked by <c>loadbearing check</c> or by a test.
     /// </summary>
     public static string RuleBlock(RuleResult result, string solutionDirectory)
     {

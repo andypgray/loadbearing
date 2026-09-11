@@ -3,10 +3,10 @@ using Zphil.LoadBearing.Prose;
 namespace Zphil.LoadBearing.Hosting;
 
 /// <summary>
-///     The scope-specific payload of an <see cref="ArchRule" /> (GRAMMAR §7). A quarantined scope
-///     desugars into two rules that share a <see cref="ScopeId" /> — the containment rule carries the
-///     boundary and baseline — and a cautioned scope into the tripwire alone; every child carries the
-///     dragons prose.
+///     What a rule contributed by a scope carries beyond an ordinary rule: which half of the scope it is,
+///     the sanctioned surface, the baseline, and what the scope says is strange inside it. A quarantine
+///     contributes two rules sharing one <see cref="ScopeId" /> — the containment rule holding the
+///     surface and the baseline — and a caution the tripwire alone; both halves carry the dragons prose.
 /// </summary>
 public sealed class ScopeData
 {
@@ -29,7 +29,10 @@ public sealed class ScopeData
         Scoped = scoped;
     }
 
-    /// <summary>Whether this is the containment or the tripwire half.</summary>
+    /// <summary>
+    ///     Gets which half of the scope this rule is: the containment rule that judges references into the
+    ///     scope, or the tripwire that warns about edits inside it.
+    /// </summary>
     public ScopeRole Role { get; }
 
     /// <summary>
@@ -49,22 +52,37 @@ public sealed class ScopeData
     internal IReadOnlyList<Selection> Boundary { get; }
 
     /// <summary>
-    ///     The sanctioned surface pre-rendered, in the spec's own order: one reference fragment per
-    ///     operand — a backticked simple name for a type, widened where simple names collide, and the
-    ///     noun's own phrase otherwise (<c>types named `CodeFormatHelper`</c>). Every surface that prints
-    ///     the boundary reads this, so the scope card and <c>explain</c> cannot disagree.
+    ///     Gets the sanctioned surface ready to print, in the order the spec named it: one phrase per
+    ///     operand — a backticked simple name for a type, widened when simple names collide, and the
+    ///     operand's own phrase otherwise, as in <c>types named `CodeFormatHelper`</c>. Empty for a hermetic
+    ///     quarantine and for a tripwire.
     /// </summary>
+    // Every surface that prints the boundary reads this, so the scope's context card and `explain` cannot
+    // disagree about what the sanctioned surface is.
     public IReadOnlyList<string> Surface { get; }
 
-    /// <summary>The grandfather baseline path (containment only), or null.</summary>
+    /// <summary>
+    ///     Gets the file recording the references into the scope that already existed when it was declared,
+    ///     or null on a tripwire. Never null on a containment rule: the path the spec gave, or
+    ///     <c>arch/baselines/{scope-id}/containment.json</c> when it gave none.
+    /// </summary>
     public string? BaselinePath { get; }
 
-    /// <summary>The load-bearing-weirdness prose, or null.</summary>
+    /// <summary>
+    ///     Gets what is load-bearing and strange inside the scope, in the spec's own words, or null when the
+    ///     spec gave only a <see cref="DragonsDoc" />.
+    /// </summary>
     public string? Dragons { get; }
 
-    /// <summary>The linked long-form dragons document path, or null.</summary>
+    /// <summary>
+    ///     Gets the path to the longer document about the scope, as the spec wrote it, or null when the spec
+    ///     gave only a <see cref="Dragons" /> line.
+    /// </summary>
     public string? DragonsDoc { get; }
 
-    /// <summary>The originating scope ID (every child of the scope shares it).</summary>
+    /// <summary>
+    ///     Gets the ID of the scope both halves came from — this rule's own ID without its
+    ///     <c>/containment</c> or <c>/tripwire</c> ending.
+    /// </summary>
     public string ScopeId { get; }
 }

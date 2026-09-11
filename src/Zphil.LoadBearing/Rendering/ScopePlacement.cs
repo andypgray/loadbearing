@@ -3,11 +3,8 @@ using Zphil.LoadBearing.Hosting;
 namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
-///     Where a scope's directory context file lands: the scope ID, its card-bearing rule (the
-///     <see cref="AgentContextRenderer.ScopeCard" />/<see cref="AgentContextRenderer.CautionCard" />
-///     source), and either the resolved <see cref="DirectoryPath" /> — the deepest common ancestor of the
-///     scoped types' declaration sites — or a null path with a <see cref="SkipReason" /> when the scope
-///     matched no types.
+///     Where a scope's context card goes: the scope's ID, the rule the card is rendered from, and either
+///     the directory whose <c>AGENTS.md</c> receives it or a null path with the reason it was skipped.
 /// </summary>
 public sealed class ScopePlacement
 {
@@ -19,21 +16,27 @@ public sealed class ScopePlacement
         SkipReason = skipReason;
     }
 
-    /// <summary>The originating scope ID (e.g. <c>legacy/billing</c>).</summary>
+    /// <summary>
+    ///     Gets the scope's ID as the spec declares it, <c>legacy/billing</c> say.
+    /// </summary>
     public string ScopeId { get; }
 
     /// <summary>
-    ///     The desugared rule the scope card is rendered from — a quarantine's containment law, or a
-    ///     caution's tripwire, which is the only child a caution has.
+    ///     Gets the rule the card is rendered from: a quarantine's containment rule, or a caution's tripwire, which is
+    ///     the only rule a caution has.
     /// </summary>
     public ArchRule Rule { get; }
 
     /// <summary>
-    ///     The directory whose <c>AGENTS.md</c> receives the scope card, or null when the scope
-    ///     matched no solution types (then <see cref="SkipReason" /> explains the skip).
+    ///     Gets the directory whose <c>AGENTS.md</c> receives the scope card, which is the deepest one holding every
+    ///     file that declares a scoped type, or null when the scope matched no type in the solution. Then
+    ///     <see cref="SkipReason" /> says so.
     /// </summary>
     public string? DirectoryPath { get; }
 
-    /// <summary>The skip explanation (for a stderr warning) iff <see cref="DirectoryPath" /> is null.</summary>
+    /// <summary>
+    ///     Gets why no directory was resolved, set exactly when <see cref="DirectoryPath" /> is null. A host with
+    ///     somewhere to put it prints it as a warning.
+    /// </summary>
     public string? SkipReason { get; }
 }

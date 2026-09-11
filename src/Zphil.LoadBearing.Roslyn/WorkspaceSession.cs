@@ -9,40 +9,34 @@ using Zphil.LoadBearing.Roslyn.Solutions;
 namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>
-///     A host-managed, long-lived solution that stays correct across many reads by reconciling against
-///     disk at the start of each read — the warm counterpart to the one-shot <see cref="WorkspaceLoader" />.
-///     One session owns one <see cref="LoadedSolution" /> (and therefore one <c>MSBuildWorkspace</c> and
-///     its out-of-process BuildHost) plus a private, forward-only snapshot chain; callers receive
-///     immutable <see cref="WorkspaceSnapshot" />s and never touch the workspace directly.
+///     A loaded solution kept alive for a host that reads it many times: a test adapter, a long-running
+///     tool, a server. Each <see cref="GetCurrentAsync" /> reconciles the solution against disk and hands
+///     back an immutable <see cref="WorkspaceSnapshot" />. The session owns the MSBuild workspace and the
+///     out-of-process build host behind it, so dispose it when the host shuts down. For a single read, use
+///     <see cref="WorkspaceLoader" /> instead.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Lazy by contract.</b> The first <see cref="GetCurrentAsync" /> performs the full load — no
-///         eager warmup — which preserves per-call error-text parity with the cold path.
+///         Nothing is loaded until the first <see cref="GetCurrentAsync" />, which pays the whole solution load; later
+///         calls pay only the reconcile. A structural change (the solution file, a project file, a
+///         <c>Directory.Build.props</c>, <c>Directory.Build.targets</c> or <c>Directory.Packages.props</c> at or above
+///         a project, a <c>global.json</c>, a restore assets file) or a source file added or deleted reloads the
+///         solution wholesale. An edit to a file already in the solution is folded into a fresh snapshot, and an
+///         unchanged tree hands back the very snapshot instance the previous call returned.
 ///     </para>
 ///     <para>
-///         <b>Correct at call time, by construction — no watcher.</b> The solution only has to be correct
-///         <em>at</em> a tool call, so each call runs a per-call reconcile sweep, cheapest checks first,
-///         instead of a background <see cref="System.IO.FileSystemWatcher" />. The sweep methods state
-///         what each one stats and why; what they add up to is the contract callers depend on: any
-///         structural delta and any added or deleted source file dispose the workspace and reload
-///         wholesale, while an in-place content edit is folded into the snapshot chain via
-///         <see cref="Solution.WithDocumentText(DocumentId,SourceText,PreservationMode)" />.
+///         It reads and never writes: no file is touched, and no snapshot is applied back to the workspace.
+///         Pointing a session at a working tree somebody else is editing is the expected use.
 ///     </para>
 ///     <para>
-///         <b>Read-only, so no write-back.</b> Unlike an editor server, the carried snapshot is never
-///         applied back to the workspace (it is already a forked, unresolved-reference-stripped solution —
-///         see <see cref="SolutionExtensions.StripUnresolvedReferences" />). Content edits mint a new
-///         private snapshot rather than mutating the workspace, so there is no pending-update or drain
-///         machinery — just the immutable chain.
-///     </para>
-///     <para>
-///         <b>Concurrency.</b> All mutation of loaded state runs under a single <see cref="SemaphoreSlim" />,
-///         so sweeps and reloads serialize. Readers share immutable snapshots; a consumer still holding a
-///         pre-reload snapshot is safe because a Roslyn <see cref="Solution" /> survives the disposal of the
-///         workspace that produced it.
+///         Calls serialize, so several callers asking at once share one load rather than starting several. A
+///         snapshot already handed out stays readable while a later call reloads, and after the session is
+///         disposed, because a Roslyn <see cref="Solution" /> outlives the workspace that produced it.
 ///     </para>
 /// </remarks>
+// The first read pays the whole load rather than the constructor doing it eagerly, so a load failure
+// reaches the caller with the same text the one-shot WorkspaceLoader produces; per-call error-text
+// parity between the warm and the cold path is pinned.
 public sealed class WorkspaceSession : IAsyncDisposable
 {
     private readonly Action<string>? diagnosticSink;
@@ -113,14 +107,14 @@ public sealed class WorkspaceSession : IAsyncDisposable
     private IReadOnlyDictionary<ProjectId, string> targetFrameworks = TargetFrameworkMaps.None;
 
     /// <summary>
-    ///     Creates an unloaded session. The workspace is opened lazily on the first
-    ///     <see cref="GetCurrentAsync" />.
+    ///     Creates a session with nothing loaded. The first <see cref="GetCurrentAsync" /> opens the workspace
+    ///     and loads the solution.
     /// </summary>
     /// <param name="diagnosticSink">
-    ///     Optional operational-log sink for reconcile events the caller may want to surface (per-file read
-    ///     failures, reload triggers). Distinct from a snapshot's
-    ///     <see cref="WorkspaceSnapshot.Diagnostics" />, which carries workspace-load failures. Null (the
-    ///     default) swallows these messages.
+    ///     Optional sink for the session's own running commentary: why a call decided to reload, and any file
+    ///     the reconcile could not read. Distinct from a snapshot's
+    ///     <see cref="WorkspaceSnapshot.Diagnostics" />, which carries the failures of the load itself. Null,
+    ///     the default, discards these messages.
     /// </param>
     public WorkspaceSession(Action<string>? diagnosticSink = null)
     {
@@ -142,9 +136,9 @@ public sealed class WorkspaceSession : IAsyncDisposable
     internal long FullReloadCount { get; private set; }
 
     /// <summary>
-    ///     Disposes the owning workspace and releases the session. Idempotent — a second call is a no-op —
-    ///     and bounded: it waits only a short interval for any in-flight sweep to release the gate before
-    ///     tearing down, so a wedged sweep cannot block process shutdown.
+    ///     Disposes the MSBuild workspace and its out-of-process build host and releases the session. A second
+    ///     call is a no-op. It waits briefly for a call already in flight to finish before tearing down, so a
+    ///     wedged read cannot hold up process shutdown; snapshots already handed out stay readable afterwards.
     /// </summary>
     public async ValueTask DisposeAsync()
     {
@@ -169,22 +163,24 @@ public sealed class WorkspaceSession : IAsyncDisposable
     }
 
     /// <summary>
-    ///     Returns the solution for <paramref name="solutionPath" />, reconciled against disk as of this
-    ///     call. The first call (or a call with a different path) performs a full load; subsequent calls
-    ///     run the reconcile sweep and reload only when a structural change, an added file, or a deleted
-    ///     document demands it. An in-place edit is folded into a fresh snapshot; an unchanged tree returns
-    ///     the same snapshot instance.
+    ///     Returns the solution at <paramref name="solutionPath" />, reconciled against disk as of this call.
+    ///     The first call, and any call naming a different path, loads the solution in full; later calls stat
+    ///     what they already know and reload only when a structural change, an added file or a deleted file
+    ///     demands it. An edit to a file already in the solution is folded into a fresh snapshot, and an
+    ///     unchanged tree returns the same snapshot instance as the call before. A load that fails leaves the
+    ///     session unloaded and throws, so the next call starts again from a fresh workspace rather than
+    ///     serving a half-loaded one.
     /// </summary>
     /// <param name="solutionPath">
     ///     Absolute path to the <c>.sln</c>/<c>.slnx</c> to load, or to a <c>.slnf</c> filter over one.
     /// </param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>An immutable snapshot: the reconciled <see cref="Solution" /> and its load diagnostics.</returns>
+    /// <returns>An immutable snapshot: the reconciled <see cref="Solution" /> and the load's diagnostics.</returns>
     /// <exception cref="ObjectDisposedException">The session has been disposed.</exception>
-    /// <remarks>
-    ///     A load failure resets the session to unloaded and rethrows, so the next call retries cleanly
-    ///     from a fresh workspace rather than serving a half-initialized one.
-    /// </remarks>
+    /// <exception cref="UserErrorException">
+    ///     The <c>.slnf</c> filter at <paramref name="solutionPath" /> could not be read. Its message is
+    ///     written for the person who ran the tool and is complete on its own.
+    /// </exception>
     public async Task<WorkspaceSnapshot> GetCurrentAsync(string solutionPath, CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);

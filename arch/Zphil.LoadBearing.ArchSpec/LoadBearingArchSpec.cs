@@ -417,7 +417,7 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
                      "the collectible context never collects and the operating system never releases the " +
                      "build output. Every rebuild of what was loaded then fails, and the only cure is killing " +
                      "the server — which for a stdio server is terminal, because the client never reconnects " +
-                     "one, so the per-edit check that was the reason to run it goes quietly dead. " +
+                     "one, so the session's architecture queries go quietly dead. " +
                      "SpecLoadContext is the single sanctioned caller: it reads bytes, and reaches for the " +
                      "loader only when the file is already gone.")
             .Fix("Read the assembly's bytes and load from the stream, the way " +

@@ -2,15 +2,16 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
 using Zphil.LoadBearing.Roslyn.Diagnostics;
 using Zphil.LoadBearing.Roslyn.Extraction;
-using Zphil.LoadBearing.Roslyn.Solutions;
 
 namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>
-///     A loaded MSBuild solution paired with its owning workspace. Dispose to release the workspace
-///     and its out-of-process BuildHost. <see cref="Solution" /> is the unresolved-reference-stripped,
-///     project-name-normalized snapshot the extractor reads, and <see cref="TargetFrameworks" /> carries
-///     the discriminators the normalization removed.
+///     A loaded MSBuild solution together with the workspace that produced it. <see cref="Solution" /> is
+///     what <see cref="CodebaseExtractor.ExtractFromSolutionAsync" /> reads: references that did not
+///     resolve have been dropped, and a multi-target-framework project's several compilations have been
+///     given one project name, with the framework each was loaded for in <see cref="TargetFrameworks" />.
+///     The project lists below say how completely it loaded. Dispose it to release the workspace and its
+///     out-of-process build host; the <see cref="Solution" /> stays readable afterwards.
 /// </summary>
 public sealed class LoadedSolution : IDisposable
 {
@@ -29,47 +30,48 @@ public sealed class LoadedSolution : IDisposable
         RestoreFailedProjects = restoreFailedProjects ?? [];
     }
 
-    /// <summary>The MSBuild workspace that produced <see cref="Solution" />.</summary>
+    /// <summary>Gets the MSBuild workspace that produced <see cref="Solution" />.</summary>
     public MSBuildWorkspace Workspace { get; }
 
-    /// <summary>The loaded, unresolved-reference-stripped solution.</summary>
+    /// <summary>
+    ///     Gets the loaded solution: references that did not resolve have been dropped, and a multi-target-framework
+    ///     project's several compilations all carry the one project name, told apart by
+    ///     <see cref="TargetFrameworks" />.
+    /// </summary>
     public Solution Solution { get; }
 
     /// <summary>
-    ///     The target framework each multi-target-framework project was loaded for, keyed by
-    ///     <see cref="ProjectId" /> — the discriminator
-    ///     <see cref="SolutionExtensions.NormalizeProjectNames" /> took out of the project names. Empty for a
-    ///     solution whose projects each target one framework.
+    ///     Gets the target framework each multi-target-framework project was loaded for, keyed by
+    ///     <see cref="ProjectId" />. Such a project arrives as one <see cref="Project" /> per framework, all
+    ///     sharing the one project name, and this map is what tells them apart; pass it to
+    ///     <see cref="CodebaseExtractor.ExtractFromSolutionAsync" /> so the extracted model records which
+    ///     framework a fact came from. Empty for a solution whose projects each target one framework.
     /// </summary>
     public IReadOnlyDictionary<ProjectId, string> TargetFrameworks { get; }
 
     /// <summary>
-    ///     The absolute <c>.csproj</c> paths of the projects that failed to load, ordinal-sorted — one of the
-    ///     two facts the fail-closed gate keys on, computed at this boundary by
-    ///     <see cref="ProjectLoadFailures.Detect" />. Empty for a solution that loaded completely.
+    ///     Gets the absolute <c>.csproj</c> paths of the projects that failed to load, ordinal-sorted. A
+    ///     non-empty list means the model built from this solution is missing whatever those projects declare,
+    ///     so report it rather than let a clean result read as a clean solution; the remedy is
+    ///     <c>dotnet build</c>. Empty for a solution that loaded completely.
     /// </summary>
     public IReadOnlyList<string> FailedProjects { get; }
 
     /// <summary>
-    ///     The absolute <c>.csproj</c> paths of the projects whose NuGet packages are not in the model —
-    ///     restore ran and failed, or never ran — ordinal-sorted. The gate's other input, computed at this
-    ///     boundary by <see cref="RestoreFailures.Detect" />. Empty for a solution that restored cleanly, and
-    ///     disjoint from <see cref="FailedProjects" /> by construction.
+    ///     Gets the absolute <c>.csproj</c> paths of the projects whose NuGet packages are not in the model,
+    ///     ordinal-sorted: restore ran and failed, or never ran. These projects did load, so the types they
+    ///     declare are present while the types they get from packages are not, and the remedy is
+    ///     <c>dotnet restore</c> rather than <c>dotnet build</c>. Never overlaps
+    ///     <see cref="FailedProjects" />. Empty for a solution that restored cleanly.
     /// </summary>
-    /// <remarks>
-    ///     Its own slot rather than a fold into <see cref="FailedProjects" />: these projects <em>did</em>
-    ///     load, and the remedy differs (<c>dotnet restore</c>, not <c>dotnet build</c>). The full rationale
-    ///     rides the one value every surface reads — <see cref="WorkspaceDiagnostics" />' slot of the same
-    ///     name.
-    /// </remarks>
     public IReadOnlyList<string> RestoreFailedProjects { get; }
 
     /// <summary>
-    ///     The absolute <c>.csproj</c> paths this solution declares that the run did not check, ordinal-sorted
-    ///     — non-empty only when the load went through a <c>.slnf</c> that left members out. A narrowed
-    ///     universe is a smaller true answer rather than a broken one, so unlike
-    ///     <see cref="FailedProjects" /> this never gates; it is what keeps a green over a subset from
-    ///     reading as a green over the solution.
+    ///     Gets the absolute <c>.csproj</c> paths this solution declares that the load did not read,
+    ///     ordinal-sorted — non-empty only when what was loaded is a <c>.slnf</c> filter that leaves members
+    ///     out. Unlike <see cref="FailedProjects" /> this is not a fault: the model is a true answer about a
+    ///     smaller set of projects. Report it, or a clean result over a subset reads as a clean result over the
+    ///     solution.
     /// </summary>
     public IReadOnlyList<string> UncheckedProjects { get; }
 
@@ -109,7 +111,10 @@ public sealed class LoadedSolution : IDisposable
             loadFailures, [], FailedProjects, UncheckedProjects, RestoreFailedProjects, UnsupportedProjects, []);
     }
 
-    /// <summary>Disposes the underlying workspace.</summary>
+    /// <summary>
+    ///     Disposes the MSBuild workspace and its out-of-process build host. <see cref="Solution" /> stays
+    ///     readable afterwards.
+    /// </summary>
     public void Dispose()
     {
         Workspace.Dispose();

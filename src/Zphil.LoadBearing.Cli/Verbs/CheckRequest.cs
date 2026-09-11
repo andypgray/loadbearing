@@ -8,13 +8,13 @@ namespace Zphil.LoadBearing.Cli.Verbs;
 /// <param name="Spec">The <c>--spec</c> value (a built DLL or a solution-member csproj), or null for convention.</param>
 /// <param name="Json">Whether to emit the machine-readable JSON document instead of human output.</param>
 /// <param name="HookJson">
-///     Whether to render for a Claude Code <c>PostToolUse</c> hook. A clean run carrying at least one
-///     warning writes the hook document (<see cref="Rendering.HookReportRenderer" />) and nothing else, so
-///     the wrapper passes stdout straight through and the warning reaches the agent as transcript context;
-///     a clean run with no warnings writes nothing at all; every other outcome writes what it always wrote,
-///     which is what the wrapper blocks with. Nothing else may share that stdout, so the run's whole human
-///     side — stamps, report and diagnostics alike — is composed into one buffer and then placed, rather
-///     than streamed across two channels. Refused beside <see cref="Json" />: two documents, one stdout.
+///     Whether to render for a Claude Code hook. A clean run carrying at least one warning writes the hook
+///     document (<see cref="Rendering.HookReportRenderer" />) and nothing else, so the wrapper passes stdout
+///     straight through and the warning reaches the agent as transcript context; a clean run with no
+///     warnings writes nothing at all; every other outcome writes what it always wrote, which is what the
+///     wrapper blocks with. Nothing else may share that stdout, so the run's whole human side — stamps,
+///     report and diagnostics alike — is composed into one buffer and then placed, rather than streamed
+///     across two channels. Refused beside <see cref="Json" />: two documents, one stdout.
 /// </param>
 /// <param name="DiffBase">The <c>--diff-base</c> git ref for the scope tripwires, or null to skip them.</param>
 /// <param name="WorkingDirectory">The directory solution discovery walks up from.</param>
@@ -48,6 +48,14 @@ namespace Zphil.LoadBearing.Cli.Verbs;
 ///     The opposite knob to <see cref="Rules" /> and independent of it — every selected rule is reported at
 ///     every rung, in less detail. Human output ignores it: a terminal has no budget to overrun.
 /// </param>
+/// <param name="HookEvent">
+///     The <c>--hook-event</c> value — which Claude Code event the <see cref="HookJson" /> document names —
+///     or null for <see cref="Rendering.HookReportRenderer.DefaultEvent" />. The field decides whether the
+///     report reaches the agent at all: Claude Code reads <c>additionalContext</c> only from a document
+///     naming the event it fired, so a turn-end hook handed the per-edit envelope is silently ignored.
+///     Refused without <see cref="HookJson" />, which is the only document it shapes, and refused for an
+///     event outside <see cref="Rendering.HookReportRenderer.Events" />.
+/// </param>
 internal sealed record CheckRequest(
     string? Solution,
     string? Spec,
@@ -60,4 +68,5 @@ internal sealed record CheckRequest(
     bool AllowWorkspaceDiagnostics,
     string? Sarif,
     string? Rules,
-    DocumentGrain Grain) : IReplayableRequest;
+    DocumentGrain Grain,
+    string? HookEvent = null) : IReplayableRequest;

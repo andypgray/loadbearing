@@ -1,26 +1,26 @@
 namespace Zphil.LoadBearing.Codebase;
 
 /// <summary>
-///     A declared member of a solution-declared type in the extracted model (GRAMMAR §4.6) — the
-///     member-subject substrate's node, the inventory a member selection ranges over. It implements
-///     <see cref="IMemberInfo" /> so the member escape-hatch predicate contract and this Roslyn-derived
-///     data are one surface, exactly as <see cref="TypeNode" /> implements <see cref="ITypeInfo" />.
+///     A member the solution declares: one method, property, field or event of a <see cref="TypeNode" />,
+///     and the unit a member selection such as <c>Types.Methods</c> or <c>Types.Members</c> ranges over. It
+///     implements <see cref="IMemberInfo" />, so the facts a <c>Where</c> predicate in a spec sees and the
+///     facts here are one surface.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <see cref="DeclaringType" /> is the <em>same</em> <see cref="TypeNode" /> instance held by
-///         <see cref="CodebaseModel.Types" /> and by <see cref="TypeNode.Members" /> (reference equality,
-///         not just name equality) — a member and its declaring type are one object graph, so a predicate
-///         reaching <c>m.DeclaringType</c> sees the identical facts the type-side surface exposes.
+///         <see cref="DeclaringType" /> is the very <see cref="TypeNode" /> instance held by
+///         <see cref="CodebaseModel.Types" /> and by <see cref="TypeNode.Members" />, so a predicate reaching
+///         through it sees the identical type facts. Only the types the solution declares carry members: a
+///         referenced framework or package type has none, and neither has an enum or a delegate.
 ///     </para>
 ///     <para>
-///         The flags carry C# declaration semantics, not IL (GRAMMAR §4.6): an <c>override</c> member is
-///         not <see cref="IsVirtual" />, an interface member is <see cref="IsAbstract" />, and a
-///         <c>const</c> field is not <see cref="IsReadOnly" /> — the two are disjoint declarations, where
-///         <see cref="HasInitOnlySetter" /> instead refines <see cref="HasSetter" />. Exactly one of
-///         <see cref="ReturnTypeFullName" /> (methods; <c>System.Void</c> for void) and
-///         <see cref="MemberTypeFullName" /> (properties/fields/events) is non-null. Only solution-declared
-///         types carry members; external nodes hold an empty <see cref="TypeNode.Members" />.
+///         The flags describe the declaration as C# spells it rather than the IL behind it. An
+///         <c>override</c> member is not <see cref="IsVirtual" />, every interface member is
+///         <see cref="IsAbstract" />, and a <c>const</c> field is not <see cref="IsReadOnly" /> — those two
+///         are separate declarations, where <see cref="HasInitOnlySetter" /> instead narrows
+///         <see cref="HasSetter" />. Exactly one of <see cref="ReturnTypeFullName" /> (methods, with
+///         <c>System.Void</c> for a void one) and <see cref="MemberTypeFullName" /> (properties, fields and
+///         events) is non-null.
 ///     </para>
 /// </remarks>
 public sealed class MemberNode : IMemberInfo
@@ -68,17 +68,17 @@ public sealed class MemberNode : IMemberInfo
     }
 
     /// <summary>
-    ///     The stable symbol ID a baseline keys on (GRAMMAR §4.3): the Roslyn
-    ///     <c>DocumentationCommentId</c> of the member's original definition — <c>M:</c> for a method,
-    ///     <c>P:</c> for a property, <c>F:</c> for a field, <c>E:</c> for an event — or an
-    ///     <c>unresolved:{declaring FQN}.{name}</c> fallback when the symbol has no DocID. Unlike a
-    ///     <c>file:line</c> site it survives file moves, renames, and formatting.
+    ///     Gets the identity a baseline records for this member: its Roslyn documentation comment ID —
+    ///     <c>M:</c> for a method, <c>P:</c> for a property, <c>F:</c> for a field, <c>E:</c> for an event — or
+    ///     <c>unresolved:{declaring type}.{name}</c> where the compiler gives the member no such ID. It survives
+    ///     file moves, renames and reformatting, where a <c>file:line</c> does not.
     /// </summary>
     public string SymbolId { get; }
 
     /// <summary>
-    ///     The declaration sites — one per part for a partial member (and each declarator for a field
-    ///     group), ordered by (file, line). The <c>file:line</c> a member-shape violation cites.
+    ///     Gets where the member is declared, ordered by file then line: one entry per part of a partial member,
+    ///     and one per declarator of a field group. A violation about the member's shape or name cites one of
+    ///     these.
     /// </summary>
     public IReadOnlyList<SourceLocation> DeclarationSites { get; }
 

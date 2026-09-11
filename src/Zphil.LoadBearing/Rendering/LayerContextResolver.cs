@@ -7,28 +7,32 @@ using Zphil.LoadBearing.Model;
 namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
-///     Places each declared layer's "local rules" context card — the second, additive
-///     emission key beside scopes. A layer earns a card iff at least one Enforce or Migrate
-///     rule is <em>anchored</em> on it: the rule's subject <see cref="Selection" /> has that layer's
-///     <see cref="Model.LayerNoun" /> as its noun head (adjectives and <c>Except</c> refinements keep
-///     the noun head, so a refined subject still anchors).
+///     Works out which directory each layer's local-rules card belongs in. A layer earns a card when at
+///     least one Enforce or Migrate rule has that layer as its subject: narrowing the layer with
+///     adjectives or <c>Except</c> still counts, and so does naming it as one cell of a family, but a
+///     union of selections does not, having no single home directory, so a union's rules stay in the
+///     root block alone. Rules a scope produced are left out, their story belonging to the scope's own
+///     card.
 /// </summary>
 /// <remarks>
-///     Scope children are excluded by their payload rather than their posture — a quarantined layer's
-///     desugared containment subject is layer-anchored, but its story belongs to the scope card, and the
-///     two keys must not double-emit; keying on the payload means a posture added later cannot slip
-///     through the filter. A caution over a layer would be excluded even without it: its tripwire carries
-///     no constraint to read a subject from, so it anchors nothing. The card lands in the deepest common
-///     ancestor directory of the layer's matched types,
-///     shared with <see cref="ScopedContextResolver" /> through <see cref="DirectoryPlacement" />. Like
-///     scoped placement, this is the one concern that needs the codebase, so it stays beside the internal
-///     <see cref="SelectionEvaluator" /> and returns a public result. The layer's purpose rides on the
-///     placement from its <see cref="LayerDefinition" />; a purpose alone earns no placement, because
-///     anchoring is what a card is for.
+///     A card lands in the deepest directory holding every file that declares one of the layer's types,
+///     so it covers the layer and as little else as it can; a layer whose types are spread across the
+///     solution therefore lands high up. A layer that matches no type in the solution comes back with a
+///     null directory and the reason, for the caller to report or ignore. A purpose alone earns no card:
+///     a card exists to carry rules.
 /// </remarks>
+// Scope children are excluded by their payload rather than their posture: a quarantined layer's
+// containment subject is layer-anchored, but its story belongs to the scope card and the two
+// emission keys must not double-emit — and keying on the payload means a posture added later cannot
+// slip through the filter. A caution over a layer would be excluded even without it: its tripwire
+// carries no constraint to read a subject from, so it anchors nothing.
 public static class LayerContextResolver
 {
-    /// <summary>Resolves a placement for every anchored layer in the model, in declaration order.</summary>
+    /// <summary>
+    ///     Resolves a placement for every layer that has rules of its own, in the order the spec declares
+    ///     the layers. Ask <see cref="HasAnchoredLayers" /> first to learn whether extracting
+    ///     <paramref name="codebase" /> is worth the cost at all.
+    /// </summary>
     public static IReadOnlyList<LayerPlacement> Resolve(ArchitectureModel model, CodebaseModel codebase)
     {
         Guard.NotNull(model, nameof(model));
@@ -61,8 +65,8 @@ public static class LayerContextResolver
     }
 
     /// <summary>
-    ///     Whether any declared layer has at least one anchored Enforce/Migrate rule — the cheap,
-    ///     codebase-free gate to consult before paying the extraction cost.
+    ///     Whether any layer has at least one Enforce or Migrate rule of its own. Answered from the model
+    ///     alone, so it is the question to ask before extracting a codebase to resolve placements against.
     /// </summary>
     public static bool HasAnchoredLayers(ArchitectureModel model)
     {

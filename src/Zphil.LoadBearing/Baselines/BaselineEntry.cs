@@ -3,27 +3,22 @@ using Zphil.LoadBearing.Internal;
 namespace Zphil.LoadBearing.Baselines;
 
 /// <summary>
-///     One grandfathered violation's identity in a baseline (GRAMMAR §4.3). A dependency-verb entry
-///     carries <see cref="Source" /> and <see cref="Target" /> symbol IDs; a shape/naming/inheritance/
-///     attribute/escape-hatch entry carries only <see cref="Subject" />. The unused slots are null.
+///     One grandfathered violation's identity in a baseline file. A violation of a verb that names a
+///     pair (a reference, a construction, an injection, a banned member use, a catch, a throw or an
+///     exposure) is keyed by <see cref="Source" /> and <see cref="Target" />; a violation about one
+///     type, member or project (shape, naming, inheritance, attribute, or an escape hatch) is keyed
+///     by <see cref="Subject" /> alone. The unused slots are null, and
+///     <c>Violation.BaselineIdentity()</c> builds the entry that identifies a given violation.
 /// </summary>
 /// <remarks>
-///     <para>
-///         IDs are Roslyn <c>DocumentationCommentId</c> strings — <c>T:</c> forms for type subjects and
-///         edges, and <c>M:</c>/<c>P:</c>/<c>F:</c>/<c>E:</c> forms for member subjects (§4.6) — so an
-///         entry's identity is stable across file moves and formatting. Value equality is ordinal over
-///         all three ID slots.
-///     </para>
-///     <para>
-///         Two slots ride beside that identity and are excluded from equality, so ratchet set
-///         operations never fork on either: <see cref="Because" />, an <em>annotation</em> nothing
-///         compares, and <see cref="SiteCount" />, the <em>measure</em> the ratchet compares an
-///         observed site count against. The measure differs from the annotation in two ways that must
-///         both hold. It is folded into the file digest, so a hand-edited count is tamper rather than a
-///         silently widened allowance. And it is line-grained where identity is format-immune: a
-///         reformat that splits or joins two same-target mentions on one line moves the count while
-///         leaving the entry it sits on exactly where it was (GRAMMAR §4.3).
-///     </para>
+///     A type or member slot holds a Roslyn <c>DocumentationCommentId</c> string, and a project slot
+///     holds <c>project:</c> followed by the project's name, so an entry survives a file move and any
+///     amount of reformatting; renaming the type or member it names, or moving it to another namespace
+///     or containing type, is what makes it a different entry. Two entries are equal when all three
+///     slots match ordinally, which leaves <see cref="Because" /> and <see cref="SiteCount" /> free to
+///     be re-recorded without forking the entry. An entry no violation in a run matches is stale (the
+///     debt it recorded has been paid off), which <c>loadbearing status</c> lists and
+///     <c>loadbearing baseline --accept-reductions</c> retires.
 /// </remarks>
 public sealed class BaselineEntry : IEquatable<BaselineEntry>
 {
@@ -36,29 +31,51 @@ public sealed class BaselineEntry : IEquatable<BaselineEntry>
         SiteCount = siteCount;
     }
 
-    /// <summary>The referencing type's symbol ID (edge entry), or null for a subject entry.</summary>
+    /// <summary>
+    ///     Gets the symbol ID of the type the violation comes from: the type that holds the reference, the
+    ///     <c>new</c>, the injected constructor parameter, the <c>catch</c>, the <c>throw</c>, the exposed
+    ///     signature position or the banned member access. Null on an entry keyed by a subject.
+    /// </summary>
     public string? Source { get; }
 
-    /// <summary>The referenced type's symbol ID (edge entry), or null for a subject entry.</summary>
+    /// <summary>
+    ///     Gets the symbol ID of what the source reached: the referenced or constructed type, the injected
+    ///     parameter's type, the caught or thrown exception type, the exposed type, or the banned member
+    ///     itself. Null on an entry keyed by a subject.
+    /// </summary>
     public string? Target { get; }
 
-    /// <summary>The offending type's or member's symbol ID (subject entry), or null for an edge entry.</summary>
+    /// <summary>
+    ///     Gets the symbol ID of the type, member or project the rule judged, for a violation that names
+    ///     one thing rather than a pair. Null on an entry keyed by a source and a target.
+    /// </summary>
     public string? Subject { get; }
 
-    /// <summary>Why this entry is grandfathered (single line, non-blank), or null when unattributed. Excluded from equality.</summary>
+    /// <summary>
+    ///     Gets the reason recorded with the entry, or null when it was captured without one — a bulk
+    ///     capture records no reason, while <c>loadbearing baseline --add</c> requires one. A single
+    ///     non-blank line, printed beside the grandfathered violation in the check report. Excluded from
+    ///     the entry's identity, so re-recording it never creates a second entry.
+    /// </summary>
     public string? Because { get; }
 
     /// <summary>
-    ///     How many distinct <c>file:line</c> sites this entry grandfathers (at least 1), or null when it
-    ///     is <em>uncounted</em> — captured before the measure existed, or by a write with no count to
-    ///     record. An uncounted entry grandfathers its pair at any size, which is what keeps a partially
-    ///     upgraded file valid. Edge entries only; excluded from equality, folded into the digest.
+    ///     Gets how many distinct <c>file:line</c> sites the entry covered when it was recorded, at least
+    ///     1, or null when no count was recorded — an entry written before counts existed, or by a write
+    ///     with none to record. A pair that has since grown past the recorded count fails the check
+    ///     instead of being grandfathered; the same or fewer passes, and
+    ///     <c>loadbearing baseline --accept-reductions</c> lowers the recorded count to what is left. An
+    ///     entry with no count grandfathers its pair however many sites it grows to, which is what keeps a
+    ///     partly cleaned-up file passing. Only an entry keyed by a pair carries a count: a subject
+    ///     entry's sites are declarations. Excluded from the entry's identity and folded into the file's
+    ///     digest, so an edited count is refused rather than quietly widening the allowance.
     /// </summary>
     public int? SiteCount { get; }
 
     /// <summary>
-    ///     Whether this is an edge entry — the shape that carries a <see cref="SiteCount" />. A subject
-    ///     entry's sites are declarations, so it never carries one (GRAMMAR §4.3).
+    ///     Gets whether this entry is keyed by a pair, <see cref="Source" /> and <see cref="Target" />,
+    ///     rather than by a <see cref="Subject" />. Only a pair-keyed entry carries a
+    ///     <see cref="SiteCount" />.
     /// </summary>
     public bool IsEdge => Source is not null;
 
@@ -73,14 +90,22 @@ public sealed class BaselineEntry : IEquatable<BaselineEntry>
                && string.Equals(Subject, other.Subject, StringComparison.Ordinal);
     }
 
-    /// <summary>An edge entry keyed by (source, target) symbol IDs — the dependency verbs.</summary>
+    /// <summary>
+    ///     Creates an entry keyed by a pair of symbol IDs, the shape a reference, construction, injection,
+    ///     banned member use, catch, throw or exposure violation takes. The entry carries no reason and no
+    ///     site count; add them with <see cref="WithBecause" /> and <see cref="WithSiteCount" />.
+    /// </summary>
     public static BaselineEntry ForEdge(string source, string target)
     {
         return new BaselineEntry(
             Guard.NotNull(source, nameof(source)), Guard.NotNull(target, nameof(target)), null, null, null);
     }
 
-    /// <summary>A subject entry keyed by one symbol ID — shape/naming/inheritance/attribute/escape verbs.</summary>
+    /// <summary>
+    ///     Creates an entry keyed by one symbol ID, the shape a violation about a single type, member or
+    ///     project takes — shape, naming, inheritance, attribute, or an escape hatch. A subject entry
+    ///     never carries a site count; add a reason with <see cref="WithBecause" />.
+    /// </summary>
     public static BaselineEntry ForSubject(string subject)
     {
         return new BaselineEntry(null, null, Guard.NotNull(subject, nameof(subject)), null, null);
@@ -104,14 +129,15 @@ public sealed class BaselineEntry : IEquatable<BaselineEntry>
             .ToList();
     }
 
-    /// <summary>A copy of this entry carrying <paramref name="because" /> — same identity, new attribution.</summary>
-    /// <remarks>Preserves <see cref="SiteCount" />: attributing an entry never disturbs its measure.</remarks>
+    /// <summary>
+    ///     Returns a copy of this entry carrying <paramref name="because" /> as the reason it is
+    ///     grandfathered — the same identity, and the same <see cref="SiteCount" />, so attributing an
+    ///     entry never disturbs what it grandfathers. The reason must be a single non-blank line.
+    /// </summary>
     /// <exception cref="ArgumentException"><paramref name="because" /> is blank or spans more than one line.</exception>
     public BaselineEntry WithBecause(string because)
     {
-        bool blankOrMultiline = string.IsNullOrWhiteSpace(because)
-                                || because.IndexOf('\r') >= 0
-                                || because.IndexOf('\n') >= 0;
+        bool blankOrMultiline = string.IsNullOrWhiteSpace(because) || SingleLineProse.IsMultiLine(because);
         if (blankOrMultiline)
             throw new ArgumentException("A baseline attribution must be a non-blank single line.", nameof(because));
 
@@ -119,18 +145,15 @@ public sealed class BaselineEntry : IEquatable<BaselineEntry>
     }
 
     /// <summary>
-    ///     A copy of this entry grandfathering <paramref name="siteCount" /> sites — same identity, new
-    ///     measure.
+    ///     Returns a copy of this entry grandfathering <paramref name="siteCount" /> sites — the same
+    ///     identity, and the same <see cref="Because" />, so the two copy calls compose in either order
+    ///     and re-recording a count never drops the reason that justified the entry.
     /// </summary>
-    /// <remarks>
-    ///     Preserves <see cref="Because" />, so the two copy verbs compose in either order and a
-    ///     re-recorded count never drops the attribution that justified the entry. Zero is refused rather
-    ///     than stored: an entry that grandfathers nothing is a stale entry, which the ratchet reports for
-    ///     acceptance instead of recording.
-    /// </remarks>
     /// <param name="siteCount">The number of distinct <c>file:line</c> sites; at least 1.</param>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="siteCount" /> is less than 1.</exception>
-    /// <exception cref="InvalidOperationException">This is a subject entry, which carries no measure.</exception>
+    /// <exception cref="InvalidOperationException">This entry is keyed by a subject and has no site count.</exception>
+    // Zero is refused rather than stored: an entry that grandfathers nothing is a stale entry, which
+    // status reports for acceptance instead of recording.
     public BaselineEntry WithSiteCount(int siteCount)
     {
         if (siteCount < 1)
@@ -150,7 +173,11 @@ public sealed class BaselineEntry : IEquatable<BaselineEntry>
         return Equals(obj as BaselineEntry);
     }
 
-    /// <summary>Hand-rolled ordinal hash — <c>System.HashCode</c> is unavailable on netstandard2.0.</summary>
+    /// <summary>
+    ///     Returns a hash over the entry's three symbol-ID slots, ordinal, consistent with
+    ///     <c>Equals</c>.
+    /// </summary>
+    // Hand-rolled because System.HashCode is unavailable on netstandard2.0.
     public override int GetHashCode()
     {
         unchecked

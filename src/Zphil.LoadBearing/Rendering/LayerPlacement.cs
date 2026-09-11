@@ -3,11 +3,9 @@ using Zphil.LoadBearing.Hosting;
 namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
-///     Where a layer's "local rules" context card lands: the layer name, its optional purpose, the anchored
-///     Enforce/Migrate rules whose subject noun head is that layer (in model order — the
-///     <see cref="AgentContextRenderer.LayerCard" /> source), and either the resolved
-///     <see cref="DirectoryPath" /> — the deepest common ancestor of the layer's types' declaration
-///     sites — or a null path with a <see cref="SkipReason" /> when the layer matched no types.
+///     Where a layer's local-rules card goes: the layer's name and purpose, the rules the card lists,
+///     and either the directory whose <c>AGENTS.md</c> receives it or a null path with the reason it was
+///     skipped.
 /// </summary>
 public sealed class LayerPlacement
 {
@@ -21,21 +19,32 @@ public sealed class LayerPlacement
         SkipReason = skipReason;
     }
 
-    /// <summary>The declaring layer's name (e.g. <c>Web</c>).</summary>
+    /// <summary>
+    ///     Gets the layer's name as the spec declares it, <c>Web</c> say.
+    /// </summary>
     public string LayerName { get; }
 
-    /// <summary>The layer's authored purpose, carried from its definition into the card lede, or null.</summary>
+    /// <summary>
+    ///     Gets what the layer is for, as the spec states it, carried into the card's lede; null when the layer was
+    ///     given no purpose.
+    /// </summary>
     public string? Purpose { get; }
 
-    /// <summary>The anchored Enforce/Migrate rules rendered into the layer card, in model order.</summary>
+    /// <summary>
+    ///     Gets the Enforce and Migrate rules the layer is the subject of, in model order, one card bullet each.
+    /// </summary>
     public IReadOnlyList<ArchRule> Rules { get; }
 
     /// <summary>
-    ///     The directory whose <c>AGENTS.md</c> receives the layer card, or null when the layer
-    ///     matched no solution types (then <see cref="SkipReason" /> explains the skip).
+    ///     Gets the directory whose <c>AGENTS.md</c> receives the layer card, which is the deepest one holding every
+    ///     file that declares one of the layer's types, or null when the layer matched no type in the solution. Then
+    ///     <see cref="SkipReason" /> says so.
     /// </summary>
     public string? DirectoryPath { get; }
 
-    /// <summary>The skip explanation (for a stderr warning) iff <see cref="DirectoryPath" /> is null.</summary>
+    /// <summary>
+    ///     Gets why no directory was resolved, set exactly when <see cref="DirectoryPath" /> is null. A host with
+    ///     somewhere to put it prints it as a warning.
+    /// </summary>
     public string? SkipReason { get; }
 }

@@ -5,18 +5,17 @@ using Zphil.LoadBearing.Roslyn.Solutions;
 namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>
-///     Resolves the target solution file: an explicit path, then the
-///     <see cref="LoadBearingEnvVars.SolutionPath" /> environment variable, then a walk up from the
-///     working directory matching <c>.sln</c>/<c>.slnf</c>/<c>.slnx</c>. The first ancestor holding
-///     exactly one solution wins, where a <c>.slnf</c> counts only when no full solution stands beside it.
+///     Resolves which solution file to load: an explicit path, then the <c>LOADBEARING_SOLUTION_PATH</c> environment
+///     variable, then a search up from the working directory for a <c>.sln</c>, <c>.slnx</c> or <c>.slnf</c>. The first
+///     ancestor directory holding exactly one solution wins, where a <c>.slnf</c> counts only when no full solution
+///     stands beside it. Nothing is guessed: a directory holding several solutions is climbed past rather than chosen
+///     from, and a search that reaches the root without finding a directory that holds exactly one throws rather than
+///     picking one. Every path returned is absolute and symlink-free (<see cref="PathCanonicalizer" />), so it compares
+///     equal to a path another tool resolved.
 /// </summary>
-/// <remarks>
-///     When the walk-up finds nothing it refuses; it never widens the search and picks. Both refusals
-///     (<see cref="AmbiguousMessage" />, <see cref="NotFoundMessage" />) name the solution argument before
-///     the environment variable, and the "nothing anywhere" one names any solution one level down — the two
-///     shapes a repository actually arrives in, measured against real ones: a solution under <c>src\</c>, or
-///     several at the root. Naming the file the reader needs is what turns a refusal into one copy-paste.
-/// </remarks>
+// Both refusals must keep naming the solution argument before the environment variable, and the
+// "nothing anywhere" one must keep naming any solution one level down; the pinned message texts are
+// what hold that.
 public static class SolutionDiscovery
 {
     /// <summary>How many near misses the "nothing anywhere" refusal lists before the "and N more" tail.</summary>
@@ -38,11 +37,15 @@ public static class SolutionDiscovery
         + $"config's args), or set {LoadBearingEnvVars.SolutionPath} to it.";
 
     /// <summary>
-    ///     Discovers the solution file to load.
+    ///     Discovers the solution file to load. Both refusals are written for a person: they list what was found and
+    ///     say to pass the solution as an argument or set <c>LOADBEARING_SOLUTION_PATH</c>; the refusal for a search
+    ///     that found nothing anywhere also names any solution one level below the starting directory.
     /// </summary>
     /// <param name="explicitPath">An explicit solution path; when set it must exist.</param>
-    /// <param name="workingDirectory">The directory to start the walk-up from; defaults to the CWD.</param>
-    /// <returns>The absolute path to the resolved solution file.</returns>
+    /// <param name="workingDirectory">
+    ///     The directory to start searching upwards from; null starts from the current directory.
+    /// </param>
+    /// <returns>The absolute, symlink-free path to the resolved solution file.</returns>
     /// <exception cref="FileNotFoundException">An explicit or env-var path was given but no file exists there.</exception>
     /// <exception cref="InvalidOperationException">No single solution was found, or a directory held several.</exception>
     public static string DiscoverSolution(string? explicitPath = null, string? workingDirectory = null)

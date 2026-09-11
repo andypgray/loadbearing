@@ -91,14 +91,24 @@ internal static class CliResultAssertions
     }
 
     /// <summary>
-    ///     Asserts stdout is the one hook document and hands back its <c>additionalContext</c> — the text the
-    ///     wrapper passes through to Claude Code.
+    ///     Asserts stdout is the one hook document, answering for <paramref name="expectedEvent" />, and
+    ///     hands back its <c>additionalContext</c> — the text the wrapper passes through to Claude Code.
     /// </summary>
-    internal static string ShouldHaveHookAdditionalContext(this CliResult result)
+    /// <remarks>
+    ///     The event is named by every caller rather than defaulted, because it decides whether the context
+    ///     arrives at all: Claude Code reads <c>additionalContext</c> only from a document naming the event
+    ///     it fired, so an envelope for the wrong event is silently dropped at the far end and a row that
+    ///     asserted only on the text would stay green through exactly that.
+    /// </remarks>
+    internal static string ShouldHaveHookAdditionalContext(this CliResult result, string expectedEvent)
     {
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        return document.RootElement.GetProperty("hookSpecificOutput")
-            .GetProperty("additionalContext")
+        JsonElement output = document.RootElement.GetProperty("hookSpecificOutput");
+        output.GetProperty("hookEventName")
+            .GetString()
+            .ShouldBe(expectedEvent, Describe(result));
+
+        return output.GetProperty("additionalContext")
             .GetString()!;
     }
 

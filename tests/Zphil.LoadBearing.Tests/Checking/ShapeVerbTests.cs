@@ -9,7 +9,9 @@ namespace Zphil.LoadBearing.Tests.Checking;
 /// <summary>
 ///     The shape/naming/escape verbs (GRAMMAR §5.3) and the adjective + noun vocabulary that feeds
 ///     them (§5.1–§5.2): every adjective (InNamespace, OfKind, WithSuffix, WithPrefix,
-///     WithNameMatching, Named, Except, Where) and the Project noun get at least one pass/fail pin here.
+///     WithNameMatching, Named, Except, Where) and the Project noun get at least one pass/fail pin here,
+///     plus the contrast that keeps a <c>*</c> inside an affix literal where the glob family expands it
+///     (§4.2).
 /// </summary>
 public sealed class ShapeVerbTests
 {
@@ -92,6 +94,48 @@ public sealed class ShapeVerbTests
         Checker.Run(NamingModel, arch =>
                 arch.Rule("naming/repo")
                     .Enforce(arch.Types.WithNameMatching("*Repo*").MustHaveNameMatching("*Repository"))
+                    .Because("b"))
+            .Single()
+            .ShouldHavePassed();
+    }
+
+    // The next two pin the one thing that separates an affix from a glob: a `*` inside an affix is a
+    // literal character, because only the *NameMatching family reaches the glob matcher. Every
+    // `*`-free affix reads the same under either rule, so the contrast against the glob spelling is
+    // the only honest way to state it — `*` is not a legal identifier character, so no codebase can
+    // declare the name the literal reading looks for, and the literal side can only ever be empty.
+
+    [Fact]
+    public void WithSuffixAdjective_ReadsStarAsLiteral_WhereWithNameMatchingGlobs()
+    {
+        Checker.Run(NamingModel, arch =>
+                arch.Rule("naming/literal-affix")
+                    .Enforce(arch.Types.WithSuffix("*Controller").MustHavePrefix("Order"))
+                    .Because("b"))
+            .Single()
+            .ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
+
+        Checker.Run(NamingModel, arch =>
+                arch.Rule("naming/glob-affix")
+                    .Enforce(arch.Types.WithNameMatching("*Controller").MustHavePrefix("Order"))
+                    .Because("b"))
+            .Single()
+            .ShouldHavePassed();
+    }
+
+    [Fact]
+    public void MustHaveSuffixVerb_ReadsStarAsLiteral_WhereMustHaveNameMatchingGlobs()
+    {
+        Checker.Run(NamingModel, arch =>
+                arch.Rule("naming/literal-verb")
+                    .Enforce(arch.Types.Named("OrderController").MustHaveSuffix("*Controller"))
+                    .Because("b"))
+            .Single()
+            .ShouldHaveFailedWithSubjects(["App.Naming.OrderController"]);
+
+        Checker.Run(NamingModel, arch =>
+                arch.Rule("naming/glob-verb")
+                    .Enforce(arch.Types.Named("OrderController").MustHaveNameMatching("*Controller"))
                     .Because("b"))
             .Single()
             .ShouldHavePassed();

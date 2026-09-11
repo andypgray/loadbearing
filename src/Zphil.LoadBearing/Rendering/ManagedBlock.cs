@@ -3,42 +3,48 @@ using Zphil.LoadBearing.Internal;
 namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
-///     The dependabot-style managed block: a marker-delimited region LoadBearing owns inside an
-///     <c>AGENTS.md</c> file, everything outside preserved byte-for-byte. A pure
-///     string function — <c>existing text × LF-internal body → new text</c> — so it is
-///     netstandard2.0-safe and deterministic.
+///     The marker-delimited region of a text file that LoadBearing owns, everything outside the markers
+///     preserved byte for byte. Two pure string functions: <see cref="Splice" /> puts a body in and
+///     <see cref="ExtractBody" /> reads one back out, so the host decides for itself whether and when to
+///     write the file.
 /// </summary>
 /// <remarks>
-///     Markers are matched as whole lines by trimmed exact text. There is exactly one managed block
-///     per file; malformed marker states throw <see cref="MalformedManagedBlockException" /> and the
-///     splice is abandoned with no write. Line endings: the block body composes LF-internally always;
-///     on splice into an existing file the written separator matches the file's <em>dominant</em>
-///     ending (majority of <c>\n</c> preceded by <c>\r</c> ⇒ CRLF; ties / none / new file ⇒ LF).
+///     A file carries exactly one managed block. Markers are matched as whole lines, ignoring leading
+///     and trailing whitespace, so the marker text must not appear anywhere else in the file, examples
+///     included. Any other marker state (a begin with no end, an end before a begin, a second of either)
+///     throws <see cref="MalformedManagedBlockException" />, and nothing is spliced or extracted.
+///     Compose the body with LF line endings: <see cref="Splice" /> writes whichever ending the existing
+///     file mostly uses, CRLF when a strict majority of its lines end that way and LF otherwise.
 /// </remarks>
+// The dependabot-style managed block, kept a pure string function (existing text + LF body -> new
+// text) so it stays netstandard2.0-safe and deterministic.
 public static class ManagedBlock
 {
-    /// <summary>The begin marker line — fixed text, no attributes or versions (idempotence).</summary>
+    /// <summary>
+    ///     The line that opens the managed block. Fixed text carrying no version and no attributes, so
+    ///     re-rendering an unchanged spec leaves the file byte for byte as it was.
+    /// </summary>
     public const string BeginMarker = "<!-- loadbearing:begin -->";
 
-    /// <summary>The end marker line — fixed text.</summary>
+    /// <summary>The line that closes the managed block. Fixed text, carrying no version and no attributes.</summary>
     public const string EndMarker = "<!-- loadbearing:end -->";
 
     private const string Lf = "\n";
     private const string Crlf = "\r\n";
 
     /// <summary>
-    ///     Splices <paramref name="body" /> (composed LF-internally, no surrounding newlines) into
-    ///     <paramref name="existing" />, returning the whole new file text.
+    ///     Splices <paramref name="body" /> into <paramref name="existing" /> and returns the whole new file
+    ///     text; nothing is written. Compose the body with LF line endings and no surrounding blank lines.
     /// </summary>
     /// <exception cref="MalformedManagedBlockException">
     ///     <paramref name="existing" /> carries a malformed marker state; nothing is spliced.
     /// </exception>
     /// <remarks>
-    ///     A null or whitespace-only <paramref name="existing" /> counts as absent: the result is the
-    ///     block plus a single trailing newline, LF. With no markers, the block is appended after the
-    ///     preserved content and exactly one blank-line separator. With one marker pair, only the text
-    ///     strictly between the markers is replaced; everything else — marker lines included — is
-    ///     preserved verbatim.
+    ///     A null or blank <paramref name="existing" /> counts as a file that is not there: the result is
+    ///     the marked block and one trailing newline, all LF. Text with no markers keeps everything it has
+    ///     and the block is appended after one blank line. Text with a marker pair keeps everything except
+    ///     what lies strictly between the markers, the marker lines themselves included, and the body
+    ///     replaces that. The line endings written are the ones the existing text mostly uses.
     /// </remarks>
     public static string Splice(string? existing, string body)
     {
@@ -63,12 +69,13 @@ public static class ManagedBlock
     }
 
     /// <summary>
-    ///     Returns the LF-normalized body strictly between the single marker pair, or null when the
-    ///     file has no markers.
+    ///     The body between the markers of <paramref name="existing" />, its line endings normalized to LF
+    ///     and its final newline removed, or null when the text carries no markers at all. Compare it
+    ///     against a freshly composed body to tell whether a committed file is still up to date.
     /// </summary>
     /// <exception cref="MalformedManagedBlockException">
-    ///     The markers are in any malformed state — so a successful non-null return also proves exactly
-    ///     one marker pair exists.
+    ///     The markers are in any malformed state, so a non-null return also says that exactly one
+    ///     well-formed marker pair exists.
     /// </exception>
     public static string? ExtractBody(string existing)
     {

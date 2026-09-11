@@ -5,56 +5,74 @@ using Zphil.LoadBearing.Internal;
 
 namespace Zphil.LoadBearing.Baselines;
 
-/// <summary>The canonical on-disk baseline format and its integrity digest.</summary>
+/// <summary>
+///     The on-disk baseline format: composes a baseline file's text from the entries it should hold,
+///     and computes the digest that file carries.
+/// </summary>
 /// <remarks>
-///     A baseline file is line-oriented JSON — UTF-8 no BOM, LF endings, a trailing newline, 2-space
-///     indent, one entry object per line — so a burndown diff removes exactly one line. An edge entry
-///     may carry a <c>siteCount</c> measure and any entry an optional <c>because</c> attribution, in
-///     that order after the ID slots; both are folded into the digest.
-///     Rules sort ordinal by ID; entries sort ordinal by <c>((Source ?? Subject), (Target ?? ""))</c>. The
-///     <c>digest</c> is SHA-256 over a separate line-oriented rendering of the parsed entries
-///     (<see cref="DigestInput(IReadOnlyDictionary{string, IReadOnlyCollection{BaselineEntry}})" />), so
-///     formatting or line-ending changes (an autocrlf checkout) are
-///     invisible while entry changes are not — tamper-<em>evident</em>, with git review the human gate.
-///     Composing always writes <see cref="SchemaVersion" />; <see cref="LegacySchemaVersion" /> is read
-///     only, and its digest grammar is frozen verbatim so a file written before the measure existed
-///     still verifies. That is why the digest verbs take the version they are computing for: a reader
-///     recanonicalizes with the file's own.
+///     A baseline file is line-oriented JSON — UTF-8 with no byte-order mark, LF line endings, a
+///     trailing newline, a two-space indent, one entry object per line — so paying off one
+///     grandfathered violation removes exactly one line in a diff. Rules sort by ID and entries by
+///     source or subject then target, both ordinal, so the same entries always compose to the same
+///     bytes. One file holds a section per rule ID, and an entry object carries <c>source</c> and
+///     <c>target</c>, or <c>subject</c>, then an optional <c>siteCount</c> and an optional
+///     <c>because</c>. The <c>digest</c> field is computed over a rendering of the entries rather than
+///     over the file text, so reformatting the file or checking it out with CRLF endings leaves it
+///     valid, while changing an entry, a count or a reason does not: a hand-edited baseline is refused
+///     rather than obeyed, and the file's history is the record of who widened what.
 /// </remarks>
+// The digest verbs take the version they are computing for because a reader recanonicalizes a
+// stored file with the file's own: LegacySchemaVersion's grammar is frozen verbatim (its preamble,
+// and no siteCount line), so a file written before the measure existed still verifies. Composing
+// always writes SchemaVersion, so any write is also the upgrade.
 public static class BaselineFormat
 {
-    /// <summary>The baseline file schema version every write composes.</summary>
+    /// <summary>
+    ///     The <c>schemaVersion</c> value <see cref="ComposeFile" /> writes, so composing a file is also
+    ///     the upgrade path off <see cref="LegacySchemaVersion" />.
+    /// </summary>
     public const int SchemaVersion = 2;
 
-    /// <summary>The older schema version readers still accept — a file with no site counts.</summary>
+    /// <summary>
+    ///     The older <c>schemaVersion</c> a reader still accepts: a file written before entries carried a
+    ///     site count. Its entries have none, so each grandfathers its pair however many sites it grows
+    ///     to, until the file is written again.
+    /// </summary>
     public const int LegacySchemaVersion = 1;
 
     private const string DigestPreamble = "loadbearing-baseline-digest-v2";
     private const string LegacyDigestPreamble = "loadbearing-baseline-digest-v1";
     private const string HexDigits = "0123456789abcdef";
 
-    /// <summary>Whether a reader accepts <paramref name="schemaVersion" /> — the current one, or the legacy one.</summary>
+    /// <summary>
+    ///     Whether a baseline file declaring <paramref name="schemaVersion" /> can be read: true for
+    ///     <see cref="SchemaVersion" /> and for <see cref="LegacySchemaVersion" />, false for anything
+    ///     else, which a reader should refuse rather than guess at.
+    /// </summary>
     public static bool IsSupported(int schemaVersion)
     {
         return schemaVersion == SchemaVersion || schemaVersion == LegacySchemaVersion;
     }
 
     /// <summary>
-    ///     Whether an edge entry in a file of <paramref name="schemaVersion" /> may carry a <c>siteCount</c>
-    ///     — every version but <see cref="LegacySchemaVersion" />, whose grammar predates the measure. The
-    ///     one answer both the digest and a reader's property walk take, so the two cannot disagree about
-    ///     which keys a version admits.
+    ///     Whether an entry in a baseline file declaring <paramref name="schemaVersion" /> may carry a
+    ///     <c>siteCount</c>: true for every accepted version but <see cref="LegacySchemaVersion" />, whose
+    ///     entries predate the count.
     /// </summary>
+    // The one answer both the digest grammar and a reader's property walk take, so the two cannot
+    // disagree about which keys a version admits.
     public static bool CarriesSiteCount(int schemaVersion)
     {
         return schemaVersion != LegacySchemaVersion;
     }
 
     /// <summary>
-    ///     Composes the canonical file bytes-as-string for the given rule sections: sorts rules and
-    ///     entries, computes and embeds a fresh <c>digest</c>, and emits the line-oriented JSON. The
-    ///     input's own order and duplicates do not matter. Always <see cref="SchemaVersion" />, so a
-    ///     write is also the upgrade path off <see cref="LegacySchemaVersion" />.
+    ///     Composes the whole text of a baseline file holding the given entries, keyed by rule ID: sorts
+    ///     the rules and their entries into the file's canonical order, computes a fresh <c>digest</c>
+    ///     over them, and returns the file, newline-terminated and ready to write as UTF-8 with no
+    ///     byte-order mark. The order of the input and any duplicate entries in it make no difference to
+    ///     the result. The file is always <see cref="SchemaVersion" />, so writing one read at
+    ///     <see cref="LegacySchemaVersion" /> upgrades it.
     /// </summary>
     public static string ComposeFile(IReadOnlyDictionary<string, IReadOnlyCollection<BaselineEntry>> rules)
     {
@@ -88,32 +106,31 @@ public static class BaselineFormat
     }
 
     /// <summary>
-    ///     The line-oriented digest input for the given rules: a fixed preamble line, then a
-    ///     <c>rule &lt;id&gt;</c> line per rule (ordinal) and an <c>edge &lt;src&gt; -&gt; &lt;tgt&gt;</c>
-    ///     or <c>subject &lt;id&gt;</c> line per entry (tuple-sorted).
+    ///     The exact text <c>ComputeDigest</c> hashes, in <see cref="SchemaVersion" />'s grammar: a fixed
+    ///     preamble line, then a <c>rule &lt;id&gt;</c> line per rule and an
+    ///     <c>edge &lt;source&gt; -&gt; &lt;target&gt;</c> or <c>subject &lt;id&gt;</c> line per entry, in
+    ///     the file's canonical order. An entry with a site count adds a <c>siteCount &lt;n&gt;</c> line
+    ///     after its own, and one with a reason a <c>because &lt;text&gt;</c> line after that. Every line
+    ///     ends in LF, the last one included. Useful for showing what a digest was taken over when a
+    ///     stored file fails to verify.
     /// </summary>
-    /// <remarks>
-    ///     A counted edge entry adds a <c>siteCount &lt;n&gt;</c> line immediately after its own line, and
-    ///     an attributed entry a <c>because &lt;text&gt;</c> line after that; the encoding stays injective
-    ///     because digest-input lines only ever start with
-    ///     <c>rule </c>/<c>edge </c>/<c>subject </c>/<c>siteCount </c>/<c>because </c> and because-text is
-    ///     single-line by invariant. Every line is LF-terminated, including the last.
-    /// </remarks>
     public static string DigestInput(IReadOnlyDictionary<string, IReadOnlyCollection<BaselineEntry>> rules)
     {
         return DigestInput(rules, SchemaVersion);
     }
 
     /// <summary>
-    ///     The same digest input in <paramref name="schemaVersion" />'s grammar — what a reader
-    ///     recanonicalizing a stored file computes, with the file's own version.
+    ///     The exact text <c>ComputeDigest</c> hashes for a file declaring
+    ///     <paramref name="schemaVersion" /> — what to compute when verifying a stored file, passing the
+    ///     version that file declares. A fixed preamble line, then a <c>rule &lt;id&gt;</c> line per rule
+    ///     and an <c>edge &lt;source&gt; -&gt; &lt;target&gt;</c> or <c>subject &lt;id&gt;</c> line per
+    ///     entry, in the file's canonical order, each entry followed by a <c>siteCount &lt;n&gt;</c> line
+    ///     where it has a count and a <c>because &lt;text&gt;</c> line where it has a reason. Every line
+    ///     ends in LF, the last one included. <see cref="LegacySchemaVersion" /> renders in the grammar it
+    ///     shipped with (its own preamble, and no <c>siteCount</c> line), so a file written before the
+    ///     count existed still verifies against the digest it carries. A version
+    ///     <see cref="IsSupported" /> does not accept renders in the current grammar.
     /// </summary>
-    /// <remarks>
-    ///     <see cref="LegacySchemaVersion" />'s grammar is frozen verbatim: its preamble is the one it
-    ///     shipped with and it emits no <c>siteCount</c> line, so a file written before the measure
-    ///     existed still verifies against its stored digest. Callers pass a version
-    ///     <see cref="IsSupported" /> accepts; anything else reads as the current grammar.
-    /// </remarks>
     public static string DigestInput(
         IReadOnlyDictionary<string, IReadOnlyCollection<BaselineEntry>> rules, int schemaVersion)
     {
@@ -121,9 +138,10 @@ public static class BaselineFormat
     }
 
     /// <summary>
-    ///     The SHA-256 lowercase-hex digest over
-    ///     <see cref="DigestInput(IReadOnlyDictionary{string, IReadOnlyCollection{BaselineEntry}})" />
-    ///     (UTF-8 bytes).
+    ///     The digest a baseline file holding the given entries carries: the SHA-256 of the UTF-8 bytes of
+    ///     <see cref="DigestInput(IReadOnlyDictionary{string, IReadOnlyCollection{BaselineEntry}})" />, in
+    ///     lowercase hex, in <see cref="SchemaVersion" />'s grammar. Taken over the entries rather than
+    ///     over the file text, so a file that differs only in layout or line endings still verifies.
     /// </summary>
     public static string ComputeDigest(IReadOnlyDictionary<string, IReadOnlyCollection<BaselineEntry>> rules)
     {
@@ -131,9 +149,12 @@ public static class BaselineFormat
     }
 
     /// <summary>
-    ///     The SHA-256 lowercase-hex digest over
-    ///     <see cref="DigestInput(IReadOnlyDictionary{string, IReadOnlyCollection{BaselineEntry}}, int)" />
-    ///     (UTF-8 bytes) — the verb a reader verifies a stored file with, passing that file's version.
+    ///     The digest a baseline file declaring <paramref name="schemaVersion" /> carries: the SHA-256 of
+    ///     the UTF-8 bytes of
+    ///     <see cref="DigestInput(IReadOnlyDictionary{string, IReadOnlyCollection{BaselineEntry}}, int)" />,
+    ///     in lowercase hex. This is what to recompute when verifying a stored file, passing the version
+    ///     that file declares; a result differing from the file's own <c>digest</c> field means the file
+    ///     was edited by hand rather than written by <see cref="ComposeFile" />.
     /// </summary>
     public static string ComputeDigest(
         IReadOnlyDictionary<string, IReadOnlyCollection<BaselineEntry>> rules, int schemaVersion)

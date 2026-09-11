@@ -3,22 +3,26 @@ using Zphil.LoadBearing.Model;
 namespace Zphil.LoadBearing.Fluent;
 
 /// <summary>
-///     An immutable, reusable selection over the declared <em>members</em> of a type selection
-///     (GRAMMAR §4.6). Minted by the projections on <see cref="Selection" />
-///     (<c>.Members</c>/<c>.Methods</c>/<c>.Properties</c>/<c>.Fields</c>/<c>.Events</c>).
+///     A set of members the spec talks about: the methods, properties, fields and events the selected
+///     types declare, reached with <c>.Members</c>, <c>.Methods</c>, <c>.Properties</c>,
+///     <c>.Fields</c> or <c>.Events</c> on a <see cref="Selection" />. Narrow it with adjectives such
+///     as <c>WithSuffix</c>, <c>WithPrefix</c>, <c>WithNameMatching</c>, <c>AttributedWith</c>,
+///     <c>ThatAreStatic</c> or <c>Where</c>, each of which returns a new selection of the same kind so
+///     that a projection's own calls stay reachable; finish it with a verb such as
+///     <c>MustHaveSuffix</c>, <c>MustBePublic</c>, <c>MustBeStatic</c> or <c>MustBeAttributedWith</c>,
+///     which yields the <see cref="Constraint" /> a rule takes. What counts as a member is what the
+///     type declares: property and event accessors, constructors, operators, indexers, finalizers and
+///     explicit interface implementations are not members here, and enum and delegate types contribute
+///     none. A rule whose subject matches no member fails saying so, and each violation is reported at
+///     the member's own declaration. Immutable and reusable: assign one to a variable and use it in as
+///     many rules as you like.
 /// </summary>
-/// <remarks>
-///     A closed class hierarchy with a <c>private protected</c> constructor, <b>disjoint</b> from
-///     <see cref="Selection" /> — that disjointness is what keeps the shared adjective/verb names
-///     (<c>WithSuffix</c>, <c>MustBeStatic</c>, …) from colliding on overload resolution: a call binds
-///     to the type-side or member-side vocabulary purely by receiver type.
-///     A member selection is a composite: the underlying <see cref="Source" /> type selection, the
-///     <see cref="Kind" /> filter that named it, and an ordered list of <see cref="MemberAdjective" />
-///     refinements (GRAMMAR §6 member-subject assembly reads exactly these three). Member modal-verb
-///     extensions turn it into a terminal <see cref="Constraint" />; member adjectives are generic
-///     self-type extensions that clone via <see cref="Rebuild" />, so a chain preserves its concrete
-///     type (<c>.Methods.Returning(...)</c> stays a <see cref="MethodSelection" />).
-/// </remarks>
+// A closed hierarchy: the constructor is private protected, so no foreign assembly can add a node,
+// and it is disjoint from Selection and ProjectSelection so the shared adjective and verb names
+// bind by receiver type rather than by overload resolution (GRAMMAR §3.2). The three slots below —
+// Source, Kind, Adjectives — are exactly what member-subject sentence assembly reads (§6); the
+// adjectives ship as generic self-type extensions that clone through Rebuild, which is what keeps a
+// concrete projection's kind-only vocabulary reachable after one.
 public abstract class MemberSelection
 {
     private protected MemberSelection(Selection source, MemberKindFilter kind, IReadOnlyList<MemberAdjective> adjectives)

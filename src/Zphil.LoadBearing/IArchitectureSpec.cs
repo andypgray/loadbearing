@@ -1,15 +1,17 @@
 namespace Zphil.LoadBearing;
 
 /// <summary>
-///     A unit of architecture specification. Spec classes implement this; they are discovered by
-///     reflection (<see cref="Discovery.SpecDiscovery" />) and each is invoked exactly once per
-///     model build with a fresh <see cref="Arch" /> (GRAMMAR §3.2, fresh-instance contract).
+///     A unit of architecture specification. Implement it as a public, non-abstract class in the spec
+///     project: every such class in the assembly is discovered by reflection and created through its
+///     public parameterless constructor, which it must therefore have, and its <see cref="Define" />
+///     runs once per model build, in ordinal name order, on the single <see cref="Arch" /> that every
+///     spec class of that build shares.
 /// </summary>
 public interface IArchitectureSpec
 {
     /// <summary>
-    ///     Registers layers, rules, and scopes on <paramref name="arch" />. The method mutates
-    ///     <paramref name="arch" />; it never evaluates anything (rules are data, GRAMMAR §2).
+    ///     Declares the spec's layers, rules and scopes on <paramref name="arch" />. Nothing is evaluated
+    ///     here: a rule is data, checked later by the CLI or the test adapter.
     /// </summary>
     void Define(Arch arch);
 }

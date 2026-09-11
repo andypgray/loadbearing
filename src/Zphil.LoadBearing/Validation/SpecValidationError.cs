@@ -1,9 +1,11 @@
 namespace Zphil.LoadBearing.Validation;
 
 /// <summary>
-///     A single spec-build validation failure (GRAMMAR §8). Pinned primarily by <see cref="Code" />
-///     plus <see cref="RuleId" />, with one representative <see cref="Message" /> per code.
+///     One mistake in a spec: which kind it is (<see cref="Code" />), which rule or scope it is about,
+///     where in the spec source it was written, and the message to print. Every error found is reported
+///     together, in <see cref="SpecValidationException.Errors" />.
 /// </summary>
+// Pinned primarily by Code plus RuleId, with one representative Message per code.
 public sealed class SpecValidationError
 {
     internal SpecValidationError(SpecValidationErrorCode code, string? ruleId, string message, SpecSourceLocation? location = null)
@@ -19,19 +21,25 @@ public sealed class SpecValidationError
         Message = location is null ? message : $"{location}: {message}";
     }
 
-    /// <summary>The catalog code.</summary>
+    /// <summary>Gets which mistake this is.</summary>
     public SpecValidationErrorCode Code { get; }
 
-    /// <summary>The offending rule or scope ID, or null for spec-wide errors (e.g. a duplicate layer name).</summary>
+    /// <summary>
+    ///     Gets the ID of the rule or scope the mistake is about, or null when it is about the spec as a
+    ///     whole — a duplicate layer name, or a mistake in a layer's definition.
+    /// </summary>
     public string? RuleId { get; }
 
     /// <summary>
-    ///     The spec-source position of the offending anchor (GRAMMAR §8), or null for a spec-wide error
-    ///     (duplicate ID, layer errors) or an error whose location was never captured. When present it is
-    ///     already rendered into the front of <see cref="Message" />.
+    ///     Gets where in the spec source the offending call was written, or null when the mistake is about
+    ///     the spec as a whole and when no position was captured. Where it is present it is already rendered
+    ///     at the front of <see cref="Message" />.
     /// </summary>
     public SpecSourceLocation? Location { get; }
 
-    /// <summary>The human-readable diagnostic, prefixed with <c>file:line</c> when a location was captured.</summary>
+    /// <summary>
+    ///     Gets the message to print, opening with <c>file:line</c> when a position was captured and with
+    ///     the diagnostic itself otherwise.
+    /// </summary>
     public string Message { get; }
 }

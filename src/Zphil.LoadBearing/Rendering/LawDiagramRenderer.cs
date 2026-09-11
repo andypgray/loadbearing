@@ -5,25 +5,23 @@ using DrawableVerb = Zphil.LoadBearing.Rendering.LawPlaceClassifier.DrawableVerb
 namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
-///     Composes the architecture law as a Mermaid flowchart — the spec-derived fence beside the
-///     codebase-derived one <see cref="GraphDiagramRenderer" /> draws. Pure over an
-///     <see cref="ArchitectureModel" /> and the spec name: no extraction, no checker run, no baseline
-///     reads, so the fence says what the law is and never what the codebase currently does about it.
-///     Output is LF-internal always and carries no timestamp or tool version, so an unchanged spec
-///     re-renders to a zero diff.
+///     Draws what a spec allows and forbids as a Mermaid flowchart: the second fence in the body
+///     <c>loadbearing render --diagram</c> writes, beside the codebase survey
+///     <see cref="GraphDiagramRenderer" /> draws. Pure over an <see cref="ArchitectureModel" />, with no
+///     codebase extracted, no check run and no baseline read, so the drawing says what the rules are and
+///     never how the code is currently doing against them. The output is always LF and carries no
+///     timestamp or tool version, so an unchanged spec re-renders to no diff at all.
 /// </summary>
 /// <remarks>
-///     The same house dialect as the survey: <c>flowchart LR</c>, quoted labels,
-///     <c>accTitle</c>/<c>accDescr</c>, no colours and no <c>classDef</c>, so structure carries the whole
-///     meaning. A solid <c>--x</c> is a forbidden reference, a dotted <c>-.-x</c> is grandfathered debt, a
-///     box inside a box is namespace containment, and the doubled box inside a quarantine is its
-///     sanctioned surface.
-///     <para>
-///         Labels carry no counts, for the reason the diagram survey settled: this artifact is committed
-///         and drift-gated, and a count moves on nearly every commit. What a drawing cannot place — a
-///         verb with no direction, a subject that is not a region of code — is listed by rule ID under
-///         the fence instead of being dropped, so the picture narrows and the law does not.
-///     </para>
+///     The same plain dialect as the survey: <c>flowchart LR</c>, quoted labels, <c>accTitle</c> and
+///     <c>accDescr</c>, no colours and no <c>classDef</c>, so structure carries the whole meaning. A
+///     solid <c>--x</c> is a forbidden reference, a dotted <c>-.-x</c> is grandfathered debt, an arrow
+///     <c>--&gt;</c> marks the only references allowed, a box inside a box is a namespace inside
+///     another, and the doubled box inside a quarantine is its sanctioned surface; a legend under the
+///     diagram spells out whichever of those the spec uses. Labels carry no counts, so a committed
+///     drawing does not change every time the code does. A rule the drawing cannot place, such as a verb
+///     with no direction or a subject that is not a region of code, is listed by rule ID beneath the
+///     fence rather than dropped.
 /// </remarks>
 public static class LawDiagramRenderer
 {
@@ -79,11 +77,12 @@ public static class LawDiagramRenderer
     private const string NestingRowText = "A box inside a box = the inner place is part of the outer";
 
     /// <summary>
-    ///     The law fence's managed-block body: a provenance caption, the fenced Mermaid diagram, and —
-    ///     when there is one — the compact list of the rules this drawing could not place in full.
+    ///     The managed-block body for the spec's half of a diagram file: a provenance caption, the fenced
+    ///     Mermaid diagram, and, where there is one, the compact list of rules this drawing could not place
+    ///     in full.
     /// </summary>
-    /// <param name="model">The reified spec to draw.</param>
-    /// <param name="specName">The spec assembly name, named in the caption and the accessible title.</param>
+    /// <param name="model">The model to draw.</param>
+    /// <param name="specName">The spec assembly's name, named in the caption and in the accessible title.</param>
     public static string Block(ArchitectureModel model, string specName)
     {
         Guard.NotNull(model, nameof(model));

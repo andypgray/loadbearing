@@ -4,23 +4,20 @@ using Zphil.LoadBearing.Internal;
 namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
-///     Composes the codebase survey as a Mermaid flowchart — the managed-block body behind
-///     <c>render --diagram</c>. Pure over a <see cref="GraphSummary" />, so the same summary the
-///     <c>graph</c> survey prints draws the diagram; output is LF-internal always and carries no timestamp
-///     or tool version, so an unchanged codebase re-renders to a zero diff.
+///     Draws a solution's projects and the references between them as a Mermaid flowchart: the body
+///     <c>loadbearing render --diagram</c> writes into a file's managed block. Pure over a
+///     <see cref="GraphSummary" />, so the drawing shows exactly what the <c>loadbearing graph</c>
+///     survey reports. The output is always LF and carries no timestamp or tool version, so an unchanged
+///     codebase re-renders to no diff at all.
 /// </summary>
 /// <remarks>
-///     House dialect, taken from a survey of committed Mermaid in respected repositories:
-///     <c>flowchart LR</c> with quoted labels, <c>accTitle</c>/<c>accDescr</c> for screen readers, and no
-///     <c>%%{init}%%</c> block, <c>classDef</c>, or colours at all — theme-neutral source renders correctly
-///     in a light or a dark reader by construction. Structure carries the meaning: a solid <c>--&gt;</c> is an
-///     observed cross-project reference, a dotted <c>-.-&gt;</c> is a project reference that is declared and
-///     never exercised. That second edge is the diagram's reason to exist — the text survey leaves the
-///     reader to compute it by eye from two separate sections.
-///     <para>
-///         Labels carry no type or reference counts: this artifact is committed and drift-gated, and counts
-///         move on nearly every commit. They stay in the <c>graph</c> survey, which nothing commits.
-///     </para>
+///     The drawing is deliberately plain: <c>flowchart LR</c> with quoted labels,
+///     <c>accTitle</c> and <c>accDescr</c> for screen readers, and no <c>%%{init}%%</c> block,
+///     <c>classDef</c> or colours, so it renders correctly for a reader in a light or a dark theme.
+///     Structure carries the meaning: a solid <c>--&gt;</c> is a cross-project reference the code
+///     actually makes, and a dotted <c>-.-&gt;</c> is a project reference that is declared and never
+///     used. Labels carry no type or reference counts, so a committed drawing does not change every time
+///     the code does; the counts are in the <c>loadbearing graph</c> survey, which nothing commits.
 /// </remarks>
 public static class GraphDiagramRenderer
 {
@@ -40,27 +37,22 @@ public static class GraphDiagramRenderer
     private const string EmptyScopeLabel = "(no projects in scope)";
 
     /// <summary>
-    ///     The managed-block body: a provenance caption, then the fenced Mermaid diagram. The caption sits
-    ///     outside the fence deliberately — nothing in the wild carries a generator banner inside diagram
-    ///     source, and the fence stays paste-able into any Mermaid renderer.
+    ///     The managed-block body for a diagram file: a provenance caption, then the fenced Mermaid diagram.
+    ///     The caption sits outside the fence, so the fence stays paste-able into any Mermaid renderer.
     /// </summary>
     /// <param name="summary">The codebase survey to draw.</param>
-    /// <param name="solutionName">The solution file name, named in the caption and the accessible title.</param>
-    /// <param name="scope">The project filter; null means <see cref="DiagramScope.Everything" />.</param>
+    /// <param name="solutionName">The solution file's name, named in the caption and in the accessible title.</param>
+    /// <param name="scope">
+    ///     The project filter; null draws every project (<see cref="DiagramScope.Everything" />).
+    /// </param>
     /// <remarks>
-    ///     <b>The drawing is of the solution, not of the workspace.</b> Only projects the solution declares
-    ///     are drawn, so the caption is literally true under any <paramref name="scope" />: a workspace also
-    ///     loads whatever a <see cref="ProjectSummary.ProjectReferences">ProjectReference</see> reaches, and
-    ///     an unscoped drawing of a codebase with a spec project would otherwise put that spec's contract
-    ///     library on a page captioned "Projects in this solution". The scope narrows <em>within</em> that
-    ///     set and is a legibility knob, never the thing keeping a foreign project out.
-    ///     <para>
-    ///         Membership that was never read draws, which is the whole of the fail-open contract:
-    ///         <see cref="ProjectSummary.SolutionMember" /> is null when nothing could be read, and treating
-    ///         null as "not a member" would empty the diagram for an unparseable solution file rather than
-    ///         degrading to today's behaviour. The <c>graph</c> survey is where the excluded projects can be
-    ///         seen, which is why there is no render-side flag to draw them here.
-    ///     </para>
+    ///     Only projects the solution declares are drawn, under any <paramref name="scope" />: a workspace
+    ///     also loads whatever a project reference reaches, and an unfiltered drawing would otherwise put
+    ///     those on a page captioned "Projects in this solution". The scope narrows within that set, so it
+    ///     is a legibility knob rather than the thing keeping a foreign project out. A project whose
+    ///     membership could not be read at all (<c>ProjectSummary.SolutionMember</c> is null) is drawn
+    ///     rather than dropped, so an unparseable solution file degrades the drawing instead of emptying it.
+    ///     To see the projects a drawing leaves out, run <c>loadbearing graph</c>.
     /// </remarks>
     public static string Block(GraphSummary summary, string solutionName, DiagramScope? scope = null)
     {

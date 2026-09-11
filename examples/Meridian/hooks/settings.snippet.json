@@ -3,14 +3,24 @@
     "deny": ["Bash(loadbearing baseline*)"]
   },
   "hooks": {
-    "PostToolUse": [
+    "Stop": [
       {
-        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
             "command": "pwsh -File \"${CLAUDE_PROJECT_DIR}/.claude/arch-hook.ps1\"",
-            "timeout": 120
+            "timeout": 600
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -File \"${CLAUDE_PROJECT_DIR}/.claude/arch-hook.ps1\"",
+            "timeout": 600
           }
         ]
       }

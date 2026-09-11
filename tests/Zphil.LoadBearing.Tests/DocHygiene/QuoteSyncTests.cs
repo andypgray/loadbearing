@@ -7,9 +7,10 @@ namespace Zphil.LoadBearing.Tests.DocHygiene;
 /// <summary>
 ///     The quote-sync gate over the hand-written docs' fenced excerpts. The landing page and the example
 ///     walkthroughs quote committed files inside fenced code blocks — a starter rule from the quoting
-///     example's spec, two rules of the self-spec, the rendered <c>AGENTS.md</c> bullets a spec generates,
-///     the adapter class that runs them all as tests, the rendered Mermaid diagram of this solution, the
-///     spec project's csproj — and this gate holds each quote to the file it was cut from: every non-blank
+///     example's spec, the rules and pack calls each walkthrough quotes out of its own spec, two rules
+///     of the self-spec, the rendered <c>AGENTS.md</c> bullets a spec generates, the adapter class that
+///     runs them all as tests, the rendered Mermaid diagram of this solution, the spec project's
+///     csproj — and this gate holds each quote to the file it was cut from: every non-blank
 ///     line of the excerpt's fence must appear, in order, as a verbatim substring of its source, so an
 ///     edit to the source that the doc does not follow fails the suite instead of publishing a stale
 ///     quote. Five excerpts are captured tool output with no committed source; they are
@@ -35,6 +36,9 @@ public sealed class QuoteSyncTests
     private const string InterchangeReadme = "examples/Meridian.Interchange/README.md";
 
     private const string SelfSpec = "arch/Zphil.LoadBearing.ArchSpec/LoadBearingArchSpec.cs";
+    private const string QuotingSpec = "examples/Meridian.Quoting/arch/Meridian.Quoting.ArchSpec/QuotingArchSpec.cs";
+    private const string MeridianSpec = "examples/Meridian/arch/Meridian.ArchSpec/MeridianArchSpec.cs";
+    private const string InterchangeSpec = "examples/Meridian.Interchange/arch/Meridian.Interchange.ArchSpec/InterchangeArchSpec.cs";
 
     /// <summary>
     ///     The registered quoted excerpts, each keyed by the doc it lives in and by a distinctive marker
@@ -50,7 +54,7 @@ public sealed class QuoteSyncTests
             RootReadme,
             "starter-rule",
             "arch.Rule(\"layering/domain-independent\")",
-            "examples/Meridian.Quoting/arch/Meridian.Quoting.ArchSpec/QuotingArchSpec.cs"),
+            QuotingSpec),
         new(
             RootReadme,
             "self-spec-rule",
@@ -76,7 +80,7 @@ public sealed class QuoteSyncTests
             RootReadme,
             "migrate-rule",
             "arch.Rule(\"data-access/no-inline-sql\")",
-            "examples/Meridian/arch/Meridian.ArchSpec/MeridianArchSpec.cs"),
+            MeridianSpec),
         new(
             // The one tool-output fence with a committed counterpart: `render --diagram` writes the block
             // into ARCHITECTURE.md, so the README quote is synced rather than demonstration-exempt. The
@@ -165,6 +169,35 @@ public sealed class QuoteSyncTests
             "interchange-agents-block",
             "- `di/hosted-services-scope-their-work`",
             "examples/Meridian.Interchange/AGENTS.md"),
+
+        // The walkthroughs also quote their own spec source, dedented, and each of those fences is synced
+        // against the spec file the way the landing page's starter rule is: what the quote carries is the
+        // spec's continuation columns, so a reflow of the spec fails here rather than shipping a stale
+        // quote. The markers are a double-quoted rule head or a pack call, which is what keeps each off
+        // the rendered AGENTS.md fence that names the same rule id in backticks. Absent on purpose: the
+        // Operations walkthrough, whose fence inlines the Selection locals the spec declares, and the three
+        // Interchange fences that spell arch.Types.InNamespace(...) where the spec uses its `interchange`
+        // local — none of those is a substring of its source, so the ordinal check cannot hold on them.
+        new(
+            QuotingReadme,
+            "quoting-spec-rules",
+            "arch.Rule(\"layering/application-boundaries\")",
+            QuotingSpec),
+        new(
+            MeridianReadme,
+            "meridian-pack-calls",
+            "DotNetGuidance.AsyncSuffix(arch, arch.AnyOf(domain, web),",
+            MeridianSpec),
+        new(
+            InterchangeReadme,
+            "interchange-hosted-service-rule",
+            "arch.Rule(\"di/hosted-services-scope-their-work\")",
+            InterchangeSpec),
+        new(
+            InterchangeReadme,
+            "interchange-captive-dependencies",
+            "DotNetGuidance.NoCaptiveDependencies(",
+            InterchangeSpec),
         new(
             // Not a rendered block: the adoption walkthrough shows the spec project "exactly as
             // committed", which is a promise the same in-order substring check can keep.

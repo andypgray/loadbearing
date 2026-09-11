@@ -1,20 +1,22 @@
 namespace Zphil.LoadBearing.Codebase;
 
 /// <summary>
-///     A project in the extracted model: its name, whether the solution file declares it, its forward
-///     project references (by name), the target frameworks it declares and — where one project file yielded
-///     several compilations — the one whose facts its shared types carry, plus the artifact facts its build
-///     evaluated: the packages it declares, whether it is packable, and whether its restore writes a lock
-///     file. The reverse graph is derived in memory by consumers when needed; only the forward edges are
-///     stored, ordinal-ordered for determinism.
+///     One project in the extracted codebase: its name, whether the solution file declares it, the
+///     projects it references, the frameworks it targets, the packages it declares, and whether it packs
+///     and locks its restore. These are the facts a rule about a project is judged on, so they are what
+///     <c>MustOnlyTarget</c>, <c>MustReferenceNoPackages</c>, <c>MustLockPackages</c> and
+///     <c>MustNotBePackable</c> read. Only forward project references are stored; build the reverse graph
+///     yourself if you need it.
 /// </summary>
 /// <remarks>
-///     The artifact facts below are <em>evaluated</em>, never read out of the project file's XML: the
-///     property a rule is about is very often set somewhere else (a <c>Directory.Build.props</c> above the
-///     project) or nowhere at all (an SDK default), and only an evaluation knows which value won. Each is
-///     therefore paired with the <c>file:line</c> that set it, and <see langword="null" /> means the
-///     evaluation never happened rather than that the property is off — the tri-state
-///     <see cref="SolutionMember" /> holds to.
+///     The framework, package, packable and lock facts are evaluated rather than read out of the project
+///     file's XML: the value that wins is very often set somewhere else, in a
+///     <c>Directory.Build.props</c> above the project, or nowhere at all, as an SDK default, and only an
+///     evaluation knows which. Each is paired with the <c>file:line</c> that set it, and
+///     <see langword="null" /> means the evaluation never happened rather than that the property is off,
+///     the same reading <see cref="SolutionMember" /> holds to. Every project verb passes on a fact that
+///     is <see langword="null" />, so a load that could not evaluate a project reports gaps rather than
+///     violations.
 /// </remarks>
 public sealed class ProjectNode : IProjectInfo
 {
@@ -44,143 +46,126 @@ public sealed class ProjectNode : IProjectInfo
         LocksPackagesSite = locksPackagesSite;
     }
 
-    /// <summary>The project (assembly) name.</summary>
+    /// <summary>
+    ///     Gets the project (assembly) name.
+    /// </summary>
     public string Name { get; }
 
     /// <summary>
-    ///     This project's stable identity (GRAMMAR §4.3, §4.10) — its own <see cref="Name" /> under a
-    ///     <c>project:</c> tag — beside <see cref="TypeNode.SymbolId" /> and
-    ///     <see cref="MemberNode.SymbolId" />, which a baseline key and a <c>--subject</c> both range over.
+    ///     Gets this project's stable identity: <c>project:</c> followed by its <see cref="Name" />, displayed verbatim
+    ///     wherever an identity is printed. It is what a baseline entry for a project rule is keyed by and what the
+    ///     CLI's <c>--subject</c> filter matches, beside the type and member identities <c>TypeNode.SymbolId</c> and
+    ///     <c>MemberNode.SymbolId</c>.
     /// </summary>
-    /// <remarks>
-    ///     A project has no <c>DocumentationCommentId</c> to key on, so the tag is minted here rather than
-    ///     by extraction. It wears a DocId's shape without ever colliding with one: every DocId tag is a
-    ///     single letter, and the shared display helper strips only those, printing a longer tag verbatim.
-    ///     This is the one owner of the literal — the stored form of an existing baseline entry depends on
-    ///     it, so it is not free to move.
-    /// </remarks>
+    // A project has no DocumentationCommentId to key on, so the tag is minted here rather than by
+    // extraction. It wears a DocId's shape without ever colliding with one: every DocId tag is a single
+    // letter, and the shared display helper strips only those, printing a longer tag verbatim. This is the
+    // one owner of the literal — the stored form of an existing baseline entry depends on it, so it is not
+    // free to move.
     public string SymbolId => "project:" + Name;
 
-    /// <summary>The names of the projects this project references, ordinal-ordered.</summary>
+    /// <summary>
+    ///     Gets the names of the projects this project declares a reference to, ordinal-ordered. Declared references
+    ///     only, never the transitive closure.
+    /// </summary>
     public IReadOnlyList<string> ProjectReferences { get; }
 
     /// <summary>
-    ///     Whether the solution file declares this project, or <see langword="null" /> when membership was not
-    ///     read. A workspace loads every project a <c>ProjectReference</c> reaches, which is a wider set than
-    ///     the one the solution declares: <see langword="false" /> marks such a passenger, and it is a fact
-    ///     about the solution rather than a defect in the project.
+    ///     Gets whether the solution file declares this project, or <see langword="null" /> when membership was never
+    ///     read: an unreadable or unrecognized solution format, a project whose file path the load never reported, or a
+    ///     model built from compilations with no solution at all. A workspace loads every project a
+    ///     <c>ProjectReference</c> reaches, which is a wider set than the solution declares, so
+    ///     <see langword="false" /> marks a project that came along for the ride rather than a defect in it. Treat
+    ///     <see langword="null" /> as passing when you filter on this, or an unread solution silently empties the view.
     /// </summary>
-    /// <remarks>
-    ///     <see langword="null" /> means unread, never "not a member" — an unreadable or unowned solution
-    ///     format, a project whose file path the load never reported, or an extraction handed no membership
-    ///     at all (every hand-built compilation). Consumers that filter on this must therefore treat unknown
-    ///     as passing, or an unparsed solution would silently empty their view.
-    /// </remarks>
     public bool? SolutionMember { get; }
 
     /// <summary>
-    ///     Every target framework this project declares, ordinal-ordered and normalized to the short moniker
-    ///     — so a classic project's <c>&lt;TargetFrameworkVersion&gt;v4.8&lt;/TargetFrameworkVersion&gt;</c>
-    ///     reads <c>net48</c> beside an SDK project's own spelling. Empty only where there was nothing to
-    ///     read it from, which is every hand-built input.
+    ///     Gets every target framework this project declares, ordinal-ordered and normalized to the short moniker, so a
+    ///     classic project's <c>&lt;TargetFrameworkVersion&gt;v4.8&lt;/TargetFrameworkVersion&gt;</c> reads
+    ///     <c>net48</c> beside an SDK project's own spelling; <c>MustOnlyTarget</c> compares against these forms. Empty
+    ///     only where there was nothing to read them from, which is any model built from compilations rather than from
+    ///     a solution.
     /// </summary>
     /// <remarks>
-    ///     <para>
-    ///         Ordinal order is also the order a workspace load hands a multi-targeted project's compilations
-    ///         to extraction in, so on that path the first entry is the one a shared type's facts fall to.
-    ///     </para>
-    ///     <para>
-    ///         Read from an evaluation where one ran, and otherwise from the frameworks the load itself
-    ///         discriminated — which is why this can be populated while
-    ///         <see cref="TargetFrameworksSite" /> is not. The fallback sees only what compiled, so it says
-    ///         nothing about a framework a filtered run left out and nothing at all about a project that
-    ///         compiled once.
-    ///     </para>
-    ///     <para>
-    ///         A project with more than one entry is one <c>.csproj</c> that arrived as several Roslyn
-    ///         projects. They union into this one node — its types, its references and its membership are the
-    ///         union — and the union is lossless everywhere except <see cref="FactsFollow" />, which is the
-    ///         one thing it cannot be.
-    ///     </para>
+    ///     Read from an evaluation where one ran, and otherwise from the frameworks the load itself told
+    ///     apart, which is why this can be populated while <see cref="TargetFrameworksSite" /> is
+    ///     <see langword="null" />. That fallback sees only what compiled, so it says nothing about a
+    ///     framework a filtered run left out and nothing at all about a project that compiled once. More than
+    ///     one entry means one project file that arrived as several compilations, ordered here as they were
+    ///     extracted, so the first is the one <see cref="FactsFollow" /> names: the project's types, its
+    ///     references and its membership are the union of them all, and that framework is the one thing the
+    ///     union cannot express.
     /// </remarks>
     public IReadOnlyList<string> TargetFrameworks { get; }
 
     /// <summary>
-    ///     Where <see cref="TargetFrameworks" /> was declared, or <see langword="null" /> when nothing
-    ///     evaluated this project. An evaluated project always carries a site even where it declares no
-    ///     framework at all — its own file stands in — so a rule about what a project targets has somewhere
-    ///     to point wherever it has something to judge.
+    ///     Gets where <see cref="TargetFrameworks" /> was declared, or <see langword="null" /> when nothing evaluated
+    ///     this project. An evaluated project always carries a site even where it declares no framework at all (its own
+    ///     file stands in), so a rule about what a project targets has somewhere to point wherever it has something to
+    ///     judge.
     /// </summary>
     public SourceLocation? TargetFrameworksSite { get; }
 
     /// <summary>
-    ///     The framework whose facts the types this project's frameworks <em>share</em> carry — the first
-    ///     extracted — or <see langword="null" /> when nothing collapsed. A type each framework declares can
-    ///     only carry one framework's edges, members and hierarchy, so a rule about it is checked against that
-    ///     framework alone and whatever another framework's <c>#if</c> guards is not in the model at all.
+    ///     Gets the framework whose facts the types more than one of this project's frameworks declare carry, the first
+    ///     one extracted, or <see langword="null" /> when no type collapsed — which includes every project that
+    ///     compiles once. Such a type can carry only one framework's edges, members and hierarchy, so a rule about it
+    ///     is checked against that framework alone and whatever another framework's <c>#if</c> guards is not in the
+    ///     model at all. <see langword="null" /> is not shorthand for the first of <see cref="TargetFrameworks" />:
+    ///     where the frameworks share no type, every type keeps its own framework's facts and no framework won.
     /// </summary>
-    /// <remarks>
-    ///     Null is deliberately not "the first of <see cref="TargetFrameworks" />": a project whose frameworks
-    ///     share no type displaced nothing — every type keeps its own framework's facts — and naming a winner
-    ///     there would be false about all of them. It is the same gate the merge's advisory note is under.
-    /// </remarks>
+    // Null here and the model's per-project multi-targeting merge note sit under one gate: both speak only
+    // where a type actually collapsed, so naming a winner here would make the note's silence read as an
+    // oversight.
     public string? FactsFollow { get; }
 
     /// <summary>
-    ///     The packages this project <em>declares</em>, ordinal by name, each with the <c>file:line</c> that
-    ///     declares it. Empty where nothing was evaluated, and empty for a project that declares none.
+    ///     Gets the packages this project declares, ordinal by name, each with the <c>file:line</c> that declares it,
+    ///     which may sit in a props file above the project. Declared references only: the transitive package graph is a
+    ///     different fact and is not in the model, and the references the SDK adds implicitly, which nobody wrote and
+    ///     nobody can remove, are left out. Empty where nothing was evaluated, and empty for a project that declares
+    ///     none.
     /// </summary>
-    /// <remarks>
-    ///     Declared references only — the transitive package graph is a different fact, and one this model
-    ///     does not hold. The list also excludes the references the SDK adds for a project implicitly, which
-    ///     nobody wrote and nobody can remove.
-    /// </remarks>
     public IReadOnlyList<PackageReference> PackageReferences { get; }
 
     /// <summary>
-    ///     Whether this project produces a package, or <see langword="null" /> where there is no answer —
-    ///     nothing evaluated it, or an evaluation that left <c>IsPackable</c> undefined, which is what a
-    ///     project outside the SDK's pack machinery does.
+    ///     Gets whether this project produces a package, or <see langword="null" /> where there is no answer: nothing
+    ///     evaluated it, or an evaluation left <c>IsPackable</c> undefined, which is what a project outside the SDK's
+    ///     pack machinery does. Almost always <see langword="true" /> without anybody having said so, because the SDK
+    ///     defaults it on, so the projects that ship and the projects that merely compile look alike until one of them
+    ///     opts out.
     /// </summary>
-    /// <remarks>
-    ///     Almost always <see langword="true" /> without anybody having said so: the SDK defaults it on, so
-    ///     the projects that ship and the projects that merely compile look alike until one of them opts out.
-    ///     That is the whole reason this is evaluated rather than read from the project's own XML.
-    /// </remarks>
     public bool? IsPackable { get; }
 
     /// <summary>
-    ///     Where <see cref="IsPackable" /> was set, or <see langword="null" /> when it has no value. The
-    ///     project's own file stands in wherever the winning declaration is not one this repository owns —
-    ///     an SDK default has a real location, but it is a path on the machine that ran the build and says
-    ///     nothing anybody can act on.
+    ///     Gets where <see cref="IsPackable" /> was set, or <see langword="null" /> when it has no value. The project's
+    ///     own file stands in wherever the winning declaration is not one the solution owns: an SDK default has a real
+    ///     location, but it is a path on the machine that ran the build and says nothing anybody can act on.
     /// </summary>
     public SourceLocation? IsPackableSite { get; }
 
     /// <summary>
-    ///     Whether restoring this project writes a lock file (<c>RestorePackagesWithLockFile</c>), or
-    ///     <see langword="null" /> where nothing evaluated it. Undeclared reads
-    ///     <see langword="false" />: NuGet's default is off, so absence here is an answer rather than a gap
-    ///     — which is what parts it from <see cref="IsPackable" />.
+    ///     Gets whether restoring this project writes a lock file (<c>RestorePackagesWithLockFile</c>), or
+    ///     <see langword="null" /> where nothing evaluated it. An evaluated project that declares nothing reads
+    ///     <see langword="false" />, NuGet's default being off, so absence is an answer here rather than a gap, which
+    ///     is what parts it from <see cref="IsPackable" />.
     /// </summary>
     public bool? LocksPackages { get; }
 
     /// <summary>
-    ///     Where <see cref="LocksPackages" /> was set, or <see langword="null" /> when it has no value. This
-    ///     is the fact most often declared away from the project — a solution-wide policy in a
-    ///     <c>Directory.Build.props</c> — so the site is regularly a file the project itself never mentions.
+    ///     Gets where <see cref="LocksPackages" /> was set, or <see langword="null" /> when it has no value. This is
+    ///     the fact most often declared away from the project, in a solution-wide <c>Directory.Build.props</c>, so the
+    ///     site is regularly a file the project itself never mentions.
     /// </summary>
     public SourceLocation? LocksPackagesSite { get; }
 }
 
 /// <summary>
-///     One package a project declares: the package's name and the <c>file:line</c> of the declaration —
-///     which may sit in a props file above the project rather than in the project itself.
+///     One package a project declares: the package's identifier and the <c>file:line</c> of the
+///     declaration, which may sit in a props file above the project rather than in the project itself. The
+///     version is not recorded.
 /// </summary>
-/// <remarks>
-///     The version is deliberately absent. It is the fact that changes most often and matters least to a
-///     structural rule, and holding it would put a model rebuild behind every dependency bump.
-/// </remarks>
 public sealed class PackageReference
 {
     internal PackageReference(string name, SourceLocation site)
@@ -189,9 +174,13 @@ public sealed class PackageReference
         Site = site;
     }
 
-    /// <summary>The package identifier, verbatim.</summary>
+    /// <summary>
+    ///     Gets the package identifier, verbatim.
+    /// </summary>
     public string Name { get; }
 
-    /// <summary>Where the reference is declared.</summary>
+    /// <summary>
+    ///     Gets where the reference is declared.
+    /// </summary>
     public SourceLocation Site { get; }
 }

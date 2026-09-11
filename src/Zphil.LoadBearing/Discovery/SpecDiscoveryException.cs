@@ -1,9 +1,8 @@
 namespace Zphil.LoadBearing.Discovery;
 
 /// <summary>
-///     Thrown when <see cref="SpecDiscovery.FindSpecs" /> finds no specs in an assembly. Specs are
-///     law; a zero result is loud, never a silent skip (GRAMMAR §9 divergence from EF's undefined
-///     order and silent skips).
+///     Thrown by <see cref="SpecDiscovery.FindSpecs" /> when an assembly declares no
+///     <see cref="IArchitectureSpec" /> class. Finding none is an error, never an empty result.
 /// </summary>
 public sealed class SpecDiscoveryException : Exception
 {

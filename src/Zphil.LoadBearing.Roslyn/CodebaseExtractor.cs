@@ -8,17 +8,19 @@ using Zphil.LoadBearing.Roslyn.Solutions;
 namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>
-///     Extracts a <see cref="CodebaseModel" /> — type nodes plus <c>file:line</c> reference edges —
-///     from Roslyn compilations. Two entries share one builder core: a fast path over hand-built
-///     <see cref="CompilationInput" />s (no MSBuild), and the solution path used against a real
-///     <see cref="Solution" /> loaded by <see cref="WorkspaceLoader" />.
+///     Builds the <see cref="CodebaseModel" /> a check reads — the types a codebase declares, the members
+///     they declare, and the <c>file:line</c> edges between them — out of Roslyn compilations. Use
+///     <see cref="ExtractFromSolutionAsync" /> for a solution loaded by <see cref="WorkspaceLoader" /> or a
+///     <see cref="WorkspaceSession" />, or <see cref="ExtractFromCompilations" /> for compilations you
+///     built yourself, which needs no MSBuild at all.
 /// </summary>
 public static class CodebaseExtractor
 {
     /// <summary>
-    ///     Extracts the model from the given compilations. Every input is declared before any
-    ///     reference is walked, so a type referenced across compilations unifies to its declaring
-    ///     node by fully-qualified name.
+    ///     Extracts the model from compilations you built yourself, with no MSBuild involved. Every input's
+    ///     types are declared before any reference is resolved, so a type one compilation references and
+    ///     another declares is one node in the model, matched by fully-qualified name. Where two inputs declare
+    ///     the same type, the first in <paramref name="inputs" /> supplies its facts.
     /// </summary>
     /// <param name="inputs">The compilations to extract from, in the order they are declared.</param>
     public static CodebaseModel ExtractFromCompilations(IReadOnlyList<CompilationInput> inputs)
@@ -27,29 +29,33 @@ public static class CodebaseExtractor
     }
 
     /// <summary>
-    ///     Extracts the model from a loaded solution: C# projects in ordinal name order, each project's
-    ///     compilation plus its forward project references (by name), delegated to the shared builder.
+    ///     Extracts the model from a loaded solution: its C# projects in ordinal name order, each with its
+    ///     compilation and the names of the projects it references. Register MSBuild with
+    ///     <see cref="MsBuild.MsBuildBootstrap.EnsureInitialized" /> and load the solution first, through
+    ///     <see cref="WorkspaceLoader" /> or a <see cref="WorkspaceSession" />; restore or build it before that,
+    ///     because a project whose packages were never restored loads without them and the types it gets from
+    ///     them are simply absent from the model.
     /// </summary>
     /// <param name="solution">The loaded solution.</param>
     /// <param name="excludeProjects">
-    ///     Project names to drop from the checked universe — the way a spec project that is itself a
-    ///     member of the target solution stays out of its own check. Null excludes nothing.
+    ///     Project names to leave out of the model — the way a spec project that is itself a member of the
+    ///     solution stays out of its own check. Null excludes nothing.
     /// </param>
     /// <param name="targetFrameworks">
-    ///     The per-project target frameworks the load reported (see
-    ///     <see cref="SolutionExtensions.NormalizeProjectNames" />). Null — or a project absent from it —
-    ///     leaves the framework unstamped, which is the single-framework norm.
+    ///     The per-project target frameworks the load reported
+    ///     (<see cref="LoadedSolution.TargetFrameworks" />), so a fact taken from a multi-target-framework
+    ///     project records the framework it came from. Null, or a project absent from it, leaves the framework
+    ///     unstamped, which is the single-framework norm.
     /// </param>
     /// <param name="declaredMembers">
-    ///     The solution's declared <c>.csproj</c> membership (<see cref="SpecExclusion.TryReadDeclaredMembers" />),
-    ///     stamped onto each project as <see cref="ProjectNode.SolutionMember" />. Null leaves every project
-    ///     unlabeled, which is what an unreadable solution file must degrade to.
+    ///     The absolute <c>.csproj</c> paths the solution file itself declares, symlink-resolved, stamped onto
+    ///     each project as <see cref="ProjectNode.SolutionMember" /> so that a project a
+    ///     <c>ProjectReference</c> dragged into the workspace can be told from one the solution claims. Null
+    ///     leaves every project unlabeled, which is what an unreadable solution file has to degrade to.
     /// </param>
     /// <param name="ct">Cancellation token.</param>
-    /// <remarks>
-    ///     <see cref="MethodImplOptions.NoInlining" /> keeps the JIT from resolving Roslyn types before
-    ///     <c>MSBuildLocator</c> registration in non-test hosts.
-    /// </remarks>
+    // MethodImplOptions.NoInlining keeps the JIT from resolving Roslyn types before MSBuildLocator
+    // registration in non-test hosts.
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static async Task<CodebaseModel> ExtractFromSolutionAsync(
         Solution solution,

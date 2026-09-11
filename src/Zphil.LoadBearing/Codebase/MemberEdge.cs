@@ -1,19 +1,25 @@
 namespace Zphil.LoadBearing.Codebase;
 
 /// <summary>
-///     A directed member-use edge <c>Source → Member</c>: <see cref="Source" />'s declaration source
-///     uses <see cref="Member" /> — a method invocation or method-group reference, a property/field/
-///     event access (including <c>?.</c>, compound assignment, and <c>+=</c>/<c>-=</c> subscription),
-///     or a <c>using static</c> bare name (GRAMMAR §4.5). <see cref="Sites" /> lists the distinct
-///     <c>file:line</c> positions where the use occurs, deduped by (file, line).
+///     One type using a member of another: <see cref="Source" />'s own source invokes, reads, writes or
+///     subscribes to <see cref="Member" />. Read them from <see cref="CodebaseModel.MemberEdges" />.
 /// </summary>
 /// <remarks>
-///     <see cref="Source" /> is the same <see cref="TypeNode" /> instance held by
-///     <see cref="CodebaseModel.Types" /> (reference equality, not just name equality), and
-///     <see cref="MemberReference.ContainingType" /> is likewise a shared node. Self-uses (a type using
-///     its own member) are never produced — the member analog of the reference-edge self-drop
-///     (GRAMMAR §4.1). Member edges are recorded <em>beside</em> the type-level edge, not instead of it:
-///     the same use also mints a <see cref="ReferenceEdge" /> to <see cref="MemberReference.ContainingType" />.
+///     <para>
+///         A method call, a method group handed over as a delegate, a property, field or event access
+///         (<c>?.</c>, compound assignment and <c>+=</c> / <c>-=</c> included), and a bare name brought into
+///         scope by <c>using static</c> all count. A type using its own members gives nothing. Both
+///         <see cref="Source" /> and <see cref="MemberReference.ContainingType" /> are the very type
+///         instances <see cref="CodebaseModel.Types" /> lists, so compare them by reference rather than by
+///         name. The same use is also recorded as an ordinary reference to the member's declaring type in
+///         <see cref="CodebaseModel.Edges" />, never instead of it.
+///     </para>
+///     <para>
+///         Three uses are deliberately absent, so a rule reading these edges will not see them: a
+///         <c>nameof</c> operand, which reads nothing at run time; an indexer; and a member the compiler
+///         takes from a pattern rather than from a name the source spells — <c>await</c>'s
+///         <c>GetAwaiter</c>, <c>using</c>'s <c>Dispose</c>, <c>foreach</c>'s enumerator, query syntax.
+///     </para>
 /// </remarks>
 public sealed class MemberEdge
 {
@@ -24,12 +30,15 @@ public sealed class MemberEdge
         Sites = sites;
     }
 
-    /// <summary>The using type.</summary>
+    /// <summary>Gets the type whose own source contains the use.</summary>
     public TypeNode Source { get; }
 
-    /// <summary>The used member.</summary>
+    /// <summary>Gets the member that was used.</summary>
     public MemberReference Member { get; }
 
-    /// <summary>The distinct use sites, ordered by (file, line).</summary>
+    /// <summary>
+    ///     Gets each distinct place the use occurs, ordered by file then line. Two uses of the same member on
+    ///     one line count as one site.
+    /// </summary>
     public IReadOnlyList<SourceLocation> Sites { get; }
 }

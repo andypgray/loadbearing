@@ -8,7 +8,7 @@ LoadBearing is a .NET tool that renders one C# architecture spec to two targets:
 
 The architecture of a long-lived codebase is real: layers, boundaries, rules. It is also unenforced: it lives in a few heads, no build step checks it, and diagrams drift. Nothing fails when a change crosses a boundary, least of all when a coding agent wrote the change: fast, plausible, and blind to which walls are load-bearing. Architecture-as-code is LoadBearing's answer: the rules become one C# spec, and the spec becomes every surface on this page.
 
-1. **Enforcement**: one checker passes or fails the rules at the command line, in CI, as named xUnit tests, and in an agent hook after each edit.
+1. **Enforcement**: one checker passes or fails the rules at the command line, in CI, as named xUnit tests, and in an agent hook when the agent's turn ends.
 2. **Agent context**: the same rules render to a managed `AGENTS.md` block, per-directory rule cards, and MCP query tools for coding agents.
 
 Write your architecture once. Use it everywhere.
@@ -37,7 +37,7 @@ Each target below consumes the same reified model, and every violation report ca
 | xUnit adapter | every rule an individually named test |
 | `loadbearing render` | the managed `AGENTS.md` block and per-directory rule cards |
 | `loadbearing mcp` | `arch_check`, `arch_status`, `arch_explain`, `arch_context`, and `arch_graph`, plus a `derive_spec` prompt |
-| agent hook | `check` after each edit; a red rule blocks it, report on stderr |
+| agent hook | `check` when a turn ends; a red rule refuses the stop, report on stderr |
 
 The adapter's failure text is byte-identical to the CLI's: the two share one renderer, and a product test pins them equal. The managed block plus `loadbearing explain` are also the generated architecture documentation, written for agents first and readable by people; the gate under [The prose it generates](#the-prose-it-generates) keeps it current.
 
@@ -78,7 +78,7 @@ The block is as current as the CLI that renders it. Nothing inside it records a 
 
 ## When an agent breaks it
 
-Suppose an agent adds a progress printer to the CLI so a slow solution load stops looking hung, and reaches for `Console.WriteLine`. The `PostToolUse` hook in [`hooks/`](https://github.com/andypgray/loadbearing/tree/main/hooks) runs `check` on the edit, the rule goes red, and the wrapper exits 2, which is how a Claude Code hook blocks, with the report on the agent's stderr:
+Suppose an agent adds a progress printer to the CLI so a slow solution load stops looking hung, and reaches for `Console.WriteLine`. The agent finishes and tries to hand the work back. The `Stop` hook in [`hooks/`](https://github.com/andypgray/loadbearing/tree/main/hooks) runs `check` over the working tree, the rule goes red, and the wrapper exits 2, which is how a Claude Code hook refuses a stop, with the report on the agent's stderr:
 
 ```text
 FAIL cli/no-stdout — The Host layer must not use `Console.Out`, `Console.Write()` or `Console.WriteLine()`.
@@ -90,7 +90,7 @@ FAIL cli/no-stdout — The Host layer must not use `Console.Out`, `Console.Write
   src/Zphil.LoadBearing.Cli/Rendering/ProgressPrinter.cs:15 — Zphil.LoadBearing.Cli.Rendering.ProgressPrinter uses System.Console.WriteLine()
 ```
 
-That stanza is one rule's worth of the board the wrapper hands back whole. It carries the five things an agent needs to act without asking a human: the rule ID, the reason, the page that reason rests on, the fix, and the exact `file:line` of every offending write. The `subject:` line is scope rather than a finding, and appears only when a generator wrote some of what the rule swept. The agent routes the output through the command's console instead, the next check is green, and the block clears in the same turn, before the change lands.
+That stanza is one rule's worth of the board the wrapper hands back whole. It carries the five things an agent needs to act without asking a human: the rule ID, the reason, the page that reason rests on, the fix, and the exact `file:line` of every offending write. The `subject:` line is scope rather than a finding, and appears only when a generator wrote some of what the rule swept. The agent routes the output through the command's console instead, and the next stop is clean. The correction lands in the turn that made the mistake, which is the last moment it costs nobody else anything.
 
 ## In xUnit
 

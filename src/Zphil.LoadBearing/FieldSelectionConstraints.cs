@@ -5,21 +5,21 @@ using Zphil.LoadBearing.Model;
 namespace Zphil.LoadBearing;
 
 /// <summary>
-///     The fields-only member modal verb (GRAMMAR §5.7) as an extension that turns a
-///     <see cref="FieldSelection" /> into a terminal <see cref="Constraint" />.
+///     The verb available on a field selection alone — the <c>Fields</c> projection of a
+///     <see cref="Selection" />. <c>MustBeReadonly</c> asks a question only a field can answer, so it
+///     does not compile on a method, property, event or plain member selection.
 /// </summary>
-/// <remarks>
-///     Like <c>.Returning</c> on <see cref="MethodSelection" />, it binds by receiver type to
-///     <see cref="FieldSelection" /> — the <c>.Fields</c> projection's selection — so it is uncompilable
-///     off <c>.Methods</c>/<c>.Properties</c>/<c>.Events</c>/<c>.Members</c> (fields-only by
-///     construction, GRAMMAR §3.2).
-/// </remarks>
+// Receiver-typed to FieldSelection exactly like .Returning is to MethodSelection, so the verb is
+// uncompilable off .Methods, .Properties, .Events and .Members — no validation rule to write and no
+// runtime refusal to render (GRAMMAR §5.7).
 public static class FieldSelectionConstraints
 {
     /// <summary>
-    ///     The subject fields must be declared <c>readonly</c> (GRAMMAR §5.7). A <c>const</c> field
-    ///     satisfies the verb — const is readonly's superset, so redding one would demand something weaker
-    ///     than what is already there.
+    ///     States that every selected field must be declared <c>readonly</c>, such as
+    ///     <c>arch.Types.Fields.ThatAreStatic().MustBeReadonly()</c>, and returns the
+    ///     <see cref="Constraint" /> to hand to <c>Enforce</c> or <c>Migrate</c>. A <c>const</c> field
+    ///     passes as well: it is already more constrained than a <c>readonly</c> one, so failing it would
+    ///     be asking for something weaker than what is already there. Every other field fails the check.
     /// </summary>
     public static Constraint MustBeReadonly(this FieldSelection subject)
     {

@@ -5,21 +5,23 @@ using Zphil.LoadBearing.Model;
 namespace Zphil.LoadBearing;
 
 /// <summary>
-///     The properties-only member modal verb (GRAMMAR §5.7) as an extension that turns a
-///     <see cref="PropertySelection" /> into a terminal <see cref="Constraint" />.
+///     The verb available on a property selection alone — the <c>Properties</c> projection of a
+///     <see cref="Selection" />. <c>MustBeGetOnly</c> asks a question only a property can answer, so
+///     it does not compile on a method, field, event or plain member selection.
 /// </summary>
-/// <remarks>
-///     Like <c>.Returning</c> on <see cref="MethodSelection" />, it binds by receiver type to
-///     <see cref="PropertySelection" /> — the <c>.Properties</c> projection's selection — so it is
-///     uncompilable off <c>.Methods</c>/<c>.Fields</c>/<c>.Events</c>/<c>.Members</c> (properties-only by
-///     construction, GRAMMAR §3.2).
-/// </remarks>
+// Receiver-typed to PropertySelection exactly like .Returning is to MethodSelection, so the verb is
+// uncompilable off .Methods, .Fields, .Events and .Members — no validation rule to write and no
+// runtime refusal to render (GRAMMAR §5.7).
 public static class PropertySelectionConstraints
 {
     /// <summary>
-    ///     The subject properties must declare no setter accessor (GRAMMAR §5.7). Strict: an
-    ///     <c>init</c>-only setter is still a setter, so <c>{ get; init; }</c> fails. Accessibility-blind
-    ///     — a <c>private set</c> fails too.
+    ///     States that every selected property must declare no setter at all, such as
+    ///     <c>arch.Types.Properties.MustBeGetOnly()</c>, and returns the <see cref="Constraint" /> to hand
+    ///     to <c>Enforce</c> or <c>Migrate</c>. This is a claim about the declaration, so it is strict in
+    ///     both directions an author tends to expect otherwise: an <c>init</c>-only setter is still a
+    ///     setter and <c>{ get; init; }</c> fails the check, and accessibility makes no difference, so
+    ///     <c>private set</c> fails too. A get-only auto-property, an expression-bodied property and a
+    ///     property with a getter accessor alone all pass.
     /// </summary>
     public static Constraint MustBeGetOnly(this PropertySelection subject)
     {

@@ -1,12 +1,14 @@
 namespace Zphil.LoadBearing.Codebase;
 
 /// <summary>
-///     The extracted codebase — its types, the dependency edges between them, the container-registration
-///     facts, and its projects: the deterministic substrate the checker evaluates rules against.
+///     The extracted codebase a check runs against: every type the solution declares, a shallow entry for
+///     each external type they reference, the edges between them, the container registrations the source
+///     spells, and the projects. Build one with the extractor in the <c>Zphil.LoadBearing.Roslyn</c>
+///     package, then hand it to <c>ArchChecker.Check</c> beside an architecture model, or summarize it
+///     with <see cref="GraphSummarizer" /> for the survey the CLI's <c>graph</c> verb prints. Every list
+///     is read-only and ordered ordinal, so two runs over unchanged source produce the same lists in the
+///     same order; each property below names the keys it is sorted by.
 /// </summary>
-/// <remarks>
-///     Every list is ordered ordinal for reproducibility; each property states the sort key it uses.
-/// </remarks>
 public sealed class CodebaseModel
 {
     internal CodebaseModel(
@@ -38,128 +40,113 @@ public sealed class CodebaseModel
     }
 
     /// <summary>
-    ///     All types — solution-declared and shallow external nodes — ordered by FullName, then declarations
-    ///     before externals, then by <see cref="TypeNode.ProjectName" />. The tie-break is load-bearing rather
-    ///     than decorative: a name a project declares that a referenced assembly also supplies carries two
-    ///     nodes, so FullName alone is not a total order and every rendered document would lose its
-    ///     byte-stability to dictionary enumeration order without it.
+    ///     Gets every type in the model: the ones the solution's projects declare, and a shallow entry for each
+    ///     external type they reference. Ordered by <see cref="TypeNode.FullName" />, declarations before external
+    ///     entries, then by <see cref="TypeNode.ProjectName" />. A full name is not a key here: where a project
+    ///     declares a name a referenced assembly also supplies, both entries are in this list, and
+    ///     <see cref="ShadowedNames" /> names exactly those cases.
     /// </summary>
+    // The (declaration-before-external, project) tie-break is what makes this a total order. FullName alone
+    // is not one, because a shadowed name carries two nodes, and without the tie-break every rendered
+    // document would take dictionary enumeration order and lose its byte-stability.
     public IReadOnlyList<TypeNode> Types { get; }
 
-    /// <summary>All reference edges, ordered by (source FullName, target FullName).</summary>
+    /// <summary>
+    ///     Gets the type-to-type reference edges: one entry per (source type, target type) pair, carrying every site
+    ///     that produced it. Ordered by (source full name, target full name).
+    /// </summary>
     public IReadOnlyList<ReferenceEdge> Edges { get; }
 
     /// <summary>
-    ///     All member-use edges (GRAMMAR §4.5), ordered by (source FullName, member
-    ///     <see cref="MemberReference.SymbolId" />). Recorded beside <see cref="Edges" />, never instead
-    ///     of it: every member use also mints a type-level edge to the member's containing type.
+    ///     Gets the member uses: one entry per (source type, used member) pair — a property, field or event access, a
+    ///     method call, a method-group reference — carrying every site. Ordered by (source full name, member
+    ///     <see cref="MemberReference.SymbolId" />). Recorded beside <see cref="Edges" /> rather than instead of it, so
+    ///     a member use also appears there as a reference edge to the member's containing type.
     /// </summary>
     public IReadOnlyList<MemberEdge> MemberEdges { get; }
 
     /// <summary>
-    ///     All construction edges (GRAMMAR §4.5), ordered by (source FullName, constructed FullName).
-    ///     Recorded beside <see cref="Edges" />, never instead of it: every <c>new Foo()</c> also mints a
-    ///     type-level edge to the constructed type.
+    ///     Gets the object creations: one entry per (source type, constructed type) pair, carrying every site, from an
+    ///     explicit <c>new Foo()</c> and a target-typed <c>new()</c> alike. Ordered by (source full name, constructed
+    ///     full name). Recorded beside <see cref="Edges" /> rather than instead of it, so a creation also appears there
+    ///     as a reference edge to the constructed type.
     /// </summary>
     public IReadOnlyList<ConstructorEdge> ConstructorEdges { get; }
 
     /// <summary>
-    ///     All constructor-injection edges (GRAMMAR §4.7), ordered by (source FullName, injected FullName).
-    ///     Read from the declared instance constructors of each solution-declared type (primary constructors
-    ///     included). Recorded beside <see cref="Edges" />, never instead of it: an injected parameter type
-    ///     also mints a type-level edge to that type.
+    ///     Gets the constructor injections: one entry per (source type, injected parameter type) pair, read from the
+    ///     declared instance constructors of each solution-declared type, primary constructors included. Ordered by
+    ///     (source full name, injected full name). Recorded beside <see cref="Edges" /> rather than instead of it, so
+    ///     an injected parameter type also appears there as a reference edge.
     /// </summary>
     public IReadOnlyList<InjectionEdge> InjectionEdges { get; }
 
     /// <summary>
-    ///     All catch edges (GRAMMAR §4.8), ordered by (source FullName, caught FullName). Read from every
-    ///     <c>catch</c> clause of each solution-declared type; a bare <c>catch</c> records
-    ///     <c>System.Exception</c>. A typed catch is recorded beside <see cref="Edges" />, never instead of
-    ///     it: its type-name syntax also mints a type-level edge (a bare catch names no type, so mints none).
-    ///     Each edge additionally carries its <see cref="CatchEdge.UnfilteredSites" /> — the subset of its
-    ///     sites whose clause spells no <c>when</c> filter — and its <see cref="CatchEdge.SwallowingSites" />,
-    ///     the subset of <em>those</em> whose block does not end in a <c>throw</c>.
+    ///     Gets the caught exception types: one entry per (source type, caught type) pair, read from every <c>catch</c>
+    ///     clause of each solution-declared type, where a bare <c>catch</c> records <c>System.Exception</c>. Ordered by
+    ///     (source full name, caught full name). Each entry also carries <see cref="CatchEdge.UnfilteredSites" />, the
+    ///     sites whose clause spells no <c>when</c> filter, and <see cref="CatchEdge.SwallowingSites" />, those of them
+    ///     whose block does not end in a <c>throw</c>. A typed catch also appears in <see cref="Edges" />, its type
+    ///     name being a reference like any other; a bare catch names no type and appears there not at all.
     /// </summary>
     public IReadOnlyList<CatchEdge> CatchEdges { get; }
 
     /// <summary>
-    ///     All throw edges (GRAMMAR §4.8), ordered by (source FullName, thrown FullName). Read from every
-    ///     <c>throw</c> statement and throw expression of each solution-declared type, keyed on the thrown
-    ///     expression's static type; a bare rethrow (<c>throw;</c>) records nothing. A <c>throw new X()</c> is
-    ///     recorded beside its <see cref="ConstructorEdges">construction edge</see> and the type-level edge.
+    ///     Gets the thrown exception types: one entry per (source type, thrown type) pair, read from every <c>throw</c>
+    ///     statement and throw expression of each solution-declared type and keyed on the thrown expression's static
+    ///     type; a bare rethrow (<c>throw;</c>) records nothing. Ordered by (source full name, thrown full name). A
+    ///     <c>throw new X()</c> appears here, in <see cref="ConstructorEdges" /> and in <see cref="Edges" /> alike.
     /// </summary>
     public IReadOnlyList<ThrowEdge> ThrowEdges { get; }
 
     /// <summary>
-    ///     All signature-exposure edges (GRAMMAR §4.9), ordered by (source FullName, exposed FullName). Read
-    ///     from every public signature position — a method's return and parameter types, a property/field/event
-    ///     type — of each effectively-public member (a public member whose containing-type chain is public at
-    ///     every level) of each solution-declared type. Recorded beside <see cref="Edges" />, never instead of
-    ///     it: the signature type-name syntax also mints a type-level edge to that type.
+    ///     Gets the types named in public signature positions: one entry per (source type, exposed type) pair, read
+    ///     from a method's return and parameter types and a property, field or event's type, for every member that is
+    ///     public and whose containing types are public at every level. Ordered by (source full name, exposed full
+    ///     name). Recorded beside <see cref="Edges" /> rather than instead of it, so a type the signature spells also
+    ///     appears there as a reference edge.
     /// </summary>
     public IReadOnlyList<ExposureEdge> ExposureEdges { get; }
 
     /// <summary>
-    ///     All container-registration facts (GRAMMAR §4.7), ordered by (lifetime, service FullName,
-    ///     implementation FullName). Held as FQN strings (never denormalized onto <see cref="TypeNode" />):
-    ///     <c>arch.Registered(lifetime)</c> membership is the union of service and implementation FQNs at
-    ///     that lifetime, resolved at evaluation against these facts.
+    ///     Gets the container registrations the source spells: one entry per (lifetime, service type, implementation
+    ///     type) fact, ordered by those three. Held as fully-qualified names rather than on the type entries themselves
+    ///     — <c>arch.Registered(lifetime)</c> selects the service and implementation names recorded at that lifetime,
+    ///     resolved against this list when the check runs.
     /// </summary>
     public IReadOnlyList<ServiceRegistration> ServiceRegistrations { get; }
 
-    /// <summary>All projects, ordered by name.</summary>
+    /// <summary>
+    ///     Gets every project in the model, ordered by name (ordinal).
+    /// </summary>
     public IReadOnlyList<ProjectNode> Projects { get; }
 
     /// <summary>
-    ///     Every full name a project declares that a referenced assembly also supplies, ordered by that name
-    ///     (ordinal), and empty for the overwhelming common case — the one place a name in
-    ///     <see cref="Types" /> does not identify a type, stated as a fact rather than left to be rediscovered
-    ///     by grouping that list. The prose form is the third <see cref="MergeNotes">merge note</see> kind.
+    ///     Gets every full name a project declares that a referenced assembly also supplies, ordered by that name
+    ///     (ordinal), and empty in the common case. This is the one place a name in <see cref="Types" /> does not
+    ///     identify a single type, stated as a fact rather than left to be found by grouping that list;
+    ///     <see cref="MergeNotes" /> reports the same split in prose.
     /// </summary>
     public IReadOnlyList<ShadowedName> ShadowedNames { get; }
 
     /// <summary>
-    ///     Advisory notes the fragment merge raised while assembling this model: the two project-level kinds
-    ///     first, each ordinal by project name, then the per-type kind, ordinal by fully-qualified name — so
-    ///     the list is stable across runs and the coarser fact is read first.
+    ///     Gets advisory notes about how this model was assembled, ready to show a reader: the project-level notes
+    ///     first, each ordinal by project name, then the per-type notes, ordinal by fully-qualified name. Empty in the
+    ///     common case. A note never means a failed load and never fails a check — the model is complete and correct,
+    ///     and the note only warns that an attribution may surprise you. It is prose to display, not to parse:
+    ///     <see cref="ShadowedNames" /> and <see cref="TypeNode.AlsoDeclaredBy" /> carry the same facts in a form to
+    ///     act on.
     /// </summary>
     /// <remarks>
-    ///     <para>
-    ///         <b>Per-type — same-FQN cross-project conflation.</b> Two or more <em>differently named</em>
-    ///         projects declare one fully-qualified type name; the first declarer wins the node's facts and
-    ///         <see cref="TypeNode.ProjectName" />, while <c>arch.Project</c> selections reach every
-    ///         declarer and a declarer's reference to its own compiled-in copy counts against that declarer
-    ///         alone. One note per conflated type names all of them, so a type several projects shadow
-    ///         costs one line. The same fact rides the node itself as
-    ///         <see cref="TypeNode.AlsoDeclaredBy" />, for a consumer that must act on it rather than
-    ///         report it.
-    ///     </para>
-    ///     <para>
-    ///         <b>Per-project — a multi-target-framework collapse.</b> One project file's several target
-    ///         frameworks share a name, so they union into one project; where two of them declare the same
-    ///         type, that type can only carry one framework's facts (the first extracted), and a rule about
-    ///         it is therefore checked against that framework alone. One note per project, naming every
-    ///         framework it targets and the winning one. A project whose frameworks share <em>no</em> type —
-    ///         and a framework-exclusive type, which keeps its own framework's facts — stays silent, because
-    ///         nothing collapsed.
-    ///     </para>
-    ///     <para>
-    ///         <b>Per-project — a name a referenced assembly also supplies.</b> A project declares a
-    ///         fully-qualified name that an assembly no project of this solution produces supplies too — a
-    ///         stand-in under a package's own namespace, a polyfill under a BCL one. Both types are in
-    ///         <see cref="Types" />, and each reference reaches whichever the referencing compilation bound,
-    ///         so a rule naming the type reaches both while an <c>arch.Project</c> selection over the
-    ///         declaring project reaches only the declaration. One note per declaring project rather than
-    ///         per name. The queryable form is the second node itself, and — for a consumer that needs the
-    ///         split named rather than inferred from two nodes wearing one name —
-    ///         <see cref="ShadowedNames" />, which is also what the survey's coverage key is a projection
-    ///         of.
-    ///     </para>
-    ///     <para>
-    ///         All three kinds are purely informational — the model is complete and correct, just carrying an
-    ///         attribution a reader can be surprised by — so they never denote a failed load and never gate
-    ///         <c>check</c> (unlike workspace-load diagnostics). Empty for the overwhelming common case.
-    ///     </para>
+    ///     Three things get a note. A type that several projects declare, one note naming all of them: the
+    ///     first declarer's compilation supplies the type's edges, members and hierarchy, while
+    ///     <c>arch.Project</c> named on any declarer selects it. A project that compiles once per target
+    ///     framework, one note per project naming its frameworks and the winning one: a type more than one of
+    ///     them declares carries the first framework's facts alone, so whatever another framework's <c>#if</c>
+    ///     guards is not in the model. A name a referenced assembly also supplies, one note per declaring
+    ///     project: both types are in <see cref="Types" />, and each reference reaches whichever one the
+    ///     referencing project bound, so a rule naming the type reaches both while an <c>arch.Project</c>
+    ///     selection over the declaring project reaches the declaration alone.
     /// </remarks>
     public IReadOnlyList<string> MergeNotes { get; }
 }

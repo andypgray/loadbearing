@@ -1,10 +1,9 @@
 namespace Zphil.LoadBearing.Codebase;
 
 /// <summary>
-///     A single source position: an absolute or solution-relative file path and a 1-based line
-///     number. The agent-facing rendered form is <c>{FilePath}:{Line}</c> (pinned by tests) — the
-///     <c>file:line</c> a violation message cites so an agent can jump straight to the offending
-///     source.
+///     A place in the source: a file path and a 1-based line number. Every site list in the extracted model
+///     is made of these (where an edge occurs, where a type or a member is declared), and a violation
+///     carries the ones it was found at, so a report can point straight at the code.
 /// </summary>
 public sealed class SourceLocation
 {
@@ -14,13 +13,18 @@ public sealed class SourceLocation
         Line = line;
     }
 
-    /// <summary>The file path — verbatim from the syntax tree (absolute under MSBuildWorkspace).</summary>
+    /// <summary>
+    ///     Gets the file path exactly as the compiler recorded it, which is absolute for a model extracted from
+    ///     a solution on disk. The CLI makes it relative to the solution directory before printing it.
+    /// </summary>
     public string FilePath { get; }
 
-    /// <summary>The 1-based line number of the position.</summary>
+    /// <summary>Gets the 1-based line number.</summary>
     public int Line { get; }
 
-    /// <summary>Renders the pinned agent-facing <c>file:line</c> form.</summary>
+    /// <summary>Returns the position as <c>{FilePath}:{Line}</c>.</summary>
+    // The rendered form is pinned by tests, which compare two site lists through it. The report renderers do
+    // not call it: each makes the path relative to the solution directory itself before printing.
     public override string ToString()
     {
         return $"{FilePath}:{Line}";

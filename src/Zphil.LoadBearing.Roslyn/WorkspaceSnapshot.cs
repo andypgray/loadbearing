@@ -7,18 +7,17 @@ namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>
 ///     An immutable view of a <see cref="WorkspaceSession" />'s solution as of one
-///     <see cref="WorkspaceSession.GetCurrentAsync" /> call: the reconciled <see cref="Solution" /> and the
-///     workspace-load diagnostics that describe it.
+///     <see cref="WorkspaceSession.GetCurrentAsync" /> call: the reconciled solution, and the diagnostics
+///     of the load that produced it.
 /// </summary>
 /// <remarks>
-///     The <see cref="Solution" /> is a Roslyn immutable snapshot and stays usable even after the session
-///     reloads or is disposed (a solution outlives its owning workspace), so a snapshot can be read
-///     concurrently with a later reconcile. <see cref="Diagnostics" /> is refreshed wholesale on each full
-///     (re)load and is stable across in-place content edits, since it describes the loaded workspace rather
-///     than any single document.
+///     The solution is a Roslyn immutable snapshot and stays readable after the session reloads or is
+///     disposed, so holding one is safe while a later call reconciles. <see cref="Diagnostics" /> describes
+///     the load rather than any one file: it is replaced wholesale when the session reloads, and the file
+///     edits a reconcile folds in leave it alone.
 /// </remarks>
-/// <param name="Solution">The reconciled, unresolved-reference-stripped solution.</param>
-/// <param name="Diagnostics">Workspace-load failure messages captured during the load that produced this snapshot.</param>
+/// <param name="Solution">The reconciled solution, with references that did not resolve dropped.</param>
+/// <param name="Diagnostics">The failure messages the workspace reported during this snapshot's load.</param>
 public sealed record WorkspaceSnapshot(Solution Solution, IReadOnlyList<string> Diagnostics)
 {
     private static readonly IReadOnlyDictionary<string, int> NoEditVersions =

@@ -1,30 +1,35 @@
 namespace Zphil.LoadBearing.Codebase;
 
 /// <summary>
-///     A directed exposure edge <c>Source → Exposed</c>: <see cref="Source" /> names <see cref="Exposed" /> in a
-///     public <em>signature position</em> — a method's return or parameter type, or a property/field/event type —
-///     of an effectively-public member (GRAMMAR §4.9). It is minted only from a public member whose containing-type
-///     chain is public at every level, so a <c>public</c> member nested in an <c>internal</c> type surfaces nothing
-///     (the honesty boundary: an internal member is not surface). Signature types decompose definition-level like
-///     type edges (§4.1): <c>Task&lt;Order&gt;</c> yields edges to both <c>Task&lt;&gt;</c> and <c>Order</c>, an
-///     array yields its element type, a tuple yields the open definition (recorded under its display form
-///     <c>(T1, T2)</c>, not <c>System.ValueTuple&lt;T1, T2&gt;</c>) and every element type, and <c>int?</c>
-///     yields <c>System.Nullable&lt;T&gt;</c> and <c>System.Int32</c>.
-///     <see cref="Sites" /> lists the distinct <c>file:line</c> positions of the exposing members (their
-///     declaration lines), deduped by (file, line).
+///     One type naming another in its public API: a member of <see cref="Source" /> names
+///     <see cref="Exposed" /> in a signature position — a method's return type or one of its parameter
+///     types, or a property, field or event's type. Read them from
+///     <see cref="CodebaseModel.ExposureEdges" />.
 /// </summary>
 /// <remarks>
-///     <see cref="Source" /> and <see cref="Exposed" /> are the same <see cref="TypeNode" /> instances held by
-///     <see cref="CodebaseModel.Types" /> (reference equality, not just name equality), so an external exposed
-///     type (e.g. a <c>DataTable</c> only the BCL declares) is a matchable target like any other external
-///     endpoint. Self-exposure (a type naming itself in its own signature) is never produced — the exposure
-///     analog of the reference-edge self-drop (§4.1), which also self-drops the enum-value-self-typing case.
-///     Constructor parameters are the injection axis's (§4.7), not this one's, and base-type/interface lists are
-///     inheritance (§5.2), not members — neither mints an exposure edge. Where the signature textually names its
-///     type, the exposure edge is recorded <em>beside</em> the type-level <see cref="ReferenceEdge" /> that
-///     type-name syntax mints, never instead of it — one site, two facts. A spelling that names no type (tuple
-///     and <c>?</c> syntax, whose wrappers decomposition synthesizes; predefined keywords like <c>int</c>) mints
-///     no twin: the exposure edge stands alone there by design.
+///     <para>
+///         Only what a caller outside the assembly could reach counts: the member must be public and every
+///         type enclosing it public too, so a <c>public</c> member of an <c>internal</c> type exposes
+///         nothing. A type naming itself gives nothing. A constructor's parameters belong to
+///         <see cref="CodebaseModel.InjectionEdges" /> instead, and base types and interface lists are
+///         inheritance rather than signatures; neither appears here. Nor do indexers, operators,
+///         conversions, accessors, explicit interface implementations, compiler-generated members, or a
+///         <c>void</c> return, which names no type.
+///     </para>
+///     <para>
+///         Signature types are recorded at their definition and taken apart: <c>Task&lt;Order&gt;</c> gives
+///         edges to <c>Task&lt;&gt;</c> and <c>Order</c>, an array gives its element type,
+///         <c>(Order, Widget)</c> gives the open tuple under its display form <c>(T1, T2)</c> plus both
+///         element types, and <c>int?</c> gives <c>System.Nullable&lt;T&gt;</c> and <c>System.Int32</c>.
+///         Framework types are recorded like any other, so <c>public string Name</c> exposes
+///         <c>System.String</c>. Where the signature spells a type's name the edge sits beside the ordinary
+///         reference that name produces; where it spells none — a tuple, a <c>?</c>, the keyword
+///         <c>int</c> — the exposure edge stands alone.
+///     </para>
+///     <para>
+///         What is recorded is the declared signature, never what flows through it: a member returning
+///         <c>object</c> exposes <c>System.Object</c> and nothing else, whatever the caller casts it to.
+///     </para>
 /// </remarks>
 public sealed class ExposureEdge
 {
@@ -35,12 +40,15 @@ public sealed class ExposureEdge
         Sites = sites;
     }
 
-    /// <summary>The exposing type — the type whose public member names the exposed type in a signature position.</summary>
+    /// <summary>Gets the exposing type — the one whose public member names the exposed type.</summary>
     public TypeNode Source { get; }
 
-    /// <summary>The exposed type.</summary>
+    /// <summary>Gets the type named in the signature.</summary>
     public TypeNode Exposed { get; }
 
-    /// <summary>The distinct exposing-member sites, ordered by (file, line).</summary>
+    /// <summary>
+    ///     Gets the declaration line of each exposing member, ordered by file then line. Two exposing members on
+    ///     one line count as one site.
+    /// </summary>
     public IReadOnlyList<SourceLocation> Sites { get; }
 }

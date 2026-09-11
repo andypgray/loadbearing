@@ -3,17 +3,16 @@ using Zphil.LoadBearing.Model;
 namespace Zphil.LoadBearing.Fluent;
 
 /// <summary>
-///     The member selection minted by the <c>.Fields</c> projection (GRAMMAR §4.6) — a
-///     <see cref="MemberSelection" /> specialized to fields, which is what makes <c>MustBeReadonly</c>
-///     available.
+///     The fields the selected types declare, reached with <c>.Fields</c> on a
+///     <see cref="Selection" />. Narrow it with the member adjectives (<c>WithSuffix</c>,
+///     <c>WithPrefix</c>, <c>WithNameMatching</c>, <c>AttributedWith</c>, <c>ThatAreStatic</c>,
+///     <c>Where</c>), each of which hands back a field selection again, so the field-only call stays
+///     reachable whatever the order; finish it with a member verb such as <c>MustHavePrefix</c> or
+///     <c>MustBePrivate</c>, or with <c>MustBeReadonly</c>, which fields alone accept. A <c>const</c>
+///     field satisfies <c>MustBeReadonly</c>. An enum's values are not fields here: an enum type
+///     declares no members a selection can reach. Immutable and reusable: every call hands back a new
+///     selection and leaves this one as it was.
 /// </summary>
-/// <remarks>
-///     The readonly verb is fields-only, so it binds by receiver type here and is uncompilable on the
-///     other projections by construction (GRAMMAR §3.2), exactly as <c>.Returning</c> is on
-///     <see cref="MethodSelection" />. The shared member adjectives preserve this type (they are generic
-///     self-type extensions), so <c>.Fields.ThatAreStatic().WithPrefix("s_")</c> type-checks in any order
-///     and the verb stays reachable after either.
-/// </remarks>
 public sealed class FieldSelection : MemberSelection
 {
     internal FieldSelection(Selection source, IReadOnlyList<MemberAdjective> adjectives)

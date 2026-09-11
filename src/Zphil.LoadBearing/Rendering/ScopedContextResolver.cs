@@ -6,20 +6,21 @@ using Zphil.LoadBearing.Internal;
 namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
-///     Places each scope's directory context file. For every card-bearing rule it evaluates the raw
-///     scoped selection in <see cref="SelectionPosition.Subject" /> position (so it
-///     ranges over solution-declared types), collects those types' declaration-site file paths, and
-///     picks their <em>deepest common ancestor directory</em> — the directory whose <c>AGENTS.md</c>
-///     receives the scope card.
+///     Works out which directory each scope's card belongs in: the deepest directory holding every file
+///     that declares one of the scoped types, so the card covers the scope and as little else as it can.
+///     One card per scope, rendered from a quarantine's containment rule or a caution's tripwire, so a
+///     quarantine never places two cards on one directory.
 /// </summary>
 /// <remarks>
-///     A scope that matches no types resolves to a null directory with a skip reason. This is the one
-///     placement concern that needs the codebase, so it stays beside the internal
-///     <see cref="SelectionEvaluator" /> and returns a public result.
+///     Only types the solution declares are considered. A scope that matches none of them comes back
+///     with a null directory and the reason, for the caller to report or ignore.
 /// </remarks>
 public static class ScopedContextResolver
 {
-    /// <summary>Resolves a placement for every scope in the model, in model order.</summary>
+    /// <summary>
+    ///     Resolves a placement for every scope in <paramref name="model" />, in the order the spec declares
+    ///     them.
+    /// </summary>
     public static IReadOnlyList<ScopePlacement> Resolve(ArchitectureModel model, CodebaseModel codebase)
     {
         Guard.NotNull(model, nameof(model));

@@ -6,8 +6,8 @@ using Zphil.LoadBearing.Cli.Rendering;
 namespace Zphil.LoadBearing.Tests.Rendering;
 
 /// <summary>
-///     The hook document's wire shape: the one <c>hookSpecificOutput</c> object a Claude Code
-///     <c>PostToolUse</c> hook is parsed for, carrying the check report as <c>additionalContext</c>.
+///     The hook document's wire shape: the one <c>hookSpecificOutput</c> object a Claude Code hook is
+///     parsed for, carrying the check report as <c>additionalContext</c> for the event that fired.
 /// </summary>
 /// <remarks>
 ///     The escaping rows are the reason this renderer exists at all. A check report is multi-line and
@@ -18,22 +18,35 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 /// </remarks>
 public sealed class HookReportRendererTests
 {
-    [Fact]
-    public void Document_CarriesThePostToolUseEventAndTheReport()
+    [Theory]
+    [InlineData("PostToolUse")]
+    [InlineData("Stop")]
+    [InlineData("SubagentStop")]
+    public void Document_CarriesTheEventItWasRenderedForAndTheReport(string hookEvent)
     {
         const string report = "warn legacy/billing/tripwire\n  warning: Changed file 'Billing/Calc.cs' is inside …";
 
-        string document = HookReportRenderer.Document(report);
+        string document = HookReportRenderer.Document(report, hookEvent);
 
         JsonElement output = Parsed(document);
         output.GetProperty("hookEventName")
             .GetString()
-            // PostToolUse is the one event whose additional context reaches the agent, so the name is not an
-            // implementation detail of the caller: a hook wired to another event gets nothing from this.
-            .ShouldBe("PostToolUse");
+            // Claude Code reads additionalContext only from a document naming the event it fired, so the name
+            // is not decoration: a Stop hook handed the per-edit envelope reaches the agent with nothing. The
+            // three rows are the whole set of events whose context arrives at all.
+            .ShouldBe(hookEvent);
         output.GetProperty("additionalContext")
             .GetString()
             .ShouldBe(report);
+    }
+
+    [Fact]
+    public void Events_AreTheThreeTheRunnerWillRenderFor()
+    {
+        // The renderer owns the set the runner refuses against, so the two cannot drift into a CLI that
+        // accepts an event this document may not name.
+        HookReportRenderer.Events.ShouldBe(["PostToolUse", "Stop", "SubagentStop"]);
+        HookReportRenderer.DefaultEvent.ShouldBe("PostToolUse");
     }
 
     [Fact]
@@ -49,7 +62,7 @@ public sealed class HookReportRendererTests
                               	— `BillingCalculator` must not be tidied. Dragons: loadbearing explain.
                               """;
 
-        string document = HookReportRenderer.Document(report);
+        string document = HookReportRenderer.Document(report, HookReportRenderer.DefaultEvent);
 
         Parsed(document)
             .GetProperty("additionalContext")
@@ -62,7 +75,7 @@ public sealed class HookReportRendererTests
     {
         // Nothing calls it this way — the runner writes no document at all when there is nothing to say — but
         // the renderer must not be the thing that decides that, and a document that parses is the floor.
-        string document = HookReportRenderer.Document(string.Empty);
+        string document = HookReportRenderer.Document(string.Empty, HookReportRenderer.DefaultEvent);
 
         Parsed(document)
             .GetProperty("additionalContext")

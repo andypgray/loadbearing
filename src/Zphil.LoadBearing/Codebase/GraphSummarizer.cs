@@ -3,22 +3,27 @@ using Zphil.LoadBearing.Internal;
 namespace Zphil.LoadBearing.Codebase;
 
 /// <summary>
-///     Summarizes a <see cref="CodebaseModel" /> into a <see cref="GraphSummary" /> — the pre-spec survey
-///     the derive flow orients on. Pure over an already-deterministic model (no I/O, no Roslyn), and
-///     every result list is ordinal-ordered, so the survey is byte-stable across runs.
+///     Turns a <see cref="CodebaseModel" /> into a <see cref="GraphSummary" />: the survey of a codebase
+///     that needs no architecture spec, which is what the CLI's <c>graph</c> verb prints. Pure counting
+///     over a model that is already ordered, with no I/O and no compiler work, and every list it produces
+///     is ordinal-ordered, so one model always summarizes to the same document.
 /// </summary>
 public static class GraphSummarizer
 {
     private const string GlobalNamespaceLabel = "(global)";
 
-    /// <summary>Builds the survey from an extracted model.</summary>
+    /// <summary>
+    ///     Builds the survey from an extracted model: every project with its namespace inventory, the
+    ///     reference edges observed between projects, the external references grouped by namespace root, and
+    ///     the names more than one place declares. Narrow the result afterwards with <see cref="Scope" />.
+    /// </summary>
     /// <remarks>
-    ///     The project edges are the edges the code actually declares. Where one source file compiles into
-    ///     several projects the model's one edge stands for one reference per declarer (GRAMMAR §4.1), so
-    ///     each is read at the project it reached: a reference into a type the referencing project compiles
-    ///     itself is not a project edge, and a reference out of such a type is one from every declarer that
-    ///     made it. <see cref="GraphSummary.MultiplyDeclaredTypes" /> states the attribution all of that
-    ///     rests on rather than leaving it silent.
+    ///     The project edges are the references the code actually makes, each read at the project that made
+    ///     it. Where one source file is compiled into several projects that distinction bites: a reference
+    ///     into a type the referencing project compiles itself is not an edge between projects, and a
+    ///     reference out of such a type is one edge from every project that compiled it.
+    ///     <see cref="GraphSummary.MultiplyDeclaredTypes" /> states the attribution all of that rests on
+    ///     rather than leaving it silent.
     /// </remarks>
     /// <param name="model">The extracted codebase to summarize.</param>
     /// <returns>The survey over every project in <paramref name="model" />.</returns>
@@ -110,38 +115,24 @@ public static class GraphSummarizer
 
     /// <summary>
     ///     Narrows a survey to the projects whose name matches one of <paramref name="projectGlobs" /> — a
-    ///     complete survey of a smaller subject, not a truncated one. A pattern matches the project
-    ///     (assembly) name as a single ordinal token through the shared glob matcher, where <c>*</c> spans
-    ///     any run of characters; an empty list narrows nothing and hands the summary straight back.
+    ///     complete survey of a smaller subject, not a truncated one. A pattern is matched against the whole
+    ///     project (assembly) name, case-sensitively, with <c>*</c> standing for any run of characters
+    ///     including none, so <c>MyApp.*</c> keeps every project whose name begins <c>MyApp.</c>. An empty
+    ///     list narrows nothing and hands <paramref name="summary" /> straight back.
     /// </summary>
     /// <remarks>
-    ///     <para>
-    ///         An observed project edge survives when <em>either</em> end is in scope. Who reaches into the
-    ///         scoped projects is the evidence a layering rule is drafted from, so dropping inbound edges
-    ///         would hide the half of the graph the reader came for. The deliberate consequence: a scoped
-    ///         survey's <see cref="GraphSummary.ProjectEdges" /> can name projects absent from
-    ///         <see cref="GraphSummary.Projects" />. External edges are attributed to one project, so they
-    ///         survive on a source match alone.
-    ///     </para>
-    ///     <para>
-    ///         Each surviving <see cref="ProjectSummary" /> is carried through verbatim, declared
-    ///         <see cref="ProjectSummary.ProjectReferences" /> included: a declared reference to a project
-    ///         outside the scope is exactly the divergence signal, and filtering it would erase it.
-    ///     </para>
-    ///     <para>
-    ///         A <see cref="GraphSummary.MultiplyDeclaredTypes" /> entry survives when <em>any</em> of its
-    ///         declaring projects is in scope, the same either-endpoint rule the project edges take: the
-    ///         reason to read the entry is that a subject anchored inside the scope answers from facts that
-    ///         may follow a declarer outside it, and that declarer is the half that explains why.
-    ///     </para>
-    ///     <para>
-    ///         A <see cref="GraphSummary.ShadowedTypes" /> entry takes the same either-end rule across its two
-    ///         different ends: it survives when its <see cref="ShadowedTypeSummary.DeclaredBy" /> project is in
-    ///         scope, or when any of its <see cref="ShadowedTypeSummary.BoundFromAssemblyBy" /> projects is.
-    ///         Those are rarely the same project — the declarer is the test assembly carrying the stand-in,
-    ///         the binder the product code reaching the package — so narrowing on the declarer alone would
-    ///         drop the entry from exactly the scope whose author needs it.
-    ///     </para>
+    ///     What survives is wider than the project list, so a narrowed survey can name projects it does not
+    ///     list. A project edge survives when either end matches, which keeps visible who reaches into the
+    ///     matched projects, so <see cref="GraphSummary.ProjectEdges" /> may name a project absent from
+    ///     <see cref="GraphSummary.Projects" />. An external edge belongs to one project, so a match on its
+    ///     source keeps it. Each surviving <see cref="ProjectSummary" /> is carried through unchanged, its
+    ///     declared <see cref="ProjectSummary.ProjectReferences" /> included, so a declared reference to a
+    ///     project outside the narrowing stays visible. A <see cref="GraphSummary.MultiplyDeclaredTypes" />
+    ///     entry survives when any of its declaring projects matches, and a
+    ///     <see cref="GraphSummary.ShadowedTypes" /> entry when either its
+    ///     <see cref="ShadowedTypeSummary.DeclaredBy" /> project or one of its
+    ///     <see cref="ShadowedTypeSummary.BoundFromAssemblyBy" /> projects does; those two are rarely the same
+    ///     project, so matching on the declarer alone would drop the entry from the very survey that needs it.
     /// </remarks>
     /// <param name="summary">The survey to narrow.</param>
     /// <param name="projectGlobs">The project-name globs; empty means every project.</param>

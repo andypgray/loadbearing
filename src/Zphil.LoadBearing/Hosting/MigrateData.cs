@@ -1,9 +1,9 @@
 namespace Zphil.LoadBearing.Hosting;
 
 /// <summary>
-///     The Migrate-specific payload of an <see cref="ArchRule" />: the descriptive
-///     current state, the prescriptive target sentence, the grandfather baseline, and the
-///     boy-scout policy.
+///     What a <c>Migrate</c> rule carries beyond an ordinary <see cref="ArchRule" />: the description of
+///     the pattern the code still follows, the sentence it is moving toward, the file recording its
+///     grandfathered violations, and what an editor passing through should do about them.
 /// </summary>
 public sealed class MigrateData
 {
@@ -15,20 +15,29 @@ public sealed class MigrateData
         Policy = policy;
     }
 
-    /// <summary>The descriptive prose of the OLD pattern (the <c>from</c> argument).</summary>
+    /// <summary>
+    ///     Gets the description of the pattern the code still follows, in the spec's own words — the
+    ///     <c>from</c> the migration was declared with.
+    /// </summary>
     public string From { get; }
 
-    /// <summary>The rendered law sentence of the target constraint (the <c>to</c> argument).</summary>
+    /// <summary>
+    ///     Gets the target constraint as one English sentence: what the code is moving toward, and what a
+    ///     violation outside the baseline is judged against.
+    /// </summary>
     public string ToSentence { get; }
 
-    /// <summary>The baseline store path.</summary>
-    /// <remarks>
-    ///     Never null post-build: when <c>.Baseline(path)</c> is omitted the model is filled with the
-    ///     conventional default derived from the rule ID (GRAMMAR §4.4). Stored forward-slash and
-    ///     relative to the solution directory.
-    /// </remarks>
+    /// <summary>
+    ///     Gets the file recording the rule's grandfathered violations. Never null: where the spec named no
+    ///     baseline it is <c>arch/baselines/{rule-id}.json</c>, each <c>/</c> in the rule ID becoming a
+    ///     directory. Stored with forward slashes and resolved against the solution directory.
+    /// </summary>
     public string BaselinePath { get; }
 
-    /// <summary>The boy-scout policy (defaults to <see cref="MigrationPolicy.MigrateIfSmall" />).</summary>
+    /// <summary>
+    ///     Gets what an editor already changing a file with grandfathered violations is asked to do about
+    ///     them; <see cref="MigrationPolicy.MigrateIfSmall" /> where the spec set none. Rendered into the
+    ///     generated agent context as guidance, and nothing checks it.
+    /// </summary>
     public MigrationPolicy Policy { get; }
 }

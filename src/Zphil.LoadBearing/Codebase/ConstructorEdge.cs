@@ -1,22 +1,26 @@
 namespace Zphil.LoadBearing.Codebase;
 
 /// <summary>
-///     A directed construction edge <c>Source → Constructed</c>: <see cref="Source" />'s declaration source
-///     directly creates <see cref="Constructed" /> with an object-creation expression — explicit
-///     <c>new Foo()</c> or target-typed <c>new()</c> (GRAMMAR §4.5). Constructed generics normalize to
-///     their open definition (§4.1), so <c>new Box&lt;int&gt;()</c> records an edge to <c>Box&lt;&gt;</c>.
-///     <see cref="Sites" /> lists the distinct <c>file:line</c> positions where the construction occurs,
-///     deduped by (file, line).
+///     One type creating another: <see cref="Source" />'s own source creates <see cref="Constructed" /> with
+///     an object-creation expression, either <c>new Foo()</c> or a target-typed <c>new()</c>. Read them from
+///     <see cref="CodebaseModel.ConstructorEdges" />.
 /// </summary>
 /// <remarks>
-///     <see cref="Source" /> and <see cref="Constructed" /> are the same <see cref="TypeNode" /> instances
-///     held by <see cref="CodebaseModel.Types" /> (reference equality, not just name equality).
-///     Self-construction (a type constructing itself) is never produced — the construction analog of the
-///     reference-edge self-drop (GRAMMAR §4.1). Construction edges are recorded <em>beside</em> the
-///     type-level edge, never instead of it: every <c>new Foo()</c> also mints a <see cref="ReferenceEdge" />
-///     to <see cref="Constructed" />. Delegate creation, attribute applications, <c>base(…)</c>/<c>this(…)</c>
-///     initializers, <c>with</c> expressions, and array creation are excluded at extraction and never appear
-///     here; reflection/container construction is a documented honesty boundary, not a recorded edge.
+///     <para>
+///         Types are recorded at their definition, so <c>new Box&lt;int&gt;()</c> gives an edge to
+///         <c>Box&lt;&gt;</c>. A type creating itself gives nothing. Both ends are the very type instances
+///         <see cref="CodebaseModel.Types" /> lists, so compare them by reference rather than by name, and
+///         the same expression is also recorded as an ordinary reference in
+///         <see cref="CodebaseModel.Edges" />, never instead of it.
+///     </para>
+///     <para>
+///         Five spellings never appear here, none of them a creation of the type written: an attribute
+///         applied to a declaration, a <c>: base(...)</c> or <c>: this(...)</c> initializer, delegate
+///         creation (<c>new Action(M)</c> and its target-typed form), a <c>with</c> expression, and array
+///         creation. An object a container or reflection creates is invisible either way — but a factory
+///         lambda that itself writes <c>new</c>, as in <c>AddScoped(sp =&gt; new Foo(...))</c>, is an
+///         ordinary creation and is recorded.
+///     </para>
 /// </remarks>
 public sealed class ConstructorEdge
 {
@@ -27,12 +31,15 @@ public sealed class ConstructorEdge
         Sites = sites;
     }
 
-    /// <summary>The constructing type.</summary>
+    /// <summary>Gets the constructing type.</summary>
     public TypeNode Source { get; }
 
-    /// <summary>The constructed type.</summary>
+    /// <summary>Gets the type that is created.</summary>
     public TypeNode Constructed { get; }
 
-    /// <summary>The distinct construction sites, ordered by (file, line).</summary>
+    /// <summary>
+    ///     Gets each distinct place the creation occurs, ordered by file then line. Two creations of the same
+    ///     type on one line count as one site.
+    /// </summary>
     public IReadOnlyList<SourceLocation> Sites { get; }
 }

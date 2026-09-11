@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`check --hook-event` names the Claude Code event the `--hook-json` document answers.**
+  `PostToolUse` (the default), `Stop` or `SubagentStop`. Claude Code reads a hook's
+  `additionalContext` only from a document naming the event it fired, so a turn-end wrapper handed
+  the per-edit envelope would report its tripwire warnings to nobody — silently, since nothing
+  downstream of a hook says that its context went nowhere. The flag needs `--hook-json` beside it and
+  refuses an event outside the three.
+
 - **The library packages ship their XML documentation.** Every public type and member across the
   packages has a doc comment, and until now none of it left the repository: no project wrote the
   documentation file, so a consumer's editor showed nothing for the fluent surface or the adapter.
@@ -271,6 +278,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   read.
 
 ### Changed
+
+- **The agent hook fires when the turn ends, not after every edit.** The recommended wiring is now a
+  `Stop` hook, with a `SubagentStop` twin for workers, and the wrappers check the working tree rather
+  than one tool's payload. A red rule refuses the stop with the report as the reason, so the agent
+  keeps working and fixes it in the same turn; a tripwire warning on a clean tree continues the turn
+  once as context. Measured over six weeks of this repository's own sessions, the per-edit shape was
+  answering a question the same turn went on to change 94% of the time, cost a median 46 seconds per
+  code edit and delivered one real block; it never fired at all in a quarter of the turns that
+  changed code, because those edits went through a shell or a language server, where a tool matcher
+  sees nothing. Reading the tree covers all of them. A stop whose tree has not changed since the last
+  clean verdict skips the check outright, so a question-and-answer turn costs nothing, and a red
+  verdict is never skipped. Consecutive continuations are capped per prompt (three, over
+  `LOADBEARING_HOOK_MAX_ROUNDS`), after which the hook reports and lets the turn end rather than
+  looping. The wrappers still honour a `PostToolUse` payload, so an existing per-edit wiring keeps
+  working; the recipe no longer includes it, nor the second `mcp_tool` leg, whose output never
+  reached the agent at all.
 
 - **A comment-only edit no longer re-extracts its project, on either hook leg.** The warm MCP
   server and the persisted CLI cache both used to re-walk a whole project whenever any byte of one

@@ -80,6 +80,27 @@
 	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=SuggestVarOrType_005FElsewhere/@EntryIndexedValue">WARNING</s:String>
 	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=SuggestVarOrType_005FDeconstructionDeclarations/@EntryIndexedValue">WARNING</s:String>
 
+	<!-- Two unread-member rules held at Suggestion. That is a demotion: both default to Warning.
+
+	     Every site they report across the four example trees is a positional record property or a
+	     get-only accessor that solution-wide search finds nothing reading, and every one of them is
+	     read all the same. The views, responses, confirmations and validation results are what an
+	     endpoint returns, and the JSON serializer reads each property by reflection; the milestone
+	     events are what one module publishes for a bus outside the tree to carry; the rate card and
+	     the day-by-day charge breakdown carry the shape of the domain, which is the thing the
+	     example teaches. None of those readers is a call the search can see, so the finding is
+	     decided by evidence the solution does not contain, and the honest answer is a demotion with
+	     its reason attached. Deleting the members instead would make the model a lie.
+
+	     The reason is the examples' own and not the root file's. The root holds its usage rules at
+	     Suggestion because a solution shipping public packages cannot answer them from inside; these
+	     trees are unpackable, so that question is never asked here, and neither of these entries is
+	     copied from the root or belongs in it, since its tree has no such site. The _002E in each
+	     key is the escape for the dot in the rule id; spelled literally the key is one ReSharper
+	     never reads, and nothing anywhere says so. -->
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=NotAccessedPositionalProperty_002EGlobal/@EntryIndexedValue">SUGGESTION</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=UnusedAutoPropertyAccessor_002EGlobal/@EntryIndexedValue">SUGGESTION</s:String>
+
 	<!-- Line wrapping is deliberately OFF, and this key is what pins it.
 
 	     The spec in this example is a chain of English sentences, shaped by hand: the statement head
@@ -90,4 +111,12 @@
 	     other side. The formatter's standing job here is to preserve the shape, never to compute
 	     it. -->
 	<s:Boolean x:Key="/Default/CodeStyle/CodeFormatting/CSharpFormat/WRAP_LINES/@EntryValue">False</s:Boolean>
+
+	<!-- ReSharper's own ledger of settings migrations, copied from the root file. A run over a
+	     solution whose file lacks these entries writes them in, which is what once put one example's
+	     file out of step with its three siblings; carried here, they are a no-op on every run. -->
+	<s:Boolean x:Key="/Default/Environment/SettingsMigration/IsMigratorApplied/=JetBrains_002EReSharper_002EPsi_002ECSharp_002ECodeStyle_002ECSharpKeepExistingMigration/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/Environment/SettingsMigration/IsMigratorApplied/=JetBrains_002EReSharper_002EPsi_002ECSharp_002ECodeStyle_002ECSharpPlaceEmbeddedOnSameLineMigration/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/Environment/SettingsMigration/IsMigratorApplied/=JetBrains_002EReSharper_002EPsi_002ECSharp_002ECodeStyle_002ECSharpUseContinuousIndentInsideBracesMigration/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/Environment/SettingsMigration/IsMigratorApplied/=JetBrains_002EReSharper_002EPsi_002ECSharp_002ECodeStyle_002ESettingsUpgrade_002EMigrateBlankLinesAroundFieldToBlankLinesAroundProperty/@EntryIndexedValue">True</s:Boolean>
 </wpf:ResourceDictionary>

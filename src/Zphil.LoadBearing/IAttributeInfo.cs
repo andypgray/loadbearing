@@ -1,25 +1,26 @@
 namespace Zphil.LoadBearing;
 
 /// <summary>
-///     The read-only view of one attribute declared on a member, the entries of
-///     <see cref="IMemberInfo.Attributes" /> (GRAMMAR §4.6, §5.6). The member-side analog of the type's
-///     attribute facts: part of the v1 member-predicate input contract, grown additively as extraction
-///     learns new facts. What a member-side attribute adjective matches against.
+///     One attribute written on a member, as a member predicate sees it: the entries of
+///     <see cref="IMemberInfo.Attributes" />. Only attributes written on the member itself appear —
+///     those on a property's <c>get</c> or <c>set</c>, and <c>[return:]</c> attributes, belong to other
+///     declarations.
 /// </summary>
 public interface IAttributeInfo
 {
     /// <summary>
-    ///     The definition-level full name of the attribute type, in extraction format and with the
-    ///     <c>Attribute</c> suffix intact (<c>N.MarkAttribute</c>, never <c>N.Mark</c>) — a C# 11 generic
-    ///     attribute reduces to its open definition (<c>N.MarkAttribute&lt;T&gt;</c>). This is what an
-    ///     open-generic-style anchor matches, and what a string full-name anchor matches (GRAMMAR §4.6).
+    ///     The attribute type's full name with its namespace, keeping the <c>Attribute</c> suffix the class
+    ///     carries (<c>MyApp.MarkAttribute</c>, never <c>MyApp.Mark</c>) and spelling a generic attribute
+    ///     with its declared type-parameter names (<c>MyApp.MarkAttribute&lt;T&gt;</c>). Every use of one
+    ///     generic attribute reports the same name here, whatever type arguments it was written with, so
+    ///     this is the name to compare against when the type arguments do not matter.
     /// </summary>
     string DefinitionFullName { get; }
 
     /// <summary>
-    ///     The attribute type's constructed display name. For a non-generic attribute it coincides with
-    ///     <see cref="DefinitionFullName" />; for a C# 11 generic attribute it carries the substituted type
-    ///     arguments (<c>N.MarkAttribute&lt;System.Int32&gt;</c>).
+    ///     The attribute type's full name with the type arguments as written
+    ///     (<c>MyApp.MarkAttribute&lt;System.Int32&gt;</c>). For a non-generic attribute there are none, so
+    ///     the name is the plain full name with the <c>Attribute</c> suffix intact.
     /// </summary>
     string FullName { get; }
 }

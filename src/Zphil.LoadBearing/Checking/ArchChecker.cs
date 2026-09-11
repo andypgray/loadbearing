@@ -7,21 +7,24 @@ using Zphil.LoadBearing.Prose;
 namespace Zphil.LoadBearing.Checking;
 
 /// <summary>
-///     Evaluates a finalized <see cref="ArchitectureModel" /> against an extracted
-///     <see cref="CodebaseModel" />, yielding one <see cref="RuleResult" /> per rule in model order.
+///     Checks a spec against a codebase. Hand a <c>Check</c> overload a built
+///     <see cref="ArchitectureModel" /> and an extracted <see cref="CodebaseModel" /> — and, where you
+///     have them, the captured baselines and the files a diff reports changed — and it returns a
+///     <see cref="CheckReport" /> holding one <see cref="RuleResult" /> per rule, in the order the spec
+///     declares them. It builds nothing, restores nothing and reads nothing from disk: everything it
+///     judges arrives in the arguments, so a codebase extracted before the last edit yields a verdict
+///     about the code as it then stood. No argument may be null except where a signature marks it
+///     nullable.
 /// </summary>
 /// <remarks>
-///     Enforce rules are evaluated; ratcheted rules — Migrate and Quarantine containment — are
-///     evaluated the same way and then <em>partitioned</em> against a <see cref="BaselineIndex" />
-///     (in-baseline = grandfathered/pass, not-in-baseline = red, including new code in the old
-///     pattern, and in-baseline-but-carrying-more-sites-than-the-entry-records red too); a scope
-///     tripwire — a quarantine's or a caution's — runs the diff-aware touch check (GRAMMAR §7), warning
-///     per changed file inside the scope and passing, or skipping when no <see cref="DiffContext" /> was
-///     supplied. Any evaluation error becomes a <see cref="ViolationKind.RuleError" /> (Failed) rather
-///     than aborting the run (all-errors philosophy). The run's universe is accounted for here too: the
-///     evaluator reports what it evaluated and says nothing about the run it ran in, so a rule that
-///     selected nothing under a <see cref="NarrowedUniverse" /> is skipped by this type rather than
-///     reported differently by that one.
+///     A rule that cannot be evaluated at all — an unrepresentable type, a closed generic where the open
+///     definition is wanted, a predicate that threw — comes back as a failed result carrying the message
+///     rather than as a thrown exception, so one broken rule never costs the rest of the run. The three
+///     shapes a rule takes: an <c>Enforce</c> rule fails on any violation; a <c>Migrate</c> rule and a
+///     quarantine's <c>containment</c> rule are evaluated the same way and then split against the
+///     baselines, so a violation the baseline records passes while every other one fails; and a scope's
+///     <c>tripwire</c> warns once per changed file that declares a type inside the scope and passes, or
+///     is skipped when no <see cref="DiffContext" /> was given.
 /// </remarks>
 public static class ArchChecker
 {
@@ -36,39 +39,64 @@ public static class ArchChecker
     // Stateless, so one instance serves every rule of every run.
     private static readonly IComparer<Violation> ReportOrder = new ReportOrderComparer();
 
-    /// <summary>Checks every rule with no baselines, so every ratchet violation is red.</summary>
-    /// <param name="model">The finalized model whose rules to evaluate.</param>
-    /// <param name="codebase">The extracted codebase to evaluate them against.</param>
-    /// <returns>The aggregate report: one <see cref="RuleResult" /> per rule, in model order, plus roll-up counts.</returns>
+    /// <summary>
+    ///     Checks every rule in the model with no baselines and no diff: every violation fails its rule, and
+    ///     every scope tripwire is skipped for want of changed files. To have a <c>Migrate</c> rule's or a
+    ///     quarantine's recorded violations tolerated instead, use an overload taking a
+    ///     <see cref="BaselineIndex" />.
+    /// </summary>
+    /// <param name="model">The built model whose rules to check.</param>
+    /// <param name="codebase">The extracted codebase to check them against.</param>
+    /// <returns>
+    ///     One <see cref="RuleResult" /> per rule, in the order the spec declares them, with the run's counts rolled
+    ///     up.
+    /// </returns>
     public static CheckReport Check(ArchitectureModel model, CodebaseModel codebase)
     {
         return Check(model, codebase, BaselineIndex.Empty, null);
     }
 
-    /// <summary>Checks every rule against <paramref name="baselines" /> with no diff context (tripwires skip).</summary>
-    /// <param name="model">The finalized model whose rules to evaluate.</param>
-    /// <param name="codebase">The extracted codebase to evaluate them against.</param>
-    /// <param name="baselines">The captured baselines the ratcheted rules partition against.</param>
-    /// <returns>The aggregate report: one <see cref="RuleResult" /> per rule, in model order, plus roll-up counts.</returns>
+    /// <summary>
+    ///     Checks every rule in the model against the captured baselines, with no diff: a violation whose
+    ///     identity a baseline records is grandfathered and does not fail its rule, any other violation
+    ///     fails, and every scope tripwire is skipped for want of changed files. To have tripwires warn, use
+    ///     an overload taking a <see cref="DiffContext" />.
+    /// </summary>
+    /// <param name="model">The built model whose rules to check.</param>
+    /// <param name="codebase">The extracted codebase to check them against.</param>
+    /// <param name="baselines">
+    ///     The captured baselines, read from the rules' baseline files; <see cref="BaselineIndex.Empty" />
+    ///     for a run that grandfathers nothing.
+    /// </param>
+    /// <returns>
+    ///     One <see cref="RuleResult" /> per rule, in the order the spec declares them, with the run's counts rolled
+    ///     up.
+    /// </returns>
     public static CheckReport Check(ArchitectureModel model, CodebaseModel codebase, BaselineIndex baselines)
     {
         return Check(model, codebase, baselines, null);
     }
 
     /// <summary>
-    ///     Checks every rule and returns the aggregate report. Ratchet violations (Migrate, Quarantine
-    ///     containment) are partitioned against <paramref name="baselines" />: a violation whose
-    ///     identity (GRAMMAR §4.3) is in the rule's captured section is grandfathered (it passes), unless
-    ///     it carries more sites than that entry records, which is growth and red;
-    ///     anything else is red. A scope tripwire warns for each changed file in
-    ///     <paramref name="diff" /> that declares a type in the scope, or skips when
-    ///     <paramref name="diff" /> is null.
+    ///     Checks every rule in the model against the captured baselines and the changed files. A
+    ///     violation whose identity a baseline records is grandfathered and does not fail its rule, unless
+    ///     the pair now carries more sites than that entry recorded, which fails; every violation the
+    ///     baselines do not record fails. A scope's tripwire warns once for each file in
+    ///     <paramref name="diff" /> that declares a type inside the scope and passes, or is skipped when
+    ///     <paramref name="diff" /> is null. A violation's identity is the pair of symbol IDs at the ends
+    ///     of an offending edge, or the symbol ID of an offending type, member or project.
     /// </summary>
-    /// <param name="model">The finalized model whose rules to evaluate.</param>
-    /// <param name="codebase">The extracted codebase to evaluate them against.</param>
-    /// <param name="baselines">The captured baselines the ratcheted rules partition against.</param>
-    /// <param name="diff">The changed-file context a scope tripwire warns from, or null to skip it.</param>
-    /// <returns>The aggregate report: one <see cref="RuleResult" /> per rule, in model order, plus roll-up counts.</returns>
+    /// <param name="model">The built model whose rules to check.</param>
+    /// <param name="codebase">The extracted codebase to check them against.</param>
+    /// <param name="baselines">
+    ///     The captured baselines, read from the rules' baseline files; <see cref="BaselineIndex.Empty" />
+    ///     for a run that grandfathers nothing.
+    /// </param>
+    /// <param name="diff">The changed files a scope's tripwire warns from, or null to skip every tripwire.</param>
+    /// <returns>
+    ///     One <see cref="RuleResult" /> per rule, in the order the spec declares them, with the run's counts rolled
+    ///     up.
+    /// </returns>
     public static CheckReport Check(
         ArchitectureModel model, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff)
     {
@@ -79,16 +107,22 @@ public static class ArchChecker
 
     /// <summary>
     ///     Checks exactly <paramref name="rules" /> — the whole model's, or the subset
-    ///     <see cref="SelectRules" /> chose — and returns the aggregate report. Each rule is evaluated
-    ///     exactly as the whole-model overload evaluates it; a narrowed run is a smaller report of the
-    ///     same shape, because <see cref="CheckReport" />'s counters derive from the results it holds.
-    ///     The verdict contract is unchanged: any red rule in the subset fails the report.
+    ///     <see cref="SelectRules" /> chose — and returns a report over those alone. Narrowing the run
+    ///     changes nothing about how a rule is judged: a violation whose identity a baseline records is
+    ///     grandfathered and does not fail its rule, every other violation fails, and a scope's tripwire
+    ///     warns once for each file in <paramref name="diff" /> that declares a type inside the scope, or
+    ///     is skipped when <paramref name="diff" /> is null. The report has the same shape as a
+    ///     whole-model one, its counts rolled up from the results it holds, and any failing rule in the
+    ///     subset fails the report.
     /// </summary>
-    /// <param name="rules">The rules to evaluate, in the order they are to be reported.</param>
-    /// <param name="codebase">The extracted codebase to evaluate them against.</param>
-    /// <param name="baselines">The captured baselines the ratcheted rules partition against.</param>
-    /// <param name="diff">The changed-file context a scope tripwire warns from, or null to skip it.</param>
-    /// <returns>The aggregate report over <paramref name="rules" /> only, in the order they were given.</returns>
+    /// <param name="rules">The rules to check, in the order they are to be reported.</param>
+    /// <param name="codebase">The extracted codebase to check them against.</param>
+    /// <param name="baselines">
+    ///     The captured baselines, read from the rules' baseline files; <see cref="BaselineIndex.Empty" />
+    ///     for a run that grandfathers nothing.
+    /// </param>
+    /// <param name="diff">The changed files a scope's tripwire warns from, or null to skip every tripwire.</param>
+    /// <returns>One <see cref="RuleResult" /> per rule given, in that order, with the run's counts rolled up.</returns>
     public static CheckReport Check(
         IReadOnlyList<ArchRule> rules, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff)
     {
@@ -137,19 +171,22 @@ public static class ArchChecker
     }
 
     /// <summary>
-    ///     The rules whose ID matches one of <paramref name="ruleIdGlobs" />, in model order — what a
-    ///     narrowed check runs, chosen before any evaluation cost is paid.
+    ///     Selects the rules whose ID matches one of the globs, in the order the spec declares them — what a
+    ///     narrowed check runs, chosen before any of the cost of checking is paid. Pass the result to the
+    ///     <c>Check</c> overload that takes a rule list.
     /// </summary>
     /// <remarks>
-    ///     A pattern matches the whole rule ID as a single ordinal token, where <c>*</c> spans any run of
-    ///     characters including the <c>/</c> separator. There is no implicit subtree: <c>legacy/billing</c>
-    ///     selects a rule with exactly that ID and none of its children, while <c>legacy/billing/*</c>
-    ///     selects the children a scope desugars into (GRAMMAR §7). An empty glob list selects
-    ///     every rule, so an unfiltered call costs nothing.
+    ///     A glob is matched against the whole rule ID as one case-sensitive token, where <c>*</c> stands
+    ///     for any run of characters, the <c>/</c> separator included. There is no implicit subtree:
+    ///     <c>legacy/billing</c> selects a rule with exactly that ID and none of the rules beneath it, while
+    ///     <c>legacy/billing/*</c> also selects the rules a scope of that ID brings with it —
+    ///     <c>legacy/billing/containment</c> and <c>legacy/billing/tripwire</c> for a quarantine, the
+    ///     tripwire alone for a caution. An empty glob list selects every rule, so an unfiltered call costs
+    ///     nothing.
     /// </remarks>
-    /// <param name="model">The finalized model to select from.</param>
-    /// <param name="ruleIdGlobs">The rule-ID globs; empty means every rule.</param>
-    /// <returns>The selected rules, in model order.</returns>
+    /// <param name="model">The built model to select from.</param>
+    /// <param name="ruleIdGlobs">The rule-ID globs; an empty list means every rule.</param>
+    /// <returns>The selected rules, in the order the spec declares them.</returns>
     public static IReadOnlyList<ArchRule> SelectRules(ArchitectureModel model, IReadOnlyList<string> ruleIdGlobs)
     {
         Guard.NotNull(model, nameof(model));

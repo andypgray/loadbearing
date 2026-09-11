@@ -3,9 +3,9 @@ using Zphil.LoadBearing.Hosting;
 namespace Zphil.LoadBearing.Validation;
 
 /// <summary>
-///     Thrown by <see cref="ArchModelBuilder" /> when a spec fails validation. Carries every
-///     <see cref="SpecValidationError" /> from a single pass — a deliberate divergence from EF
-///     Core's fail-fast validator so an agent fixing a spec sees all problems at once (GRAMMAR §8).
+///     Thrown when a spec is loaded and something in it is wrong: <see cref="ArchModelBuilder" /> raises
+///     it instead of returning a model. <see cref="Errors" /> carries every mistake found in that one
+///     pass rather than only the first, and the message is those errors one per line.
 /// </summary>
 public sealed class SpecValidationException : Exception
 {
@@ -15,6 +15,9 @@ public sealed class SpecValidationException : Exception
         Errors = errors;
     }
 
-    /// <summary>Every validation error found, in the order the checks ran.</summary>
+    /// <summary>
+    ///     Gets every mistake found, in the order the checks ran. Each names its kind, the rule or scope it
+    ///     is about, and where in the spec source it was written.
+    /// </summary>
     public IReadOnlyList<SpecValidationError> Errors { get; }
 }

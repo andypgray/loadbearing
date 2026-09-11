@@ -3,11 +3,11 @@ using Zphil.LoadBearing.Model;
 namespace Zphil.LoadBearing;
 
 /// <summary>
-///     A named architectural layer — itself a <see cref="Selection" />, so it can be used directly
-///     as a rule subject or a reference target with no <c>.Types</c> hop (GRAMMAR §12). A bare
-///     layer with no adjectives speaks in the collective voice ("The Domain layer …", GRAMMAR §6);
-///     any adjective returns a <see cref="Model.RefinedSelection" /> and switches to types voice. The
-///     definition carries an optional <see cref="Purpose" /> trailer saying what the layer is for.
+///     A named layer: a <see cref="Selection" /> that also carries a name, defined with the
+///     <c>Layer</c> methods on <see cref="Arch" />. Use it directly as a rule subject or target, where
+///     a rule reads as a sentence about the layer ("The Domain layer must not reference ..."); an
+///     adjective narrows it and returns an ordinary selection. Call <see cref="Purpose" /> to say what
+///     the layer is for.
 /// </summary>
 public sealed class Layer : Selection
 {
@@ -20,9 +20,11 @@ public sealed class Layer : Selection
     }
 
     /// <summary>
-    ///     What the layer is for — one sentence, rendered after the definition in the module-map row and after
-    ///     the first sentence of the layer card's lede (GRAMMAR §5.5). Optional; at most one, and never a
-    ///     card on its own: a card is placed only where a rule anchors on the layer.
+    ///     States what the layer is for, in one line of prose, such as
+    ///     <c>arch.Layer("Domain", "MyApp.Domain.*").Purpose("Business rules; no I/O.")</c>. Rendered as
+    ///     written after the layer's definition in the generated agent context. Optional and at most
+    ///     once; a blank or multi-line value, or a second call, is reported when the spec is loaded.
+    ///     Returns the same layer.
     /// </summary>
     public Layer Purpose(string prose)
     {

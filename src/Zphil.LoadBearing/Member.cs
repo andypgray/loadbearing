@@ -5,19 +5,17 @@ using Zphil.LoadBearing.Validation;
 namespace Zphil.LoadBearing;
 
 /// <summary>
-///     A member-access ban target (GRAMMAR §4.5) — a declaring type plus a member name, minted by
-///     <see cref="Arch.Member(System.Type,System.String,System.String,System.Int32)" /> (or the expression-anchor
-///     overloads
-///     <c>arch.Member&lt;T&gt;(x =&gt; x.M)</c> / <c>arch.Member(() =&gt; Type.M)</c>, which desugar at
-///     mint to the same leaf) for <see cref="SelectionConstraints.MustNotUse(Selection,Member,Member[])" />.
+///     A member to ban with <c>MustNotUse</c>: a declaring type plus a member name, created by the
+///     <c>Member</c> methods on <see cref="Arch" />. A ban covers every overload of the name, and it
+///     matches accesses whose compile-time receiver is the declaring type: a ban on a concrete member
+///     does not catch calls made through an interface-typed receiver, and a ban on an interface member
+///     does not catch direct calls on the concrete type. Not a <see cref="Selection" />: it takes no
+///     adjectives and no verbs, and it may be reused across rules built on the same
+///     <see cref="Arch" />.
 /// </summary>
-/// <remarks>
-///     A target-only leaf, deliberately <em>not</em> a <see cref="Selection" />: it never enters the
-///     selection hierarchy, so adjectives and modal verbs are uncompilable on it by construction
-///     (GRAMMAR §3.2). Matching is by declaring type + member name, so one ban covers every overload —
-///     there is no signature form. Owner-stamped like a selection and reusable across rules on the same
-///     <see cref="Arch" /> (the fresh-instance contract covers it, GRAMMAR §8 item 13).
-/// </remarks>
+// A target-only leaf outside the Selection hierarchy on purpose (GRAMMAR §3.2): adjectives and modal
+// verbs must stay uncompilable on a member. Owner-stamped like a selection so the fresh-instance
+// contract (§8 item 13) covers it.
 public sealed class Member
 {
     private readonly Type? _declaringType;

@@ -1,23 +1,26 @@
 namespace Zphil.LoadBearing.Codebase;
 
 /// <summary>
-///     The kinds of member a member-use edge can target (GRAMMAR §4.5). This is the inventory the
-///     syntax walk records a use against — LoadBearing's own enum, never Roslyn's <c>SymbolKind</c>.
-///     Accessors do not appear: a property/event accessor folds into its declaring
-///     <see cref="Property" />/<see cref="Event" /> at extraction, so <c>obj.P</c> reads and
-///     <c>obj.P = x</c> writes are one <see cref="Property" /> edge, not two accessor-method edges.
+///     Which kind of member a <see cref="MemberReference" /> names. An accessor never appears: a property's
+///     or an event's accessor is recorded as the property or event itself, so <c>obj.P</c> and
+///     <c>obj.P = x</c> are both one property use rather than two calls.
 /// </summary>
+// LoadBearing's own enum, never Roslyn's SymbolKind: Core is netstandard2.0 and references no Roslyn.
+// The accessor fold happens at extraction (GRAMMAR §4.5), so no reader has to redo it.
 public enum MemberKind
 {
-    /// <summary>A method (ordinary or a reduced extension normalized to its declaring static method).</summary>
+    /// <summary>
+    ///     A method. A call written in extension-method form is recorded against the static method that
+    ///     declares it.
+    /// </summary>
     Method,
 
-    /// <summary>A property (both accessors fold here).</summary>
+    /// <summary>A property. Both of its accessors are recorded here.</summary>
     Property,
 
-    /// <summary>A field, including an enum member.</summary>
+    /// <summary>A field, an enum member included.</summary>
     Field,
 
-    /// <summary>An event (both accessors fold here).</summary>
+    /// <summary>An event. Both of its accessors are recorded here.</summary>
     Event
 }

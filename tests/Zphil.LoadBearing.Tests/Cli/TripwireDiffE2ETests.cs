@@ -62,19 +62,23 @@ public sealed class TripwireDiffE2ETests
     private const string QuarantineDragons =
         "  dragons: Banker's rounding happens at line-item level, NOT invoice level. Do not normalize.";
 
-    // One untracked file in dragon territory, read on two channels. The rows differ only in the flag they
-    // add and neither mutates further, so the leased tree — and the wholesale workspace reload a new source
-    // file forces on it — is paid once for the pair rather than once per row.
-    private static readonly Lazy<Task<(CliResult Human, CliResult Hook)>> Untracked = new(async () =>
-    {
-        using var repo = new TempGitRepo();
-        // A brand-new, still-untracked file in the quarantined billing project — SDK globs compile it in.
-        repo.WriteQuarantineNote();
+    // One untracked file in dragon territory, read on three channels. The rows differ only in the flags they
+    // add and none of them mutates further, so the leased tree — and the wholesale workspace reload a new
+    // source file forces on it — is paid once for the trio rather than once per row.
+    private static readonly Lazy<Task<(CliResult Human, CliResult Hook, CliResult StopHook)>> Untracked =
+        new(async () =>
+        {
+            using var repo = new TempGitRepo();
+            // A brand-new, still-untracked file in the quarantined billing project — SDK globs compile it in.
+            repo.WriteQuarantineNote();
 
-        string[] args =
-            ["check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD"];
-        return (await CliRunner.InvokeAsync(args), await CliRunner.InvokeAsync([.. args, "--hook-json"]));
-    });
+            string[] args =
+                ["check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD"];
+            return (
+                await CliRunner.InvokeAsync(args),
+                await CliRunner.InvokeAsync([.. args, "--hook-json"]),
+                await CliRunner.InvokeAsync([.. args, "--hook-json", "--hook-event", "Stop"]));
+        });
 
     [Fact]
     public async Task CheckDiffBase_UntrackedFileInQuarantinedScope_WarnsAndExitsZero()
@@ -162,7 +166,7 @@ public sealed class TripwireDiffE2ETests
         // behind it. That purity is the whole contract, because the wrapper passes stdout through verbatim
         // and Claude Code parses it.
         result.ShouldSucceed();
-        string context = result.ShouldHaveHookAdditionalContext();
+        string context = result.ShouldHaveHookAdditionalContext("PostToolUse");
         context.ShouldContain("warn legacy/billing/tripwire");
         context.ShouldContain(QuarantineWarning);
         context.ShouldContain(QuarantineDragons);
@@ -172,23 +176,38 @@ public sealed class TripwireDiffE2ETests
     public async Task CheckHookJson_CleanRunWithACautionWarning_CarriesTheSameTextIntoAdditionalContext()
     {
         // The caution's third channel, and the one it was built for: a rule that only ever warns has only
-        // exit 0 to travel on, and an every-edit agent hook is exactly the reader the dragons are addressed
-        // to. Same two lines as the human run, inside the document the wrapper hands to Claude Code.
+        // exit 0 to travel on, and an agent hook is exactly the reader the dragons are addressed to. Same
+        // two lines as the human run, inside the document the wrapper hands to Claude Code.
         CliResult result = (await Caution.Value).Hook;
 
         result.ShouldSucceed();
-        string context = result.ShouldHaveHookAdditionalContext();
+        string context = result.ShouldHaveHookAdditionalContext("PostToolUse");
         context.ShouldContain("warn domain/retry-budget/tripwire");
         context.ShouldContain(CautionWarning);
         context.ShouldContain(CautionDragons);
     }
 
     [Fact]
+    public async Task CheckHookJsonForStop_CarriesTheStopEventSoTheContextReachesTheAgent()
+    {
+        // The turn-end shape the wrappers are wired to. Everything about the run is the PostToolUse row's —
+        // same tree, same warning, same text — except the one field that decides whether any of it arrives:
+        // Claude Code reads additionalContext only from a document naming the event it fired, so a Stop hook
+        // handed a PostToolUse envelope reports its dragons to nobody.
+        CliResult result = (await Untracked.Value).StopHook;
+
+        result.ShouldSucceed();
+        string context = result.ShouldHaveHookAdditionalContext("Stop");
+        context.ShouldContain("warn legacy/billing/tripwire");
+        context.ShouldContain(QuarantineWarning);
+    }
+
+    [Fact]
     public async Task CheckHookJson_CleanRunWithNoWarnings_WritesNothingAtAll()
     {
         // The same repository untouched: the tripwire finds no changed file, and a hook with nothing to say
-        // must say nothing rather than post an empty document. Silence is what keeps the channel bearable on
-        // an every-edit hook, so it is pinned as tightly as the document itself.
+        // must say nothing rather than post an empty document. Silence is what keeps the channel bearable at
+        // all, so it is pinned as tightly as the document itself.
         using var repo = new TempGitRepo();
 
         CliResult result = await CliRunner.InvokeAsync(
@@ -230,6 +249,33 @@ public sealed class TripwireDiffE2ETests
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.QuarantinedSpecDll, "--json", "--hook-json");
 
         result.ShouldRefuseWith("--json and --hook-json both own stdout");
+    }
+
+    [Fact]
+    public async Task CheckHookEventWithoutHookJson_IsRefused()
+    {
+        // --hook-event shapes one document and there is no document without --hook-json, so asking for the
+        // pairing that cannot work is refused rather than ignored: a wrapper that dropped --hook-json would
+        // otherwise keep exiting 0 with a report nothing reads.
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.QuarantinedSpecDll, "--hook-event", "Stop");
+
+        result.ShouldRefuseWith("--hook-event names the event the --hook-json document answers");
+    }
+
+    [Fact]
+    public async Task CheckHookEventOutsideTheThreeEvents_IsRefused()
+    {
+        // The other silent failure: an event Claude Code never fires produces a well-formed document whose
+        // context is dropped at the far end, and nothing downstream of a hook reports that. Refused here,
+        // where the message can name the three that work.
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.QuarantinedSpecDll, "--hook-json",
+            "--hook-event", "PostToolBatch");
+
+        result.ShouldRefuseWith(
+            "--hook-event 'PostToolBatch' is not an event whose context reaches the agent",
+            "PostToolUse, Stop, SubagentStop");
     }
 
     [Fact]

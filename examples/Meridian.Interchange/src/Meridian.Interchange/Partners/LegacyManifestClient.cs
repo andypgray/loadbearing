@@ -48,6 +48,8 @@ internal sealed class LegacyManifestClient : IPartnerClient
 
     private Task<string> SerializeAsync(PartnerEnvelope envelope, CancellationToken cancellationToken)
     {
+        if (cancellationToken.IsCancellationRequested) return Task.FromCanceled<string>(cancellationToken);
+
         // The gateway expects each manifest addressed to the configured legacy system.
         var manifest =
             $"""<manifest system="{_options.Partners.LegacyManifest}" id="{envelope.MessageId}">{envelope.Payload}</manifest>""";

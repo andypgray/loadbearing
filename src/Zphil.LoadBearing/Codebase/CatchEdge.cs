@@ -1,38 +1,31 @@
 namespace Zphil.LoadBearing.Codebase;
 
 /// <summary>
-///     A directed catch edge <c>Source → Caught</c>: <see cref="Source" />'s declaration source has a
-///     <c>catch</c> clause whose caught type resolves to <see cref="Caught" /> (GRAMMAR §4.8). A typed
-///     <c>catch (IOException e)</c> records <see cref="Caught" /> as <c>IOException</c>; a bare <c>catch</c>
-///     records <c>System.Exception</c> — nothing in source names the type, so a bare <c>catch</c> mints no
-///     type-level <see cref="ReferenceEdge" /> (the caught channel only). Constructed generics normalize to
-///     their open definition (§4.1). <see cref="Sites" /> lists the distinct <c>file:line</c> positions of
-///     the <c>catch</c> clauses, deduped by (file, line).
+///     One type catching an exception type: a <c>catch</c> clause in <see cref="Source" />'s own source
+///     catches <see cref="Caught" />. Read them from <see cref="CodebaseModel.CatchEdges" />. A bare
+///     <c>catch</c> is recorded as catching <c>System.Exception</c>, which is what the language means by it.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <see cref="Source" /> and <see cref="Caught" /> are the same <see cref="TypeNode" /> instances held by
-///         <see cref="CodebaseModel.Types" /> (reference equality, not just name equality). Self-catch (a type
-///         catching itself) is never produced — the catch analog of the reference-edge self-drop (§4.1). A
-///         rethrowing catch still mints (edges are facts). A <c>when</c> filter never suppresses the edge; its
-///         contents mint their own ordinary type/member edges. What a filter does do is keep its site out of
-///         <see cref="UnfilteredSites" /> — an explicitly separate fact recorded beside <see cref="Sites" />, which
-///         it is always a subset of. Filter presence there is <em>syntactic</em>: a <c>when (true)</c> is a filter,
-///         because the axis records what the source spells and never judges what a filter tests. A bare
-///         <c>catch</c> is unfiltered; a bare <c>catch when (…)</c> is filtered. Type-parameter catches, error
-///         types, and unresolvable types mint nothing (the shared reference-universe gates). A typed
-///         <c>catch</c> is recorded <em>beside</em> the type-level edge its type-name syntax mints, never
-///         instead of it.
+///         A <c>catch</c> that immediately rethrows still counts — these are facts about the source, not
+///         judgements about it — and a type catching itself gives nothing. Exception types are recorded at
+///         their definition, and a <c>catch</c> on a type parameter, or on a type the compilation cannot
+///         resolve, records nothing at all. Both ends are the very type instances
+///         <see cref="CodebaseModel.Types" /> lists, so compare them by reference rather than by name.
+///         Because no source names the type, a bare <c>catch</c> adds no ordinary reference, where a typed
+///         <c>catch (IOException)</c> does and the catch edge sits beside it.
 ///     </para>
 ///     <para>
-///         <see cref="SwallowingSites" /> is syntactic in exactly the same way, and its boundary is worth stating
-///         because it is the one place a reader could expect analysis: the fact is whether the clause's block's
-///         <em>last statement</em> is a <c>throw</c> — bare <c>throw;</c> or <c>throw new X(…)</c>, both being a
-///         throw statement — never an all-paths flow analysis. So <c>catch { if (…) return; throw; }</c> counts as
-///         throwing and is not a swallowing site, even though one path leaves the handler having suppressed the
-///         failure. The axis records what the source spells, and this is the documented honesty boundary.
+///         Three site lists narrow one another: <see cref="Sites" />, then
+///         <see cref="UnfilteredSites" />, then <see cref="SwallowingSites" />. Both narrowings read what
+///         the source spells and never analyse it — <c>when (true)</c> counts as a filter, and only the
+///         block's last statement decides whether a clause throws.
 ///     </para>
 /// </remarks>
+// The two subsets are recorded rather than left to a reader to derive, because sites dedupe by
+// (file, line): a filtered and an unfiltered catch of one type on one physical line collapse to a single
+// site, and a filter a #if applies under one target framework but not another reaches the merge as one
+// site reported both ways (GRAMMAR §4.8). Subtracting one set from another loses both cases.
 public sealed class CatchEdge
 {
     internal CatchEdge(
@@ -49,25 +42,35 @@ public sealed class CatchEdge
         SwallowingSites = swallowingSites;
     }
 
-    /// <summary>The catching type.</summary>
+    /// <summary>
+    ///     Gets the catching type. A <c>catch</c> written inside a lambda or a local function counts for the
+    ///     type that encloses it, and one in top-level statements for <c>Program</c>.
+    /// </summary>
     public TypeNode Source { get; }
 
-    /// <summary>The caught exception type.</summary>
+    /// <summary>Gets the caught exception type — <c>System.Exception</c> for a bare <c>catch</c>.</summary>
     public TypeNode Caught { get; }
 
-    /// <summary>The distinct catch sites, ordered by (file, line).</summary>
+    /// <summary>
+    ///     Gets each distinct <c>catch</c> position, ordered by file then line. Two <c>catch</c> clauses for the
+    ///     same type on one line count as one site.
+    /// </summary>
     public IReadOnlyList<SourceLocation> Sites { get; }
 
     /// <summary>
-    ///     The subset of <see cref="Sites" /> whose <c>catch</c> clause carries no <c>when</c> filter, in the
-    ///     same (file, line) order. Empty when every site is filtered.
+    ///     Gets the sites of <see cref="Sites" /> whose <c>catch</c> clause carries no <c>when</c> filter, in
+    ///     the same order. Empty when every site is filtered. Whether a filter is present is read from what the
+    ///     source spells, never from what the filter tests, so <c>when (true)</c> counts as filtered. A bare
+    ///     <c>catch</c> is unfiltered; a bare <c>catch when (...)</c> is not.
     /// </summary>
     public IReadOnlyList<SourceLocation> UnfilteredSites { get; }
 
     /// <summary>
-    ///     The subset of <see cref="UnfilteredSites" /> whose <c>catch</c> block does not end in a
-    ///     <c>throw</c> statement, in the same (file, line) order — the sites that hold a failure and
-    ///     continue. Empty when every unfiltered site rethrows or translates.
+    ///     Gets the sites of <see cref="UnfilteredSites" /> whose <c>catch</c> block does not end in a
+    ///     <c>throw</c> statement — the ones that hold a failure and carry on. Empty when every unfiltered site
+    ///     rethrows or throws something else. Only the block's last statement is read, and never whether every
+    ///     path reaches it: <c>catch { if (x) return; throw; }</c> is absent from this list, and
+    ///     <c>catch { if (x) throw; Cleanup(); }</c> is in it.
     /// </summary>
     public IReadOnlyList<SourceLocation> SwallowingSites { get; }
 }

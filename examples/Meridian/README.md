@@ -147,7 +147,7 @@ loadbearing check examples/Meridian/Meridian.slnx
 
 ## In the agent's loop
 
-The rendered block steers an agent's first attempt. A hook makes the same rules block a wrong one before it lands. Wired as a Claude Code `PostToolUse` hook, `loadbearing check` runs after each edit, and a new violation returns on stderr at the moment of creation, so the agent reads the rule and corrects the code in the same turn. Add the inline-SQL method from [the statistical prior](#the-statistical-prior) to `BookingsController` and the hook blocks the edit with exit 2, feeding back the failing rule (its passing siblings in the report omitted here):
+The rendered block steers an agent's first attempt. A hook makes the same rules catch a wrong one before anybody else sees it. Wired as a Claude Code `Stop` hook, `loadbearing check` runs when the agent says it is done, and a new violation returns on stderr as the reason the turn is not over, so the agent reads the rule and corrects the code before handing the work back. Add the inline-SQL method from [the statistical prior](#the-statistical-prior) to `BookingsController` and the hook refuses the stop with exit 2, feeding back the failing rule (its passing siblings in the report omitted here):
 
 ```text
 FAIL data-access/no-inline-sql — Types in `Meridian.Web.Controllers.*` must not reference `SqlConnection` or `SqlCommand`.

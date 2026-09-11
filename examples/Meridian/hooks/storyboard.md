@@ -1,14 +1,19 @@
 # Agent-loop storyboard: the rule that corrects the agent
 
-A coding agent, working a routine task, writes the pattern Meridian is retiring, and the
-architecture rule reaches it at the moment of creation, so the agent self-corrects before the
-change ever lands. This page walks that loop beat by beat, then walks the other half of it: an
-edit the rules allow, into code the spec has marked as dangerous, where the hook informs rather
-than blocks.
+A coding agent, working a routine task, writes something the architecture rules do not allow, and
+the rule reaches it before the turn ends, so the agent self-corrects before the work is handed
+back. This page walks that loop beat by beat, then walks the other half of it: an edit the rules
+allow, into code the spec has marked as dangerous, where the hook informs rather than blocks.
 
-Every fenced block below is real captured output from the wrapper in this directory, run against
-Meridian. Nothing here is mocked, and [Reproduce it](#reproduce-it) walks the same loop by hand
-at the command line.
+Every fenced block below is real output, captured either from the hook's own channel in the
+session transcript or from the same check run by hand against Meridian. Nothing here is mocked,
+and [Reproduce it](#reproduce-it) walks the same loop at the command line.
+
+**How it was captured (2026-09-09).** Two `claude -p` runs against this repository with the
+`Stop` and `SubagentStop` entries below wired and nothing else, both given the Beat 1 brief and
+one steer: follow the prevailing data-access style of the other controllers. Beats 2 to 4 are the
+Haiku 4.5 run; Beat 5 is the Opus run. What neither run did is written into Beat 2, because it is
+the more interesting half of the result.
 
 ## The files in this directory
 
@@ -19,13 +24,13 @@ as a paste-in rather than a live `.claude/` folder. Lift these into your own rep
 |---|---|
 | [`arch-hook.ps1`](arch-hook.ps1) | The PowerShell wrapper: runs `loadbearing check` and maps its exit code to Claude Code's blocking convention. |
 | [`arch-hook.sh`](arch-hook.sh) | The POSIX variant, same contract. |
-| [`settings.snippet.json`](settings.snippet.json) | Paste into your `.claude/settings.json`: a `PostToolUse` hook on `Edit\|Write`, plus a deny rule that keeps `baseline` a human decision. |
+| [`settings.snippet.json`](settings.snippet.json) | Paste into your `.claude/settings.json`: a `Stop` entry and a `SubagentStop` twin, plus a deny rule that keeps `baseline` a human decision. |
 
 The wrappers are the Meridian instantiation of LoadBearing's agent-hook recipe, filled in with
 Meridian's solution, spec assembly, and diff base. The one thing the wrapper exists to get right
 is the exit code:
-a clean check returns 0 and the edit proceeds; a red rule returns 2, which is how a Claude Code
-hook blocks, carrying the violation report on stderr so the agent reads it and fixes the code;
+a clean check returns 0 and the turn ends; a red rule returns 2, which is how a Claude Code hook
+refuses a stop, carrying the violation report on stderr so the agent reads it and fixes the code;
 LoadBearing's own errors return 1, a config problem the user sees rather than an architecture
 violation the agent is told to fix. Returning 0 is not the same as saying nothing: where the check
 warned, the wrapper hands the report back as hook context, which is Beat 5.
@@ -38,106 +43,37 @@ warned, the wrapper hands the report back as hook context, which is Beat 5.
 `BookingsController` is one of the two controllers already migrated to a repository and an
 injected clock. The other six open a `SqlConnection` and run inline SQL in the request path.
 
-## Beat 2: the agent writes the old pattern
+## Beat 2: what the agent got right, and what it did not
 
 Six of the eight controllers do data access with inline SQL, so an agent reading the codebase for
-house style finds the retired pattern in the majority and copies it. It adds `Microsoft.Data.SqlClient`,
-takes an `IConfiguration` to reach the connection string, and writes the query straight into the
-controller, the same shape `CustomsController` already uses:
+house style has a majority to copy. Neither run copied it. Both read the committed
+[`AGENTS.md`](../AGENTS.md) block, which says in the spec's own words that the twelve inline-SQL
+sites are grandfathered debt and that new code must not add to them, and both wrote the lookup as
+a call through the already-injected `IBookingRepository`:
 
 ```csharp
-[HttpGet("lookup/{reference}")]
-public IActionResult Lookup(string reference)
+[HttpGet("{reference}")]
+public async Task<IActionResult> GetByReference(string reference)
 {
-    string connectionString = configuration.GetConnectionString("Meridian")!;
-    const string sql =
-        """
-        SELECT Reference, CustomerName, Lane, ContainerNumbers, CutoffUtc
-        FROM Bookings
-        WHERE Reference = @reference
-        """;
-
-    using var connection = new SqlConnection(connectionString);
-    using var command = new SqlCommand(sql, connection);
-    command.Parameters.AddWithValue("@reference", reference);
-    connection.Open();
-
-    using SqlDataReader reader = command.ExecuteReader();
-    if (!reader.Read()) return NotFound();
-
-    var booking = new Booking
-    {
-        Reference = reader.GetString(0),
-        CustomerName = reader.GetString(1),
-        Lane = reader.GetString(2),
-        ContainerNumbers = reader.GetString(3).Split(','),
-        CutoffUtc = reader.GetDateTime(4)
-    };
+    Booking? booking = await bookings.Get(reference);
+    if (booking is null) return NotFound();
 
     return Ok(booking);
 }
 ```
 
-This compiles and runs. It is also exactly the debt `data-access/no-inline-sql` is ratcheting down,
-and it is new code, so the ratchet must go red on it.
+That is the rendered block doing its job: it steered the first attempt away from the pattern
+Meridian is retiring, with no check involved. What the block did not say is what to call the
+method. `GetByReference` returns a `Task`, `naming/async-suffix` is a second ratchet with thirteen
+sites already on the record, and `IBookingRepository.Get`, one line above in the same file, is one
+of the thirteen. So the agent copied a name that is grandfathered rather than allowed, and this
+compiles, runs, and is new debt.
 
-## Beat 3: the hook fires
+## Beat 3: the turn ends, and the hook refuses the stop
 
-The `Edit` that wrote the method triggers the `PostToolUse` hook. The wrapper runs `check`, sees a
-red rule, and exits 2, feeding this report to the agent on stderr:
-
-```text
-pass layering/domain-independent — The Domain layer must not reference the Web layer.
-pass naming/controllers — Types derived from `ControllerBase` must be named `*Controller`.
-FAIL data-access/no-inline-sql — Types in `Meridian.Web.Controllers.*` must not reference `SqlConnection` or `SqlCommand`.
-  because: Data access behind a repository can be tested and swapped; SQL in the request path cannot.
-  fix: Move the SQL into a repository; see BookingRepository.
-  src/Meridian.Web/Controllers/BookingsController.cs:85 — Meridian.Web.Controllers.BookingsController references Microsoft.Data.SqlClient.SqlConnection
-  src/Meridian.Web/Controllers/BookingsController.cs:86 — Meridian.Web.Controllers.BookingsController references Microsoft.Data.SqlClient.SqlCommand
-  src/Meridian.Web/Controllers/BookingsController.cs:87 — Meridian.Web.Controllers.BookingsController references Microsoft.Data.SqlClient.SqlCommand
-  src/Meridian.Web/Controllers/BookingsController.cs:88 — Meridian.Web.Controllers.BookingsController references Microsoft.Data.SqlClient.SqlConnection
-  src/Meridian.Web/Controllers/BookingsController.cs:90 — Meridian.Web.Controllers.BookingsController references Microsoft.Data.SqlClient.SqlCommand
-  grandfathered: 12 (baselined; run 'loadbearing status' for burndown)
-pass time/inject-clock — Types in the Web layer, except types named `SystemClock`, must not use `DateTime.Now` or `DateTime.UtcNow`.
-  grandfathered: 7 (baselined; run 'loadbearing status' for burndown)
-pass naming/async-suffix — Methods of authored types in the Domain or Web layers returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` must be named `*Async`.
-  grandfathered: 13 (baselined; run 'loadbearing status' for burndown)
-pass di/no-buildserviceprovider — Types must not use `ServiceCollectionContainerBuilderExtensions.BuildServiceProvider()`.
-pass clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway`, must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
-  grandfathered: 1 (baselined; run 'loadbearing status' for burndown)
-pass clearance/engine/tripwire
-
-Checked 8 rules: 7 passed, 1 failed, 0 skipped (2 violations, 0 warnings).
-```
-
-The report carries the four things an agent needs to act: the rule ID (`data-access/no-inline-sql`),
-the reason, the fix that names the exemplar to copy, and the exact `file:line` of every offending
-reference. The twelve inline-SQL sites already on the record stay quiet, reported as a passing rule
-with `grandfathered: 12`; only the new code is red. New code in the old pattern is blocked; the
-existing debt is not.
-
-## Beat 4: the agent self-corrects
-
-The fix line points at `BookingRepository`, and the agent finds that `IBookingRepository` already
-has the method this endpoint needs. The inline SQL collapses to a call through the injected
-repository:
-
-```csharp
-[HttpGet("lookup/{reference}")]
-public async Task<IActionResult> LookupAsync(string reference)
-{
-    Booking? booking = await bookings.Get(reference);
-    return booking is null ? NotFound() : Ok(booking);
-}
-```
-
-The `Async` suffix on the new method is the second ratchet doing the same job as the first. Write it
-as `Lookup` and `naming/async-suffix` goes red on that one method while its thirteen grandfathered
-sites stay quiet, with the same shape of report: a rule ID, a reason, a fix, and one `file:line`. The
-repository method it calls is one of those thirteen, so the old name and the new one sit a line
-apart, and only the new one is blocked.
-
-The next `Edit` runs the hook again. The check is green, the wrapper exits 0, and the edit proceeds:
+The agent finished and tried to hand the work back. The `Stop` hook ran `check` over the working
+tree, the ratchet went red on the one new site, and the wrapper exited 2 with this report on
+stderr:
 
 ```text
 pass layering/domain-independent — The Domain layer must not reference the Web layer.
@@ -146,18 +82,56 @@ pass data-access/no-inline-sql — Types in `Meridian.Web.Controllers.*` must no
   grandfathered: 12 (baselined; run 'loadbearing status' for burndown)
 pass time/inject-clock — Types in the Web layer, except types named `SystemClock`, must not use `DateTime.Now` or `DateTime.UtcNow`.
   grandfathered: 7 (baselined; run 'loadbearing status' for burndown)
-pass naming/async-suffix — Methods of authored types in the Domain or Web layers returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` must be named `*Async`.
+FAIL naming/async-suffix — Methods of authored types in the Domain or Web layers returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` must be named `*Async`.
+  because: Task- and ValueTask-returning methods carry the Async suffix so callers see at the call site that a method must be awaited.
+  citation: https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap
+  fix: Rename the method to end in Async and update its callers; see the interface and its implementation together.
+  src/Meridian.Web/Controllers/BookingsController.cs:60 — Meridian.Web.Controllers.BookingsController.GetByReference()
   grandfathered: 13 (baselined; run 'loadbearing status' for burndown)
 pass di/no-buildserviceprovider — Types must not use `ServiceCollectionContainerBuilderExtensions.BuildServiceProvider()`.
 pass clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway`, must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
   grandfathered: 1 (baselined; run 'loadbearing status' for burndown)
 pass clearance/engine/tripwire
 
+Checked 8 rules: 7 passed, 1 failed, 0 skipped (1 violation, 0 warnings).
+```
+
+Claude Code turns exit 2 into a refused stop and hands that stderr back as the reason, which is how
+it arrives in the transcript:
+
+```text
+Stop hook feedback:
+[sh "${CLAUDE_PROJECT_DIR}/examples/Meridian/hooks/arch-hook.sh"]: pass layering/domain-independent — …
+```
+
+The report carries the five things an agent needs to act: the rule ID (`naming/async-suffix`), the
+reason, the page that reason rests on, the fix, and the exact `file:line`. The sites already
+on the record stay quiet, reported as a passing rule with `grandfathered: 13`; only the new name is
+red. Two lines above it, the inline-SQL sites are quiet for the same reason, and that is the debt
+the block had already talked the agent out of adding to.
+
+## Beat 4: the agent self-corrects
+
+The agent read the report and renamed the method, in one edit and with no help from anyone:
+
+> The arch hook caught the async naming violation. I need to rename the method to follow the
+> async suffix convention.
+
+```csharp
+[HttpGet("{reference}")]
+public async Task<IActionResult> GetByReferenceAsync(string reference)
+```
+
+Then it stopped again. The hook ran the check a second time, found the tree clean, wrote nothing,
+and exited 0, so the turn ended. Run the same check by hand and it prints the board with
+`naming/async-suffix` back among the passes:
+
+```text
 Checked 8 rules: 8 passed, 0 failed, 0 skipped (0 violations, 0 warnings).
 ```
 
-The endpoint is done, the retired pattern never reached the tree, and the correction was the tool's
-own fix line, not a reviewer catching it later.
+Nothing shipped in the old shape, and the correction was the tool's own fix line rather than a
+reviewer catching it later. Between the two stops the hook cost one check, not one per edit.
 
 ## Beat 5: a different task, and the warning that does not block
 
@@ -165,15 +139,29 @@ own fix line, not a reviewer catching it later.
 > and `Z` in the category position as well as `U`; `ContainerNumberValidator` accepts only `U`.
 
 That is a real bug, the fix is one line, and it lives inside `Meridian.Clearance`, the scope the
-spec quarantines. The agent widens the check:
+spec quarantines. The agent widened the check:
 
 ```csharp
+// ISO 6346 category identifiers: U freight, J detachable equipment, Z trailers and chassis.
 if (containerNumber[3] is not ('U' or 'J' or 'Z')) return false;
 ```
 
 Nothing here breaks a law. Containment governs who may *reference* the scope from outside, and this
 edit is inside it, so the check is clean and the wrapper exits 0. What the check does say is that
-the edit landed in dragon territory:
+the edit landed in dragon territory, and a warning has only exit 0 to travel on. So the wrapper
+passes `--hook-json --hook-event Stop` and the tool writes the report as the one exit-0 object
+Claude Code reads, naming the event that fired:
+
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "Stop",
+    "additionalContext": "pass layering/domain-independent — The Domain layer must not reference …"
+  }
+}
+```
+
+The board inside it, in full:
 
 ```text
 pass layering/domain-independent — The Domain layer must not reference the Web layer.
@@ -189,28 +177,26 @@ pass clearance/engine/containment — Types in `Meridian.Clearance.*`, except `I
   grandfathered: 1 (baselined; run 'loadbearing status' for burndown)
 warn clearance/engine/tripwire
   warning: Changed file 'src/Meridian.Clearance/ContainerNumberValidator.cs' is inside quarantined scope 'clearance/engine' — does the task actually require editing dragon territory? Dragons: loadbearing explain clearance/engine/tripwire.
+  dragons: ISO 6346 check digit: the letter-value table skips every multiple of 11 (A=10, B=12 … U=32); the gaps are load-bearing — linearizing the table breaks every real container number. Call in only through IClearanceGateway.
 
 Checked 8 rules: 8 passed, 0 failed, 0 skipped (0 violations, 1 warning).
 ```
 
-Getting that paragraph in front of the agent is the whole of the tripwire. A warning never moves the
-exit code, and a hook that exits 0 has no stderr channel to the agent, so the wrapper passes
-`--hook-json` and hands this report back as `hookSpecificOutput.additionalContext`, the one exit-0
-output Claude Code turns into a transcript message. The agent reads it, follows the line it ends
-with, and gets the dragons:
+Claude Code delivers that as a `Stop hook additional context` message and lets the turn continue
+once, which is the whole of the tripwire: the dragons arrive under the warning that fired, so the
+agent reads them where it is standing rather than paying a round trip to `explain`. It answered
+them point by point, and this is the part worth reading twice:
 
-```text
-clearance/engine/tripwire (quarantine/tripwire)
-  because: The check-digit table implements a published external standard with no cleaner target shape; contain it behind the gateway rather than change it.
-  scope: clearance/engine
-  dragons: ISO 6346 check digit: the letter-value table skips every multiple of 11 (A=10, B=12 … U=32); the gaps are load-bearing — linearizing the table breaks every real container number. Call in only through IClearanceGateway.
-```
+> **The dragons warn about the letter-value table specifically** — `A=10, B=12 … U=32`, every
+> multiple of 11 skipped, gaps load-bearing. I didn't touch `ContainerCheckDigit`. The table is
+> what makes `J` and `Z` score correctly without any change, which is why the fix is one line in
+> the validator and nothing in the check digit.
 
 The category fix ships. What does not happen is the next edit: an agent one file away from a
 letter-value table with three gaps in it, told that the gaps are load-bearing before it decides they
 are a typo. That is the difference between the two postures on one codebase: Beat 3's ratchet
-blocks new code in a retired pattern, and the tripwire lets a legitimate edit through while making
-sure nobody makes it uninformed.
+refuses a stop that would have left new code in a retired shape, and the tripwire lets a legitimate
+edit through while making sure nobody makes it uninformed.
 
 ## Reproduce it
 
@@ -225,32 +211,31 @@ dotnet build examples/Meridian/Meridian.slnx
 loadbearing check examples/Meridian/Meridian.slnx      # exit 0: the committed baseline is clean
 ```
 
-Add the Beat 2 method to `BookingsController` (with `using Microsoft.Data.SqlClient;` and an
-`IConfiguration configuration` constructor parameter), rebuild `Meridian.Web`, and check again:
+Add the Beat 2 method to `BookingsController` above its `sample` endpoint, and check again. The
+check reads source, so no rebuild is needed for this one:
 
 ```bash
-dotnet build examples/Meridian/src/Meridian.Web/Meridian.Web.csproj
 loadbearing check examples/Meridian/Meridian.slnx --diff-base HEAD   # exit 1: the Beat 3 board
 ```
 
-That `--diff-base HEAD` is what the wrapper adds; it only evaluates the quarantined-scope tripwire (the
-extra `pass clearance/engine/tripwire` line) and does not change the failing rule. To drive the
+That `--diff-base HEAD` is what the wrapper adds; it only evaluates the quarantined-scope tripwire
+(the extra `pass clearance/engine/tripwire` line) and does not change the failing rule. To drive the
 wrapper the way the hook does, install the [global tool](../README.md#run-it-yourself) so
 `loadbearing` resolves, then run `sh hooks/arch-hook.sh` (or `arch-hook.ps1`): it runs that same
 check, prints the report and exits 2 on a red rule, and prints nothing and exits 0 once you switch
-to the Beat 4 version. Revert `BookingsController` when you are done so the example tree stays clean.
+to the Beat 4 name. Revert `BookingsController` when you are done so the example tree stays clean.
 
 Beat 5 is the same loop with the tripwire armed. Widen the category check in
 `ContainerNumberValidator` as the beat does, rebuild, and check:
 
 ```bash
 dotnet build examples/Meridian/src/Meridian.Clearance/Meridian.Clearance.csproj
-loadbearing check examples/Meridian/Meridian.slnx --diff-base HEAD              # exit 0: the Beat 5 board
-loadbearing check examples/Meridian/Meridian.slnx --diff-base HEAD --hook-json  # the same board, as hook context
+loadbearing check examples/Meridian/Meridian.slnx --diff-base HEAD                            # exit 0: the Beat 5 board
+loadbearing check examples/Meridian/Meridian.slnx --diff-base HEAD --hook-json --hook-event Stop  # the same board, as hook context
 ```
 
 The second command is what the wrapper actually runs, and its output is the JSON object the hook
-passes through: one `hookSpecificOutput`, carrying that board escaped into `additionalContext`. Add
-`--rules 'clearance/*'` to read it without the eight-rule board inside the string. Run either
-against the reverted tree and the first prints a clean board while the second prints nothing at all:
-a clean check with no warnings says nothing to the agent.
+passes through: one `hookSpecificOutput`, naming the event that fired and carrying that board
+escaped into `additionalContext`. Add `--rules 'clearance/*'` to read it without the eight-rule
+board inside the string. Run either against the reverted tree and the first prints a clean board
+while the second prints nothing at all: a clean check with no warnings says nothing to the agent.

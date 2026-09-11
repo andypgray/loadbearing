@@ -2,13 +2,18 @@ using Zphil.LoadBearing.Internal;
 
 namespace Zphil.LoadBearing.Fluent;
 
-/// <summary>A dot-segment-aware, case-sensitive namespace matcher (GRAMMAR §4.2).</summary>
-/// <remarks>
-///     Deliberately not <c>Microsoft.Extensions.FileSystemGlobbing</c>, which is path-segment based
-///     and stays for file paths. Trailing <c>.*</c> is the self-inclusive subtree operator; an
-///     interior standalone <c>*</c> matches exactly one segment; a partial-segment <c>*</c> matches
-///     within a segment and never crosses a dot; a lone <c>*</c> matches everything.
-/// </remarks>
+/// <summary>
+///     Matches namespaces against a glob, the way a spec's namespace patterns are matched. Matching is
+///     by dot-separated segment and case-sensitive, and five rules cover it: a trailing <c>.*</c>
+///     covers the namespace itself and everything beneath it, so <c>MyApp.Domain.*</c> matches
+///     <c>MyApp.Domain</c> and <c>MyApp.Domain.Orders</c> but not <c>MyApp.DomainX</c>; a <c>*</c>
+///     standing alone as a segment matches exactly one segment, so <c>MyApp.*.Orders</c> matches
+///     <c>MyApp.Sales.Orders</c> but neither <c>MyApp.Orders</c> nor <c>MyApp.A.B.Orders</c>; a
+///     <c>*</c> inside a segment matches within that segment and never crosses a dot, so
+///     <c>MyApp.Legacy*</c> matches <c>MyApp.LegacyBilling</c> but not <c>MyApp.Legacy.Billing</c>; a
+///     glob with no <c>*</c> matches that one namespace; and a lone <c>*</c> matches every namespace.
+///     Namespaces only: this is not a file-path matcher.
+/// </summary>
 public sealed class NamespacePattern
 {
     /// <summary>The subtree operator's spelling (GRAMMAR §4.2), so the literal and its length live in one place.</summary>
@@ -22,7 +27,12 @@ public sealed class NamespacePattern
 
     private readonly string? _subtreePrefixDot;
 
-    /// <summary>Creates a matcher for the given namespace glob.</summary>
+    /// <summary>
+    ///     Creates a matcher for a namespace glob, such as <c>new NamespacePattern("MyApp.Domain.*")</c>.
+    ///     Throws <see cref="ArgumentNullException" /> when the glob is null and
+    ///     <see cref="ArgumentException" /> when it is blank; <see cref="Validate" /> answers the same
+    ///     question without throwing, and also catches a glob that can never match.
+    /// </summary>
     public NamespacePattern(string pattern)
     {
         string glob = Guard.NotNullOrWhiteSpace(pattern, nameof(pattern));
@@ -45,19 +55,18 @@ public sealed class NamespacePattern
         _patternSegments = glob.Split('.');
     }
 
-    /// <summary>Validates a namespace glob at spec-build time (GRAMMAR §8 items 15–16).</summary>
+    /// <summary>
+    ///     Checks whether a namespace glob is usable, before it is made into a matcher. Two globs are not:
+    ///     a blank one, and one ending in <c>.*</c> that carries another <c>*</c> before it
+    ///     (<c>MyApp.*.Controllers.*</c>) — everything before a trailing <c>.*</c> is matched literally, so
+    ///     such a glob can never match anything. Every other glob is usable, an interior <c>*</c> segment
+    ///     (<c>MyApp.*.Orders</c>) and a lone <c>*</c> included.
+    /// </summary>
     /// <param name="pattern">The namespace glob to check.</param>
-    /// <returns>A human reason when the glob is unusable, or <c>null</c> when it is well-formed.</returns>
-    /// <remarks>
-    ///     Two failure modes — a blank/whitespace glob, and a <em>dead subtree pattern</em>: a trailing
-    ///     <c>.*</c> whose literal prefix carries a <c>*</c>. The subtree operator compares that prefix
-    ///     literally (see <see cref="Matches" />), so <c>MyApp.*.Controllers.*</c> can never match; the
-    ///     reason steers the author to anchor the subtree on a literal prefix. An interior standalone
-    ///     <c>*</c> with no trailing subtree operator (<c>MyApp.*.Orders</c>) is legitimate segment
-    ///     matching (§4.2), and a lone <c>*</c> matches everything — both return <c>null</c>. Reason
-    ///     knowledge lives here, not in the validator, so the matcher and its build-time gate cannot
-    ///     drift apart.
-    /// </remarks>
+    /// <returns>A sentence saying what is wrong with the glob, or <c>null</c> when it is usable.</returns>
+    // The reason text lives beside the matcher rather than in the validator, so the two cannot drift:
+    // what Matches treats as literal is exactly what this refuses to strand a `*` in (GRAMMAR §4.2,
+    // §8 items 15-16).
     public static string? Validate(string pattern)
     {
         if (string.IsNullOrWhiteSpace(pattern)) return "is blank";
@@ -72,7 +81,11 @@ public sealed class NamespacePattern
         return null;
     }
 
-    /// <summary>Whether the given namespace matches the pattern.</summary>
+    /// <summary>
+    ///     Whether a namespace matches the glob, by the segment rules the pattern carries. Pass the
+    ///     namespace on its own, without a type name; the empty string is the global namespace. Throws
+    ///     <see cref="ArgumentNullException" /> when it is null.
+    /// </summary>
     public bool Matches(string @namespace)
     {
         Guard.NotNull(@namespace, nameof(@namespace));

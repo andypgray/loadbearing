@@ -1,52 +1,51 @@
 namespace Zphil.LoadBearing.Roslyn.Caching;
 
 /// <summary>
-///     A file's recorded freshness fingerprint: its existence, last-write time, and byte length at the
-///     moment we captured it, plus the wall-clock instant of the capture. This is the shared primitive
-///     behind two staleness checks — the warm <see cref="WorkspaceSession" />'s per-call reconcile sweep
-///     and the persisted extraction cache's validation pass — so it carries no
-///     session or cache coupling; it only knows how to stat a path and how to reason about the racy
-///     window.
+///     A file's recorded freshness fingerprint: whether it existed, its last-write time and its byte length
+///     at the moment of capture, plus the instant of the capture itself. Take one with
+///     <see cref="Capture" /> or <see cref="CaptureUnverified" />, then ask <see cref="MatchesStat" /> or
+///     <see cref="CanTrust" /> whether a fresh capture of the same path still matches. It knows how to stat
+///     a path and how to reason about the window in which a timestamp cannot be trusted; what to do about a
+///     mismatch is the caller's business.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>The racy window.</b> Filesystems record mtimes at coarse resolution (the FAT/exFAT floor
-///         is 2 seconds; NTFS is far finer at ~100 ns). If we captured a fingerprint within
-///         <see cref="RacyWindow" /> of the file's own mtime, a same-tick external write could share that
-///         mtime, so mtime-equality alone cannot prove the file is unchanged. Such a fingerprint stays
-///         <em>unpromoted</em> (<see cref="IsPromoted" /> is false) until it has been content-verified
-///         once and re-captured comfortably outside the window — see <see cref="CanTrust" />.
+///         Filesystems record last-write times coarsely (the FAT/exFAT floor is two seconds, while NTFS is far finer),
+///         so a fingerprint captured within <see cref="RacyWindow" /> of the file's own timestamp cannot prove the file
+///         is unchanged: a write in the same tick would share that timestamp. Such a fingerprint stays unpromoted
+///         (<see cref="IsPromoted" /> is false) until it has been checked against the file's content once and captured
+///         again comfortably outside the window. That is the difference between the two comparisons:
+///         <see cref="CanTrust" /> insists on it and <see cref="MatchesStat" /> does not.
 ///     </para>
 ///     <para>
-///         <b>Any mtime difference is a change.</b> A backwards mtime (a timestamp-preserving restore:
-///         <c>robocopy /COPY:T</c>, some git tooling, archive extraction) is a difference, not proof of
-///         freshness. The <see cref="Length" /> field additionally catches a content change that restores
-///         the exact recorded mtime. The one residual blind spot is equal mtime <em>and</em> equal length
-///         <em>and</em> changed content on an already-promoted file; without a filesystem watcher (which
-///         this design deliberately omits), the next structural change or process restart recovers it.
+///         Any difference in timestamp counts as a change, including one that moved backwards: a timestamp-preserving
+///         restore is a difference, not proof of freshness. <see cref="Length" /> catches a change that put the
+///         recorded timestamp back exactly. One case gets past both: equal timestamp, equal length and different
+///         content, on an already-promoted file. Nothing here watches the filesystem, so it takes the caller's next
+///         wholesale reload, or its next run, to pick such a change up.
 ///     </para>
 /// </remarks>
 public readonly record struct FileFreshness(bool Exists, DateTime LastWriteTimeUtc, long Length, DateTime RecordedAtUtc)
 {
     /// <summary>
-    ///     Filesystem-mtime resolution slop. A fingerprint captured within this window of the file's own
-    ///     mtime cannot be trusted on mtime-equality alone. 2 seconds covers the FAT/exFAT tick floor and
-    ///     is conservative on NTFS.
+    ///     The window within which a file's last-write time cannot be trusted on its own: two seconds, which
+    ///     covers the FAT/exFAT tick floor and is conservative on NTFS. A fingerprint captured this close to
+    ///     the file's own timestamp needs one content check before <see cref="CanTrust" /> will accept it.
     /// </summary>
     public static readonly TimeSpan RacyWindow = TimeSpan.FromSeconds(2);
 
     /// <summary>
-    ///     True when this fingerprint was captured comfortably outside the <see cref="RacyWindow" /> — the
-    ///     capture instant is more than <see cref="RacyWindow" /> after the file's mtime — so mtime
-    ///     equality can be trusted as proof the file is unchanged.
+    ///     Gets whether this fingerprint was captured more than <see cref="RacyWindow" /> after the file's own
+    ///     last-write time, so a later timestamp match can be trusted as proof the file is unchanged.
     /// </summary>
     public bool IsPromoted => Exists && RecordedAtUtc - LastWriteTimeUtc > RacyWindow;
 
     /// <summary>
-    ///     Stats <paramref name="fullPath" /> now and records the capture instant as <c>UtcNow</c>. A file
-    ///     whose mtime is already older than <see cref="RacyWindow" /> is therefore captured
-    ///     <see cref="IsPromoted">promoted</see> — trustworthy on a later mtime-equality check. A missing
-    ///     file yields <see cref="Exists" /> <c>= false</c>.
+    ///     Stats <paramref name="fullPath" /> now and records the capture instant as the current UTC time. A
+    ///     file whose last-write time is already older than <see cref="RacyWindow" /> is therefore captured
+    ///     promoted, and can be trusted on a later timestamp match with no content read. A missing file yields
+    ///     a fingerprint whose <see cref="Exists" /> is false, which is a mismatch against one that exists — so
+    ///     a file that later appears reads as a change.
     /// </summary>
     public static FileFreshness Capture(string fullPath)
     {
@@ -57,11 +56,11 @@ public readonly record struct FileFreshness(bool Exists, DateTime LastWriteTimeU
     }
 
     /// <summary>
-    ///     Stats <paramref name="fullPath" /> now but records the capture instant as the file's own mtime,
-    ///     giving a zero racy gap so the fingerprint stays <see cref="IsPromoted">unpromoted</see> until
-    ///     its first content verification. Used when recording a file we have just loaded: "unchanged
-    ///     since load" cannot be told from "rewritten in the load tick with a preserved mtime" without one
-    ///     verification, so the conservative choice is to force that one check.
+    ///     Stats <paramref name="fullPath" /> now but records the capture instant as the file's own last-write
+    ///     time, which leaves the fingerprint unpromoted until its first content check. Use it when recording a
+    ///     file you have just read: "unchanged since the read" cannot be told from "rewritten in the same tick
+    ///     with its timestamp preserved" without reading the content once, and this forces that one read. A
+    ///     missing file yields a fingerprint whose <see cref="Exists" /> is false.
     /// </summary>
     public static FileFreshness CaptureUnverified(string fullPath)
     {
@@ -72,10 +71,10 @@ public readonly record struct FileFreshness(bool Exists, DateTime LastWriteTimeU
     }
 
     /// <summary>
-    ///     Pure stat equality against a fresh capture of the same path: same existence, same mtime, same
-    ///     length. The structural-file check (sln/csproj/props/assets) uses this — those files are cheap
-    ///     to reload wholesale on any delta, so they skip the racy-window content dance entirely. An
-    ///     existence flip (an absent probe file that appears) is a mismatch.
+    ///     Returns whether <paramref name="current" />, a fresh capture of the same path, has the same
+    ///     existence, the same last-write time and the same length. A stat comparison only: no content is read
+    ///     and the racy window does not apply, which suits files cheap enough to reload wholesale on any
+    ///     difference. An existence flip (a file that was absent and has appeared) is a mismatch.
     /// </summary>
     public bool MatchesStat(FileFreshness current)
     {
@@ -85,10 +84,10 @@ public readonly record struct FileFreshness(bool Exists, DateTime LastWriteTimeU
     }
 
     /// <summary>
-    ///     True when this recorded fingerprint proves the file is unchanged against <paramref name="current" />
-    ///     (a fresh capture of the same path) <em>without</em> reading its content: both exist, mtime and
-    ///     length still match, and this fingerprint is <see cref="IsPromoted">promoted</see> past the racy
-    ///     window. Any doubt returns false, so the caller re-reads and content-verifies.
+    ///     Returns whether this fingerprint proves the file is unchanged against <paramref name="current" />, a
+    ///     fresh capture of the same path, without reading its content: both exist, last-write time and length
+    ///     still match, and this fingerprint is past the racy window (<see cref="IsPromoted" />). Any doubt
+    ///     returns false, so the caller reads the file and compares the content itself.
     /// </summary>
     public bool CanTrust(FileFreshness current)
     {

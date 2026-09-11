@@ -1,8 +1,11 @@
 namespace Zphil.LoadBearing.Checking;
 
 /// <summary>
-///     The full result of a check run: one <see cref="RuleResult" /> per rule in model (authoring)
-///     order, plus roll-up counts.
+///     Everything one check run produced: a <see cref="RuleResult" /> for each rule that ran, in the
+///     order the spec declares them, and counts rolled up from those results. Returned by the
+///     <c>Check</c> methods on <see cref="ArchChecker" />. Every count here derives from
+///     <see cref="Results" />, so a run narrowed to a few rules is a smaller report of the same shape.
+///     <see cref="HasViolations" /> is the verdict.
 /// </summary>
 public sealed class CheckReport
 {
@@ -22,55 +25,79 @@ public sealed class CheckReport
         UncountedBaselineEntryCount = results.Sum(r => r.UncountedBaselineEntries);
     }
 
-    /// <summary>Every rule's result, in model order.</summary>
+    /// <summary>Gets each rule's result, in the order the spec declares the rules.</summary>
     public IReadOnlyList<RuleResult> Results { get; }
 
-    /// <summary>Total rules in the report.</summary>
+    /// <summary>Gets how many rules the run covered — the size of <see cref="Results" />.</summary>
     public int RulesChecked { get; }
 
-    /// <summary>Rules that held.</summary>
+    /// <summary>
+    ///     Gets how many rules held. A rule that only warned counts here, and so does one whose every
+    ///     violation a baseline grandfathered.
+    /// </summary>
     public int RulesPassed { get; }
 
-    /// <summary>Rules that were violated or errored.</summary>
+    /// <summary>
+    ///     Gets how many rules did not hold: those carrying a violation no baseline grandfathers, those
+    ///     whose subject matched nothing, and those that errored while being evaluated.
+    /// </summary>
     public int RulesFailed { get; }
 
     /// <summary>
-    ///     Rules the run reached no verdict for — a scope tripwire with no <c>--diff-base</c> diff
-    ///     context (GRAMMAR §7), or a rule whose subject a solution filter left out of the checked universe.
+    ///     Gets how many rules the run reached no verdict for — a scope's tripwire when the check ran with
+    ///     no <c>--diff-base</c>, or a rule whose whole subject lies in projects a <c>.slnf</c> solution
+    ///     filter left unchecked. Each such result says which, in its <see cref="RuleResult.SkipReason" />.
     /// </summary>
     public int RulesSkipped { get; }
 
-    /// <summary>Total <em>red</em> violations across all rules (grandfathered Migrate violations excluded).</summary>
+    /// <summary>
+    ///     Gets how many violations failed their rule, across every rule. Grandfathered violations are not
+    ///     counted here; <see cref="GrandfatheredCount" /> holds those.
+    /// </summary>
     public int ViolationCount { get; }
 
-    /// <summary>Total warnings across all rules.</summary>
+    /// <summary>
+    ///     Gets how many warnings the run raised across every rule. A warning fails nothing and never changes the exit
+    ///     code.
+    /// </summary>
     public int WarningCount { get; }
 
-    /// <summary>Total grandfathered (baselined) Migrate violations across all rules — the burndown remaining.</summary>
+    /// <summary>
+    ///     Gets how many violations a baseline tolerated across every rule — the debt still to be paid down.
+    ///     Each is reported and none of them fails its rule.
+    /// </summary>
     public int GrandfatheredCount { get; }
 
     /// <summary>
-    ///     Total <em>sites</em> carried by those grandfathered violations — the burndown remaining at the
-    ///     grain the ratchet measures, which is at least <see cref="GrandfatheredCount" /> and is
-    ///     computable whether or not any entry has recorded a count yet.
+    ///     Gets how many source sites those grandfathered violations carry between them. One violation
+    ///     covers every site of the same pair, so this is at least <see cref="GrandfatheredCount" /> and is
+    ///     the finer measure of the same remaining debt.
     /// </summary>
     public int GrandfatheredSiteCount { get; }
 
-    /// <summary>Total stale baseline entries across all rules — fixed debt awaiting <c>baseline --accept-reductions</c>.</summary>
+    /// <summary>
+    ///     Gets how many recorded baseline entries no current violation matched, across every rule — debt
+    ///     that has since been fixed. <c>loadbearing baseline --accept-reductions</c> retires them.
+    /// </summary>
     public int StaleBaselineEntryCount { get; }
 
     /// <summary>
-    ///     Total shrunk baseline entries across all rules — grandfathered pairs now carrying fewer sites
-    ///     than they record, awaiting <c>baseline --accept-reductions</c> to lower the count.
+    ///     Gets how many matched baseline entries now cover fewer sites than they record, across every rule.
+    ///     Each still passes; <c>loadbearing baseline --accept-reductions</c> lowers the recorded count.
     /// </summary>
     public int ShrunkBaselineEntryCount { get; }
 
     /// <summary>
-    ///     Total uncounted baseline entries across all rules — grandfathered edge entries recording no
-    ///     site count, so they hold their pair at any size until a write records one.
+    ///     Gets how many matched baseline entries record no site count at all, across every rule, so each
+    ///     tolerates its pair however many sites it grows to.
+    ///     <c>loadbearing baseline --accept-reductions</c> records a count.
     /// </summary>
     public int UncountedBaselineEntryCount { get; }
 
-    /// <summary>Whether any rule failed — the CLI's exit-code-1 signal. Red-only, so a fully grandfathered spec is clean.</summary>
+    /// <summary>
+    ///     Gets whether any rule failed: the run's verdict, and what makes the CLI's <c>check</c> verb exit
+    ///     with 1. Grandfathered violations do not count, so a run whose every violation is grandfathered is
+    ///     clean.
+    /// </summary>
     public bool HasViolations => RulesFailed > 0;
 }

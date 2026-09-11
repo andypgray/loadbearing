@@ -3,36 +3,42 @@ using Zphil.LoadBearing.Internal;
 namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
-///     Renders source paths solution-relative with forward slashes — the machine-independent form both
-///     render targets emit. This is what keeps the JSON golden pin and the pinned human report stable
-///     across machines.
+///     Renders source paths relative to the solution directory with forward slashes: the form the check
+///     report, <c>--json</c> output and SARIF output all carry, so a path reads the same whichever
+///     machine produced it.
 /// </summary>
 /// <remarks>
-///     <c>Path.GetRelativePath</c> does not exist on netstandard2.0, so the relative
-///     walk is hand-rolled to match its semantics: full-path both operands, compare directory segments
-///     with the platform's file-name comparison (case-insensitive on Windows and macOS, ordinal on
-///     Linux), and emit <c>../</c> per unmatched base segment followed by the remaining target segments.
-///     Different roots (a different drive) fall back to the raw target with slashes normalized.
-///     Pinned equivalent to <c>Path.GetRelativePath(dir, file).Replace('\\','/')</c> by
-///     <c>PathFormatTests</c>.
+///     <see cref="Relative" /> gives what <c>Path.GetRelativePath(directory, file)</c> gives with
+///     backslashes replaced by forward ones. Both arguments are made absolute first; segments are
+///     compared the way the platform compares file names, case-insensitively on Windows and macOS and
+///     ordinally on Linux; a target above the base directory is reached with <c>../</c> segments; a
+///     target that is the base directory itself comes back as <c>.</c>; and two paths with different
+///     roots, a different drive say, have no relative form at all, so the target comes back as it was
+///     with its slashes normalized.
 /// </remarks>
+// Path.GetRelativePath does not exist on netstandard2.0, so the walk is hand-rolled; PathFormatTests
+// pins it equivalent to Path.GetRelativePath(dir, file).Replace('\\','/'), which is what keeps the
+// JSON golden and the pinned human report stable across machines.
 public static class PathFormat
 {
-    /// <summary>The forward-slashed path from <paramref name="solutionDirectory" /> to <paramref name="filePath" />.</summary>
+    /// <summary>
+    ///     The forward-slashed path from <paramref name="solutionDirectory" /> to
+    ///     <paramref name="filePath" />. Relativizing many paths against one directory is cheaper through a
+    ///     <see cref="Relativizer" />, which analyses the directory once.
+    /// </summary>
     public static string Relative(string solutionDirectory, string filePath)
     {
         return new Relativizer(solutionDirectory).Relative(filePath);
     }
 
     /// <summary>
-    ///     Whether <paramref name="directory" /> equals or is an ancestor of <paramref name="path" /> — the
-    ///     scope-placement question: does this directory's context card cover that file?
+    ///     Whether <paramref name="directory" /> is <paramref name="path" /> or an ancestor of it: the
+    ///     question of whether the card placed on a directory covers a given file.
     /// </summary>
     /// <remarks>
-    ///     Both operands are full-pathed and split into segments, and the segments are compared with the
-    ///     same per-OS rule <see cref="Relative" /> uses (<see cref="PathComparison" />), so containment
-    ///     and relativization cannot disagree about whether two spellings are one path. Symlinks are not
-    ///     resolved: a caller that needs canonical paths canonicalizes before asking.
+    ///     Both arguments are made absolute and compared segment by segment, the way the platform compares
+    ///     file names, so this and <see cref="Relative" /> cannot disagree about whether two spellings are
+    ///     one path. Symlinks are not resolved: canonicalize first if that matters.
     /// </remarks>
     public static bool Contains(string directory, string path)
     {
@@ -58,12 +64,12 @@ public static class PathFormat
         return end == parts.Length ? parts : parts.Take(end).ToArray();
     }
 
-    /// <summary><see cref="Relative" /> with its base directory analyzed once.</summary>
-    /// <remarks>
-    ///     The base is the same string for every site of a report, and full-pathing plus splitting it per
-    ///     call is the whole constant half of the walk — so a renderer builds one of these and relativizes
-    ///     each site against it. There is only ever one algorithm: <see cref="Relative" /> runs this one.
-    /// </remarks>
+    /// <summary>
+    ///     A base directory analysed once, for a caller relativizing many paths against the same one: a
+    ///     report renderer with a site per violation, say. Otherwise
+    ///     <c>PathFormat.Relative(directory, file)</c> answers the same question in one call.
+    /// </summary>
+    // One algorithm, not two: PathFormat.Relative builds one of these and calls it.
     public sealed class Relativizer
     {
         private readonly string[] _baseSegments;

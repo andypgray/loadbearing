@@ -51,9 +51,16 @@ internal static class CommandFactory
         Option<bool> hookJson = new("--hook-json")
         {
             Description =
-                "Render for a Claude Code PostToolUse hook: a clean run carrying warnings writes the report "
+                "Render for a Claude Code hook: a clean run carrying warnings writes the report "
                 + "as hookSpecificOutput.additionalContext and nothing else, so the hook's stdout reaches the "
                 + "agent; a clean run with no warnings writes nothing; violations print as usual. Not with --json."
+        };
+        Option<string?> hookEvent = new("--hook-event")
+        {
+            Description =
+                "Which Claude Code event the --hook-json document answers — Stop, SubagentStop, or PostToolUse "
+                + "(the default). Claude Code reads additionalContext only from a document naming the event it "
+                + "fired, so a turn-end hook needs this. Requires --hook-json."
         };
         Option<string?> diffBase = new("--diff-base")
         {
@@ -108,6 +115,7 @@ internal static class CommandFactory
             spec,
             json,
             hookJson,
+            hookEvent,
             diffBase,
             allowWorkspaceDiagnostics,
             sarif,
@@ -134,7 +142,8 @@ internal static class CommandFactory
                 parseResult.GetValue(sarif),
                 parseResult.GetValue(rules),
                 DocumentGrains.Coarsest(
-                    parseResult.GetValue(overview), parseResult.GetValue(skeleton), parseResult.GetValue(index))),
+                    parseResult.GetValue(overview), parseResult.GetValue(skeleton), parseResult.GetValue(index)),
+                parseResult.GetValue(hookEvent)),
             (request, output, error, ct) =>
                 MsBuildGate.RunCheckAsync(request, output, error, hostSource, environment, ct));
 

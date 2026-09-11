@@ -10,6 +10,12 @@ namespace Meridian.Operations.ArchSpec;
 ///     surface; the module dependency graph is explicit and acyclic; and the demurrage engine is
 ///     quarantined behind its calculator facade.
 /// </summary>
+// This example's README quotes rules from the class below as they are written here, continuation
+// columns included, and the compiled spec is the same whichever way they are laid out. The marker
+// holds the formatter off everything after it, so the shape a reader meets here is the shape they
+// meet there, and the file still goes through cleanup with the rest of the tree rather than being
+// remembered as an exception. It is unbalanced on purpose: the quoted blocks sit throughout Define.
+// @formatter:off
 public sealed class OperationsArchSpec : IArchitectureSpec
 {
     /// <inheritdoc />

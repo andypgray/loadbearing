@@ -1,25 +1,32 @@
 namespace Zphil.LoadBearing;
 
 /// <summary>
-///     A rule's lifecycle posture. A scope's <c>Quarantine</c> and <c>Caution</c> are authored on the
-///     surface but desugar into ordinary posture-bearing rule nodes carrying
-///     <see cref="Quarantine" />/<see cref="Caution" /> (GRAMMAR §7), so checker, renderer, and baseline
-///     all walk one model.
+///     How a rule is enforced: whether a violation fails the check, is tolerated as grandfathered
+///     debt, or only warns. A rule's posture is the verb it was declared with; a scope's rules carry
+///     <see cref="Quarantine" /> or <see cref="Caution" />.
 /// </summary>
+// A scope's Quarantine and Caution are authored on the surface but reify into ordinary posture-bearing
+// rule nodes (GRAMMAR §7), so the checker, the renderers and the baseline walk one model.
 public enum Posture
 {
-    /// <summary>The law: violation is red. Rendered context speaks in "must".</summary>
+    /// <summary>Every violation fails the check. The generated context speaks in "must".</summary>
     Enforce,
 
-    /// <summary>Ratcheted tech debt: a descriptive current state plus a prescriptive target.</summary>
+    /// <summary>
+    ///     Debt being paid down: violations recorded in the rule's baseline are grandfathered, and any
+    ///     other violation fails the check.
+    /// </summary>
     Migrate,
 
-    /// <summary>Here be dragons: an unenforceable interior with an enforceable boundary.</summary>
+    /// <summary>
+    ///     A scope with a boundary: a new reference into it from outside the sanctioned surface fails the
+    ///     check, and a check with a diff base warns about edits inside it.
+    /// </summary>
     Quarantine,
 
     /// <summary>
-    ///     Here be dragons, with no boundary: an unenforceable interior nothing is kept out of. The first
-    ///     posture with no red state — its one rule, the tripwire, warns and can never fail.
+    ///     A scope with no boundary: a check with a diff base warns about edits inside it, and nothing
+    ///     about it ever fails the check.
     /// </summary>
     Caution
 }

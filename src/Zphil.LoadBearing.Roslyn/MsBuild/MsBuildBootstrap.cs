@@ -4,29 +4,21 @@ using Zphil.LoadBearing.Roslyn.Hosting;
 namespace Zphil.LoadBearing.Roslyn.MsBuild;
 
 /// <summary>
-///     Selects an MSBuild instance and registers it both for the current process and (via inherited
-///     environment variables) for the Roslyn out-of-process BuildHost.
+///     Chooses the MSBuild a run will use and registers it, both for this process and for the separate build-host
+///     process Roslyn spawns to read project files. This is the first thing a host does: call
+///     <see cref="EnsureInitialized" /> (or <see cref="Initialize" />) before anything touches a Roslyn workspace type,
+///     then load a solution with <see cref="WorkspaceLoader" /> or a <see cref="WorkspaceSession" />. Left until later,
+///     the runtime resolves MSBuild assemblies before anything has said which ones to resolve. On Windows a stable
+///     Visual Studio install is preferred, because the build-host process needs one to load a non-SDK project; set
+///     <c>LOADBEARING_VS_INSTALL_PATH</c> to a Visual Studio install root (the parent of <c>MSBuild\Current\Bin</c>) to
+///     choose a different one.
 /// </summary>
-/// <remarks>
-///     <para>
-///         Roslyn's <c>MSBuildWorkspace</c> spawns a separate <c>BuildHost</c> process to load
-///         project files, and the BuildHost's <c>FindMSBuild</c> calls
-///         <see cref="MSBuildLocator.QueryVisualStudioInstances()" /> and picks the highest-version
-///         instance it can see — previews included, a moving target this process cannot vouch for.
-///         So a stable VS instance is selected here (via <see cref="VsWhereLocator" />) and the
-///         choice propagates to the BuildHost subprocess via <c>VSINSTALLDIR</c> + <c>VSCMD_VER</c>,
-///         which MSBuildLocator honours as a synthetic "developer console" instance (see
-///         <c>MSBuildLocator.GetDevConsoleInstance</c>); <c>VSCMD_VER=99.0</c> wins the BuildHost's
-///         descending-version sort. <c>VisualStudioVersion</c> is avoided because MSBuild itself
-///         reads that variable during project evaluation.
-///     </para>
-///     <para>
-///         <b>Why vswhere instead of MSBuildLocator.QueryVisualStudioInstances:</b> see
-///         <see cref="VsWhereLocator" />. The asymmetry that matters here is that the BuildHost
-///         subprocess <em>does</em> see VS Setup instances through that API, because it runs on
-///         .NET Framework 4.7.2 — the parent process cannot.
-///     </para>
-/// </remarks>
+// The two processes are pointed at MSBuild separately, and not at the same one (see
+// RegisterEngineForThisProcess). This one gets an engine through
+// MSBuildLocator; the BuildHost subprocess inherits VSINSTALLDIR + VSCMD_VER, which its own
+// MSBuildLocator honours as a synthetic "developer console" instance, and VSCMD_VER=99.0 is what wins
+// that process's descending-version sort against any other installed VS. VisualStudioVersion must not
+// be used for this: MSBuild itself reads that variable during project evaluation.
 public static class MsBuildBootstrap
 {
     private const string DevConsoleVersion = "99.0";
@@ -68,23 +60,27 @@ public static class MsBuildBootstrap
     }
 
     /// <summary>
-    ///     Registers an MSBuild instance and propagates the choice to subprocesses.
+    ///     Selects an MSBuild instance, registers an engine for this process, and points the build-host process at the
+    ///     Visual Studio install behind the selection. Call it before any Roslyn workspace type loads, and only where
+    ///     this host owns registration outright; where something else may have registered MSBuild already — a test
+    ///     project that registers in a module initializer, for instance — call <see cref="EnsureInitialized" />
+    ///     instead. Returns what was chosen, whose <see cref="MsBuildSelection.Source" /> is the one line worth
+    ///     logging. A <c>LOADBEARING_VS_INSTALL_PATH</c> that is not an existing directory, or that holds no
+    ///     <c>MSBuild.exe</c> under <c>MSBuild\Current\Bin</c>, fails with a message naming the variable and the path
+    ///     that was probed.
     /// </summary>
-    /// <remarks>
-    ///     Must be called before any Roslyn workspace type loads, otherwise the runtime resolves
-    ///     MSBuild assemblies before <see cref="MSBuildLocator" /> has had a chance to point at them.
-    ///     Callers guard on <see cref="MSBuildLocator.IsRegistered" /> for idempotency.
-    /// </remarks>
     public static MsBuildSelection Initialize()
     {
         return SelectAndRegister();
     }
 
     /// <summary>
-    ///     Registers MSBuild once, idempotently: a no-op returning <see langword="null" /> when
-    ///     <see cref="MSBuildLocator.IsRegistered" /> is already true (e.g. tests registered in a
-    ///     <c>[ModuleInitializer]</c>). Lets a host gate registration without referencing
-    ///     <see cref="MSBuildLocator" /> itself, keeping that dependency out of the CLI's clean path.
+    ///     Registers MSBuild if nothing has yet and returns what was chosen, or returns <see langword="null" /> when
+    ///     MSBuild is already registered. Safe to call from every entry point of a host, which is why it is the form to
+    ///     prefer over <see cref="Initialize" />. A null answer is not a failure: it says the choice was already made,
+    ///     and <see cref="MsBuildSelection.Source" /> is only available from the call that made it. A
+    ///     <c>LOADBEARING_VS_INSTALL_PATH</c> that is not an existing directory, or that holds no <c>MSBuild.exe</c>
+    ///     under <c>MSBuild\Current\Bin</c>, fails with a message naming the variable and the path that was probed.
     /// </summary>
     public static MsBuildSelection? EnsureInitialized()
     {

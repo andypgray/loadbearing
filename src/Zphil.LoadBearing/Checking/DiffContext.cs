@@ -3,27 +3,26 @@ using Zphil.LoadBearing.Internal;
 namespace Zphil.LoadBearing.Checking;
 
 /// <summary>
-///     The set of files changed relative to a git ref — the substrate a scope tripwire checks
-///     against (GRAMMAR §7).
+///     The files a check is to treat as changed, relative to a git ref. Pass one to a <c>Check</c> call
+///     on <see cref="ArchChecker" /> and a scope's tripwire fires: it warns once for each of these files
+///     that declares a type inside a quarantined or a cautioned scope, and the rule passes either way.
+///     Pass none and every tripwire is skipped instead. Paths may arrive with either separator, and are
+///     matched the way the host file system matches names — ignoring case on Windows and macOS,
+///     exactly on Linux.
 /// </summary>
-/// <remarks>
-///     Paths are normalized to forward slashes on the way in and compared with the platform's
-///     file-name comparison (<see cref="PathComparison" />: case-insensitive on Windows and macOS,
-///     ordinal on Linux). A null context means no <c>--diff-base</c> was supplied, and every tripwire
-///     skips. Pure string logic only — no <c>Path.GetRelativePath</c>/Span (unavailable on
-///     netstandard2.0).
-/// </remarks>
+// Pure string logic: no Path.GetRelativePath and no Span, neither being available on netstandard2.0.
 public sealed class DiffContext
 {
     private readonly HashSet<string> _changed;
     private readonly string _solutionPrefix;
 
     /// <summary>
-    ///     Builds a diff context from the base ref, the solution directory, and the changed files
-    ///     (any separators, any casing — all normalized to forward slashes).
+    ///     Builds a diff context from the ref the comparison was taken against, the solution directory, and
+    ///     the files that changed. Paths may use either separator and any casing; they are stored with
+    ///     forward slashes and keep the casing given.
     /// </summary>
-    /// <param name="baseRef">The git ref the changed-file set was taken against.</param>
-    /// <param name="solutionDirectory">The directory a tripwire message's paths are made relative to.</param>
+    /// <param name="baseRef">The git ref the changed-file set was taken against, such as <c>origin/main</c>.</param>
+    /// <param name="solutionDirectory">The directory the paths in a tripwire's warning are made relative to.</param>
     /// <param name="changedFiles">The files that changed since <paramref name="baseRef" />.</param>
     public DiffContext(string baseRef, string solutionDirectory, IEnumerable<string> changedFiles)
     {
@@ -35,10 +34,17 @@ public sealed class DiffContext
         ChangedFiles = _changed;
     }
 
-    /// <summary>The solution directory, normalized to forward slashes with no trailing slash.</summary>
+    /// <summary>
+    ///     Gets the solution directory the context was built with, its separators normalized to forward
+    ///     slashes and any trailing slash removed.
+    /// </summary>
     public string SolutionDirectory { get; }
 
-    /// <summary>The changed files, normalized to forward slashes; membership follows <see cref="PathComparison" />.</summary>
+    /// <summary>
+    ///     Gets the changed files with forward slashes and their original casing, in no particular order.
+    ///     Membership follows the host file system's name comparison: case is ignored on Windows and macOS,
+    ///     and is significant on Linux.
+    /// </summary>
     public IReadOnlyCollection<string> ChangedFiles { get; }
 
     /// <summary>

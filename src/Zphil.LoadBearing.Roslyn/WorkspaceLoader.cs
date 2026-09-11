@@ -7,17 +7,13 @@ using Zphil.LoadBearing.Roslyn.Solutions;
 namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>
-///     One-shot MSBuild solution loading for the enforcement path: create a workspace, open the
-///     solution, strip unresolved references, normalize the project names, return. A check/render run is
-///     one-shot, so none of the machinery a long-lived workspace server would need (watcher, reload,
-///     external-edit reconcile, incremental sync, semaphores, two-phase ready tasks, warmup) exists here.
+///     Loads a solution once, for a host that reads it once: a check, a render, a test run.
+///     <see cref="LoadAsync" /> opens a fresh MSBuild workspace, reads the solution, drops references that
+///     did not resolve, gives a multi-target-framework project's several compilations one name, and hands
+///     back a <see cref="LoadedSolution" /> the caller disposes. What it returns is as current as the
+///     moment of the load and is never reconciled afterwards; a host that reads one solution many times
+///     wants <see cref="WorkspaceSession" />, which keeps this loader's result warm.
 /// </summary>
-/// <remarks>
-///     The one-shot <em>primitive</em>: each invocation opens a fresh workspace, reads the solution once,
-///     and disposes it, so the loaded snapshot is only ever as current as the moment of the load. The CLI
-///     and the xUnit adapter build directly on it and keep that staleness contract; the warm lifetime,
-///     <see cref="WorkspaceSession" />, owns this primitive rather than replacing it.
-/// </remarks>
 public static class WorkspaceLoader
 {
     private static long _loadCount;
@@ -31,8 +27,12 @@ public static class WorkspaceLoader
     internal static long LoadCount => Interlocked.Read(ref _loadCount);
 
     /// <summary>
-    ///     Opens <paramref name="solutionPath" /> through a fresh <see cref="MSBuildWorkspace" /> and
-    ///     returns the loaded, stripped solution.
+    ///     Opens <paramref name="solutionPath" /> through a fresh MSBuild workspace and returns the loaded
+    ///     solution. Register MSBuild with <see cref="MsBuild.MsBuildBootstrap.EnsureInitialized" /> before the
+    ///     first call, and restore or build the solution, or the result reports the projects it could not load
+    ///     or restore. The returned <see cref="LoadedSolution" /> owns the workspace and its out-of-process
+    ///     build host: dispose it when the read is done. A <c>.slnf</c> that cannot be read raises a
+    ///     <see cref="UserErrorException" /> whose message is written for the person who ran the tool.
     /// </summary>
     /// <param name="solutionPath">
     ///     Absolute path to the <c>.sln</c>/<c>.slnx</c> to load, or to a <c>.slnf</c> filter over one. A
@@ -40,18 +40,15 @@ public static class WorkspaceLoader
     ///     reported as <see cref="LoadedSolution.UncheckedProjects" /> rather than as a failure.
     /// </param>
     /// <param name="diagnosticLog">
-    ///     Optional sink for workspace-failure diagnostics. Failures are surfaced but never abort the
-    ///     load: MSBuildWorkspace reports partial-load problems as diagnostics, and a partial load
-    ///     still yields a usable model. These render; they do not decide anything — whether the model is
+    ///     Optional sink for the workspace's own failure messages. A failure never aborts the load: a partial
+    ///     load still yields a usable model, and these messages are for a host to render. Whether the model is
     ///     incomplete is <see cref="LoadedSolution.FailedProjects" />'s and
-    ///     <see cref="LoadedSolution.RestoreFailedProjects" />'s answer.
+    ///     <see cref="LoadedSolution.RestoreFailedProjects" />'s answer, not this sink's.
     /// </param>
     /// <param name="ct">Cancellation token.</param>
-    /// <remarks>
-    ///     <see cref="MethodImplOptions.NoInlining" /> keeps the JIT from resolving MSBuild/Roslyn
-    ///     assemblies before <c>MSBuildLocator</c> registration in non-test hosts (the CLI);
-    ///     in tests registration happens in a <c>[ModuleInitializer]</c>, so ordering is already safe.
-    /// </remarks>
+    // MethodImplOptions.NoInlining keeps the JIT from resolving MSBuild/Roslyn assemblies before
+    // MSBuildLocator registration in non-test hosts (the CLI); in tests registration happens in a
+    // [ModuleInitializer], so ordering is already safe there.
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static async Task<LoadedSolution> LoadAsync(
         string solutionPath, Action<string>? diagnosticLog = null, CancellationToken ct = default)

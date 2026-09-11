@@ -1,23 +1,28 @@
 namespace Zphil.LoadBearing.Codebase;
 
 /// <summary>
-///     A directed throw edge <c>Source → Thrown</c>: <see cref="Source" />'s declaration source has a
-///     <c>throw</c> statement or throw expression whose thrown expression's static type resolves to
-///     <see cref="Thrown" /> (GRAMMAR §4.8). Covers <c>throw new X()</c>, <c>throw ex</c> (the variable's
-///     static type), <c>?? throw …</c>, conditional/switch-expression arms, and expression-bodied
-///     <c>=&gt; throw new X()</c>. A bare rethrow (<c>throw;</c>), <c>throw null</c>, and type-parameter
-///     throws record nothing. Constructed generics normalize to their open definition (§4.1).
-///     <see cref="Sites" /> lists the distinct <c>file:line</c> positions of the throws, deduped by
-///     (file, line).
+///     One type throwing an exception type: a <c>throw</c> in <see cref="Source" />'s own source throws
+///     something whose declared type is <see cref="Thrown" />. Read them from
+///     <see cref="CodebaseModel.ThrowEdges" />. Throw expressions count as well as statements —
+///     <c>?? throw</c>, a conditional or switch-expression arm, an expression-bodied
+///     <c>=&gt; throw new X()</c>.
 /// </summary>
 /// <remarks>
-///     <see cref="Source" /> and <see cref="Thrown" /> are the same <see cref="TypeNode" /> instances held by
-///     <see cref="CodebaseModel.Types" /> (reference equality, not just name equality), so an external thrown
-///     type is a matchable target like any other external endpoint. Self-throw (a type throwing itself) is
-///     never produced — the throw analog of the reference-edge self-drop (§4.1). Throw helpers
-///     (<c>ArgumentNullException.ThrowIfNull</c>) are ordinary invocations, not throws, so they mint member-use
-///     only and no throw edge. A <c>throw new X()</c> is recorded <em>beside</em> its construction edge and the
-///     type-level edge its name syntax mints, never instead of them.
+///     <para>
+///         What is recorded is the thrown expression's declared type, so
+///         <c>catch (Exception ex) { ...; throw ex; }</c> is a throw of <c>System.Exception</c> whatever was
+///         caught. A bare <c>throw;</c> introduces no expression and records nothing;
+///         <c>throw null</c> and a throw of a type parameter record nothing either; a type throwing itself
+///         gives nothing; and exception types are recorded at their definition. Both ends are the very type
+///         instances <see cref="CodebaseModel.Types" /> lists, so compare them by reference rather than by
+///         name.
+///     </para>
+///     <para>
+///         A throw helper is not a throw: <c>ArgumentNullException.ThrowIfNull(x)</c> is an ordinary call,
+///         so it appears as a <see cref="MemberEdge" /> and never here. A <c>throw new X()</c> appears here
+///         and as a <see cref="ConstructorEdge" /> and as an ordinary reference — one place in the source,
+///         three facts.
+///     </para>
 /// </remarks>
 public sealed class ThrowEdge
 {
@@ -28,12 +33,18 @@ public sealed class ThrowEdge
         Sites = sites;
     }
 
-    /// <summary>The throwing type.</summary>
+    /// <summary>
+    ///     Gets the throwing type. A <c>throw</c> written inside a lambda or a local function counts for the
+    ///     type that encloses it, and one in top-level statements for <c>Program</c>.
+    /// </summary>
     public TypeNode Source { get; }
 
-    /// <summary>The thrown exception type.</summary>
+    /// <summary>Gets the thrown expression's declared type.</summary>
     public TypeNode Thrown { get; }
 
-    /// <summary>The distinct throw sites, ordered by (file, line).</summary>
+    /// <summary>
+    ///     Gets each distinct throw position, ordered by file then line. Two throws of the same type on one line
+    ///     count as one site.
+    /// </summary>
     public IReadOnlyList<SourceLocation> Sites { get; }
 }

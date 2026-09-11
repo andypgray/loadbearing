@@ -1,9 +1,9 @@
 namespace Zphil.LoadBearing.Hosting;
 
 /// <summary>
-///     The finalized, walkable architecture model — the single reified spec both render targets
-///     consume. Returned by <see cref="ArchModelBuilder.Build(IArchitectureSpec[])" />
-///     once the spec passes the whole validation catalog.
+///     The finished architecture model: every rule and every layer a spec declared, in one object to
+///     read from. Returned by <c>ArchModelBuilder.Build</c>, which hands one back only after the spec
+///     passes validation, so nothing here is half-formed and no default is left to fill in.
 /// </summary>
 public sealed class ArchitectureModel
 {
@@ -14,12 +14,12 @@ public sealed class ArchitectureModel
     }
 
     /// <summary>
-    ///     Every rule, in authoring order, with each scope's generated children — a quarantine's
-    ///     containment then tripwire, a caution's tripwire alone — sitting at the scope's position
-    ///     (GRAMMAR §7).
+    ///     Gets every rule, in the order the spec declared them, with the rules each scope contributes — a
+    ///     quarantine's containment then its tripwire, a caution's tripwire alone — standing where the scope
+    ///     itself was declared.
     /// </summary>
     public IReadOnlyList<ArchRule> Rules { get; }
 
-    /// <summary>Every declared layer, in authoring order.</summary>
+    /// <summary>Gets every layer, in the order the spec declared them.</summary>
     public IReadOnlyList<LayerDefinition> Layers { get; }
 }

@@ -5,32 +5,30 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Zphil.LoadBearing.Packs.DotNet;
 
 /// <summary>
-///     Canonical .NET guidance as a rule pack: project-independent rules, one static method each,
-///     declared on the caller's <see cref="Arch" />. A pack is an ordinary class library — there is no
-///     plugin host and no discovery, so a rule lands only where a spec calls for it, and opting out
-///     means not making the call.
+///     Canonical .NET guidance as a rule pack: nine project-independent rules, one static method each,
+///     declared on the <see cref="Arch" /> your spec is handed. A pack is an ordinary class library
+///     with no plugin host and no discovery, so a rule lands only where a spec calls for it, and
+///     opting out of one means not making the call. Taking a rule from here and also writing it
+///     yourself is a duplicate rule ID, which is reported when the spec is loaded.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The pack owns each rule's <c>Because</c> and its <c>Citation</c>, because the reason a rule
-///         exists — and the canonical page that reason rests on — is the same everywhere. The consumer
-///         owns the posture and may override the <c>Fix</c>, because remediation names local types. A
-///         <c>Fix</c> override is a parameter rather than a trailer: every method returns <c>void</c>, so
-///         exactly one <c>Because</c>, one <c>Citation</c> and one <c>Fix</c> reach the rule and a second
-///         trailer is uncompilable rather than a validation error.
+///         The pack owns each rule's reason and the canonical page it cites, because those are the
+///         same in every codebase and you can override neither. You own the posture, the selections
+///         the rule governs, and the remediation hint: pass a replacement as the <c>fix</c> argument,
+///         since these methods return nothing and leave no <c>.Fix(...)</c> to chain.
 ///     </para>
 ///     <para>
-///         Method names are the rule-name half of the ID, PascalCased with the area dropped
-///         (<c>http/reuse-httpclient</c> → <see cref="ReuseHttpClient" />), so the mapping needs no table.
-///     </para>
-///     <para>
-///         Anchor doctrine: every member anchor is written <c>arch.Member(typeof(X), nameof(X.M))</c>,
-///         never the expression form. This pack ships inside a codebase it governs, and an expression
-///         anchor is real syntax — it would mint a use edge attributed to this type and make the pack a
-///         violator of its own rules. <c>nameof</c> operands mint nothing. The two forms reify
-///         identically, so the doctrine costs nothing.
+///         A method's name is the rule-name half of its ID, PascalCased with the area dropped
+///         (<c>http/reuse-httpclient</c> is <see cref="ReuseHttpClient" />), so the mapping needs no
+///         table.
 ///     </para>
 /// </remarks>
+// Anchor doctrine: every member anchor here is written arch.Member(typeof(X), nameof(X.M)), never
+// the expression form. This pack ships inside a codebase it governs, and an expression anchor is
+// real syntax — it would mint a use edge attributed to this type and make the pack a violator of
+// its own rules. nameof operands mint nothing, and the two forms reify identically (GRAMMAR §13),
+// so the doctrine costs nothing.
 public static class DotNetGuidance
 {
     // The two pages more than one rule rests on, written once so a moved page cannot be corrected on some
@@ -42,14 +40,19 @@ public static class DotNetGuidance
         "https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap";
 
     /// <summary>
-    ///     <c>http/reuse-httpclient</c> — nothing outside <paramref name="compositionRoot" /> constructs
-    ///     an <see cref="HttpClient" />.
+    ///     Declares <c>http/reuse-httpclient</c>: nothing in <paramref name="subject" /> outside
+    ///     <paramref name="compositionRoot" /> constructs an <see cref="HttpClient" />. Every
+    ///     <c>new HttpClient(...)</c> elsewhere is a violation; take a typed or named client from
+    ///     <c>IHttpClientFactory</c> instead.
     /// </summary>
-    /// <param name="arch">The spec's stage-machine entry point.</param>
+    /// <param name="arch">The <see cref="Arch" /> the spec is declaring on.</param>
     /// <param name="subject">The types the rule governs.</param>
     /// <param name="compositionRoot">The wiring seam that is allowed to construct clients.</param>
-    /// <param name="posture">Enforce, or Migrate with the project's counter-prior prose.</param>
-    /// <param name="fix">A project-specific remediation hint, replacing the pack's generic one.</param>
+    /// <param name="posture">
+    ///     <c>PackPosture.Enforce</c>, or <c>PackPosture.Migrate</c> with a line saying what the code
+    ///     does today.
+    /// </param>
+    /// <param name="fix">What to do instead, in one line, replacing the pack's generic hint. Optional.</param>
     public static void ReuseHttpClient(
         Arch arch, Selection subject, Selection compositionRoot, PackPosture posture, string? fix = null)
     {
@@ -64,14 +67,19 @@ public static class DotNetGuidance
     }
 
     /// <summary>
-    ///     <c>di/no-service-locator</c> — nothing outside <paramref name="resolveSeam" /> resolves a
-    ///     service from an <see cref="IServiceProvider" />.
+    ///     Declares <c>di/no-service-locator</c>: nothing in <paramref name="subject" /> outside
+    ///     <paramref name="resolveSeam" /> calls <c>IServiceProvider.GetService</c> or the
+    ///     <c>GetService</c> and <c>GetRequiredService</c> extension methods on it. Declare the dependency
+    ///     as a constructor parameter instead.
     /// </summary>
-    /// <param name="arch">The spec's stage-machine entry point.</param>
+    /// <param name="arch">The <see cref="Arch" /> the spec is declaring on.</param>
     /// <param name="subject">The types the rule governs.</param>
     /// <param name="resolveSeam">The sanctioned resolve sites — typically the composition root.</param>
-    /// <param name="posture">Enforce, or Migrate with the project's counter-prior prose.</param>
-    /// <param name="fix">A project-specific remediation hint, replacing the pack's generic one.</param>
+    /// <param name="posture">
+    ///     <c>PackPosture.Enforce</c>, or <c>PackPosture.Migrate</c> with a line saying what the code
+    ///     does today.
+    /// </param>
+    /// <param name="fix">What to do instead, in one line, replacing the pack's generic hint. Optional.</param>
     public static void NoServiceLocator(
         Arch arch, Selection subject, Selection resolveSeam, PackPosture posture, string? fix = null)
     {
@@ -89,13 +97,17 @@ public static class DotNetGuidance
     }
 
     /// <summary>
-    ///     <c>di/no-buildserviceprovider</c> — nothing builds a second container while configuring
-    ///     services.
+    ///     Declares <c>di/no-buildserviceprovider</c>: nothing in <paramref name="subject" /> calls
+    ///     <c>BuildServiceProvider</c>, which builds a second container with its own singletons while
+    ///     services are still being configured.
     /// </summary>
-    /// <param name="arch">The spec's stage-machine entry point.</param>
+    /// <param name="arch">The <see cref="Arch" /> the spec is declaring on.</param>
     /// <param name="subject">The types the rule governs.</param>
-    /// <param name="posture">Enforce, or Migrate with the project's counter-prior prose.</param>
-    /// <param name="fix">A project-specific remediation hint, replacing the pack's generic one.</param>
+    /// <param name="posture">
+    ///     <c>PackPosture.Enforce</c>, or <c>PackPosture.Migrate</c> with a line saying what the code
+    ///     does today.
+    /// </param>
+    /// <param name="fix">What to do instead, in one line, replacing the pack's generic hint. Optional.</param>
     public static void NoBuildServiceProvider(
         Arch arch, Selection subject, PackPosture posture, string? fix = null)
     {
@@ -111,13 +123,18 @@ public static class DotNetGuidance
     }
 
     /// <summary>
-    ///     <c>async/no-sync-over-async</c> — nothing blocks on a <see cref="Task" /> or a
-    ///     <see cref="ValueTask" /> via <c>Wait</c>/<c>Result</c>/<c>GetResult</c>.
+    ///     Declares <c>async/no-sync-over-async</c>: nothing in <paramref name="subject" /> blocks on a
+    ///     <see cref="Task" /> or a <see cref="ValueTask" />. The banned members are <c>Task.Wait</c>,
+    ///     <c>Result</c> on <c>Task&lt;T&gt;</c> and <c>ValueTask&lt;T&gt;</c>, and <c>GetResult</c> on
+    ///     the four task awaiters. Await the call and make the method async instead.
     /// </summary>
-    /// <param name="arch">The spec's stage-machine entry point.</param>
+    /// <param name="arch">The <see cref="Arch" /> the spec is declaring on.</param>
     /// <param name="subject">The types the rule governs.</param>
-    /// <param name="posture">Enforce, or Migrate with the project's counter-prior prose.</param>
-    /// <param name="fix">A project-specific remediation hint, replacing the pack's generic one.</param>
+    /// <param name="posture">
+    ///     <c>PackPosture.Enforce</c>, or <c>PackPosture.Migrate</c> with a line saying what the code
+    ///     does today.
+    /// </param>
+    /// <param name="fix">What to do instead, in one line, replacing the pack's generic hint. Optional.</param>
     public static void NoSyncOverAsync(
         Arch arch, Selection subject, PackPosture posture, string? fix = null)
     {
@@ -139,13 +156,19 @@ public static class DotNetGuidance
     }
 
     /// <summary>
-    ///     <c>di/no-captive-dependencies</c> — the singletons named by <paramref name="subject" /> inject
-    ///     nothing scoped or transient.
+    ///     Declares <c>di/no-captive-dependencies</c>: no type in <paramref name="subject" /> takes a
+    ///     constructor parameter typed on a service the source registers as scoped or as transient. A
+    ///     singleton holding one captures it past its lifetime and shares it across every caller.
     /// </summary>
-    /// <param name="arch">The spec's stage-machine entry point.</param>
-    /// <param name="subject">The singleton selection — typically <c>arch.Registered(Lifetime.Singleton)</c>.</param>
-    /// <param name="posture">Enforce, or Migrate with the project's counter-prior prose.</param>
-    /// <param name="fix">A project-specific remediation hint, replacing the pack's generic one.</param>
+    /// <param name="arch">The <see cref="Arch" /> the spec is declaring on.</param>
+    /// <param name="subject">
+    ///     The singletons the rule governs — typically <c>arch.Registered(Lifetime.Singleton)</c>.
+    /// </param>
+    /// <param name="posture">
+    ///     <c>PackPosture.Enforce</c>, or <c>PackPosture.Migrate</c> with a line saying what the code
+    ///     does today.
+    /// </param>
+    /// <param name="fix">What to do instead, in one line, replacing the pack's generic hint. Optional.</param>
     public static void NoCaptiveDependencies(
         Arch arch, Selection subject, PackPosture posture, string? fix = null)
     {
@@ -162,16 +185,20 @@ public static class DotNetGuidance
     }
 
     /// <summary>
-    ///     <c>naming/async-suffix</c> — the <see cref="Task" />- and <see cref="ValueTask" />-returning
-    ///     methods of <paramref name="subject" /> carry the <c>Async</c> suffix.
+    ///     Declares <c>naming/async-suffix</c>: every <see cref="Task" />- or
+    ///     <see cref="ValueTask" />-returning method the types in <paramref name="subject" /> declare is
+    ///     named with the <c>Async</c> suffix, so a caller sees at the call site that it must be awaited.
     /// </summary>
-    /// <param name="arch">The spec's stage-machine entry point.</param>
+    /// <param name="arch">The <see cref="Arch" /> the spec is declaring on.</param>
     /// <param name="subject">
-    ///     The types whose methods the rule governs; the pack narrows to authored types and applies the
-    ///     method projection.
+    ///     The types whose methods the rule governs; the pack narrows them to the ones no source generator
+    ///     emitted and looks at their methods.
     /// </param>
-    /// <param name="posture">Enforce, or Migrate with the project's counter-prior prose.</param>
-    /// <param name="fix">A project-specific remediation hint, replacing the pack's generic one.</param>
+    /// <param name="posture">
+    ///     <c>PackPosture.Enforce</c>, or <c>PackPosture.Migrate</c> with a line saying what the code
+    ///     does today.
+    /// </param>
+    /// <param name="fix">What to do instead, in one line, replacing the pack's generic hint. Optional.</param>
     public static void AsyncSuffix(
         Arch arch, Selection subject, PackPosture posture, string? fix = null)
     {
@@ -188,14 +215,18 @@ public static class DotNetGuidance
     }
 
     /// <summary>
-    ///     <c>exceptions/no-general-catch</c> — nothing outside
-    ///     <paramref name="topLevelHandler" /> catches and holds base <see cref="Exception" />.
+    ///     Declares <c>exceptions/no-general-catch</c>: nothing in <paramref name="subject" /> outside
+    ///     <paramref name="topLevelHandler" /> catches base <see cref="Exception" /> and swallows it. A
+    ///     clause that filters with <c>when</c>, or that rethrows, is not a violation.
     /// </summary>
-    /// <param name="arch">The spec's stage-machine entry point.</param>
+    /// <param name="arch">The <see cref="Arch" /> the spec is declaring on.</param>
     /// <param name="subject">The types the rule governs.</param>
     /// <param name="topLevelHandler">The one place a catch-all belongs.</param>
-    /// <param name="posture">Enforce, or Migrate with the project's counter-prior prose.</param>
-    /// <param name="fix">A project-specific remediation hint, replacing the pack's generic one.</param>
+    /// <param name="posture">
+    ///     <c>PackPosture.Enforce</c>, or <c>PackPosture.Migrate</c> with a line saying what the code
+    ///     does today.
+    /// </param>
+    /// <param name="fix">What to do instead, in one line, replacing the pack's generic hint. Optional.</param>
     public static void NoGeneralCatch(
         Arch arch, Selection subject, Selection topLevelHandler, PackPosture posture, string? fix = null)
     {
@@ -210,16 +241,21 @@ public static class DotNetGuidance
     }
 
     /// <summary>
-    ///     <c>async/accept-cancellation</c> — the <see cref="Task" />- and <see cref="ValueTask" />-returning
-    ///     methods of <paramref name="subject" /> accept a <see cref="CancellationToken" />.
+    ///     Declares <c>async/accept-cancellation</c>: every <see cref="Task" />- or
+    ///     <see cref="ValueTask" />-returning method the types in <paramref name="subject" /> declare
+    ///     accepts a <see cref="CancellationToken" /> parameter, so a caller can stop in-flight work and
+    ///     flow its token on through the calls the method makes.
     /// </summary>
-    /// <param name="arch">The spec's stage-machine entry point.</param>
+    /// <param name="arch">The <see cref="Arch" /> the spec is declaring on.</param>
     /// <param name="subject">
-    ///     The types whose methods the rule governs; the pack narrows to authored types and applies the
-    ///     method projection.
+    ///     The types whose methods the rule governs; the pack narrows them to the ones no source generator
+    ///     emitted and looks at their methods.
     /// </param>
-    /// <param name="posture">Enforce, or Migrate with the project's counter-prior prose.</param>
-    /// <param name="fix">A project-specific remediation hint, replacing the pack's generic one.</param>
+    /// <param name="posture">
+    ///     <c>PackPosture.Enforce</c>, or <c>PackPosture.Migrate</c> with a line saying what the code
+    ///     does today.
+    /// </param>
+    /// <param name="fix">What to do instead, in one line, replacing the pack's generic hint. Optional.</param>
     public static void AcceptCancellation(
         Arch arch, Selection subject, PackPosture posture, string? fix = null)
     {
@@ -236,13 +272,17 @@ public static class DotNetGuidance
     }
 
     /// <summary>
-    ///     <c>persistence/no-mapping-attributes</c> — no type in <paramref name="subject" /> carries an
-    ///     ORM mapping attribute.
+    ///     Declares <c>persistence/no-mapping-attributes</c>: no type in <paramref name="subject" />
+    ///     carries <c>[Table]</c> or <c>[ComplexType]</c>, so a persisted type stays ignorant of how it is
+    ///     stored and can be mapped from the persistence layer instead.
     /// </summary>
-    /// <param name="arch">The spec's stage-machine entry point.</param>
+    /// <param name="arch">The <see cref="Arch" /> the spec is declaring on.</param>
     /// <param name="subject">The types the rule governs.</param>
-    /// <param name="posture">Enforce, or Migrate with the project's counter-prior prose.</param>
-    /// <param name="fix">A project-specific remediation hint, replacing the pack's generic one.</param>
+    /// <param name="posture">
+    ///     <c>PackPosture.Enforce</c>, or <c>PackPosture.Migrate</c> with a line saying what the code
+    ///     does today.
+    /// </param>
+    /// <param name="fix">What to do instead, in one line, replacing the pack's generic hint. Optional.</param>
     public static void NoMappingAttributes(
         Arch arch, Selection subject, PackPosture posture, string? fix = null)
     {
@@ -257,16 +297,19 @@ public static class DotNetGuidance
     }
 
     /// <summary>
-    ///     Declares every rule in the pack at one posture, with no <c>Fix</c> overrides. A convenience for
-    ///     proving the pack's full surface in one call — no real spec wants all of them, so prefer naming
-    ///     the ones you mean.
+    ///     Declares all nine of the pack's rules at one posture, each with the pack's own remediation
+    ///     hint. A convenience for exercising the whole pack in one call: no real spec wants all nine over
+    ///     the same subject at the same posture, so name the ones you mean instead.
     /// </summary>
-    /// <param name="arch">The spec's stage-machine entry point.</param>
-    /// <param name="subject">The types the whole-surface rules govern.</param>
+    /// <param name="arch">The <see cref="Arch" /> the spec is declaring on.</param>
+    /// <param name="subject">The types the rules govern, except the captive-dependency rule.</param>
     /// <param name="compositionRoot">The wiring seam exempted from client construction and service resolution.</param>
-    /// <param name="singletons">The singleton selection <c>di/no-captive-dependencies</c> governs.</param>
+    /// <param name="singletons">The singletons <c>di/no-captive-dependencies</c> governs.</param>
     /// <param name="topLevelHandler">The one place a catch-all belongs.</param>
-    /// <param name="posture">Enforce, or Migrate with the project's counter-prior prose.</param>
+    /// <param name="posture">
+    ///     <c>PackPosture.Enforce</c>, or <c>PackPosture.Migrate</c> with a line saying what the code
+    ///     does today.
+    /// </param>
     public static void ApplyAll(
         Arch arch,
         Selection subject,

@@ -38,7 +38,7 @@ cross-reference one another as parts of one business.
   walkthrough. The full derive flow from real code to a first spec, every step a real command
   with real output.
 - [The agent loop, closed by a hook](Meridian/hooks/): the `Meridian/hooks` showcase. A Claude
-  Code hook runs `check` after each edit, so new code in a retired pattern goes red at the
+  Code hook runs `check` when the agent's turn ends, so new code in a retired pattern goes red at the
   moment of creation; the storyboard walks one task from the old pattern to self-correction.
 
 Read them in list order: later pages build on earlier ones, and each ends with the

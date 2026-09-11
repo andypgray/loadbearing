@@ -2,21 +2,21 @@ using Zphil.LoadBearing.Internal;
 
 namespace Zphil.LoadBearing.Baselines;
 
-/// <summary>One rule's parsed baseline section: the set of grandfathered <see cref="BaselineEntry" />s.</summary>
-/// <remarks>
-///     <see cref="Entries" /> is deduped and tuple-sorted (<c>((Source ?? Subject), (Target ?? ""))</c>,
-///     ordinal); membership is answered in O(1) via an internal identity → entry map. Keying on the
-///     Because-free <see cref="BaselineEntry" /> identity (equality excludes the attribution) means the
-///     stored entry — attribution and all — is recoverable via <see cref="TryMatch" />, so the ratchet
-///     can carry a grandfathered violation's original <c>because</c> into a report. A present section with
-///     zero entries (captured-empty) is distinct from an absent one (uncaptured) — the absence lives in
-///     <see cref="BaselineIndex" />, not here.
-/// </remarks>
+/// <summary>
+///     One rule's captured baseline: the set of <see cref="BaselineEntry" /> identities whose
+///     violations are grandfathered — reported, but not failing the check. A section with zero entries
+///     is still a captured baseline; a rule with no captured baseline at all is absent from its
+///     <see cref="BaselineIndex" /> rather than present and empty.
+/// </summary>
 public sealed class RuleBaseline
 {
     private readonly Dictionary<BaselineEntry, BaselineEntry> _lookup;
 
-    /// <summary>Builds a section from its entries (order and duplicates do not matter).</summary>
+    /// <summary>
+    ///     Builds a section from the entries read out of a baseline file. Their order does not matter, and
+    ///     entries sharing an identity are collapsed into one: the first of them keeps its reason and its
+    ///     site count.
+    /// </summary>
     public RuleBaseline(IReadOnlyCollection<BaselineEntry> entries)
     {
         Guard.NotNull(entries, nameof(entries));
@@ -31,17 +31,22 @@ public sealed class RuleBaseline
         Entries = BaselineEntry.InCanonicalOrder(_lookup.Values);
     }
 
-    /// <summary>The grandfathered entries, deduped and tuple-sorted ordinal.</summary>
+    /// <summary>
+    ///     Gets the grandfathered entries in the baseline file's own order — by source or subject symbol
+    ///     ID, then by target, ordinal — with entries sharing an identity collapsed into one.
+    /// </summary>
     public IReadOnlyList<BaselineEntry> Entries { get; }
 
-    /// <summary>The number of grandfathered entries in this section.</summary>
+    /// <summary>Gets how many entries this section grandfathers.</summary>
     public int Count => Entries.Count;
 
     /// <summary>
-    ///     Looks up the <em>stored</em> entry whose identity equals <paramref name="identity" />,
-    ///     recovering its <see cref="BaselineEntry.Because" /> attribution (which identity equality
-    ///     deliberately excludes). Returns false, with <paramref name="stored" /> null, for an identity
-    ///     this section does not grandfather.
+    ///     Looks up the stored entry whose identity matches <paramref name="identity" />, returning false
+    ///     with <paramref name="stored" /> null when this section grandfathers no such entry. Pass the
+    ///     entry <c>Violation.BaselineIdentity()</c> returns: an identity ignores the reason and the site
+    ///     count, so what comes back is the entry as the file stored it, carrying the
+    ///     <see cref="BaselineEntry.Because" /> recorded with it and the
+    ///     <see cref="BaselineEntry.SiteCount" /> it grandfathers.
     /// </summary>
     public bool TryMatch(BaselineEntry identity, out BaselineEntry? stored)
     {

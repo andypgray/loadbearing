@@ -1,15 +1,11 @@
 namespace Zphil.LoadBearing.Packs.DotNet;
 
 /// <summary>
-///     The posture a consumer chooses for a pack rule, plus the one thing a posture needs beyond the
-///     <see cref="Posture" /> enum: <c>Migrate</c>'s counter-prior prose, which is project matter the
-///     pack cannot know. Pairing the two in a closed type makes "Enforce with prose" and "Migrate
-///     without prose" uncompilable, rather than a throw out of <c>Define</c>.
+///     The posture a spec author chooses for a rule taken from <see cref="DotNetGuidance" />:
+///     <see cref="Enforce" />, or <see cref="Migrate" /> with a line saying what the code does today.
+///     Every pack method takes one. There is no <c>Quarantine</c> or <c>Caution</c> here, because a
+///     pack hands out rules rather than regions.
 /// </summary>
-/// <remarks>
-///     There is deliberately no <c>Quarantine</c> or <c>Caution</c> factory: a scope is a region, not a
-///     rule a pack hands out.
-/// </remarks>
 public sealed class PackPosture
 {
     private PackPosture(Posture posture, string? from)
@@ -18,28 +14,32 @@ public sealed class PackPosture
         From = from;
     }
 
-    /// <summary>The law: the rule must hold, and a violation is red.</summary>
+    /// <summary>Gets the binding posture: the rule must hold, and every violation fails the check.</summary>
     public static PackPosture Enforce { get; } = new(Posture.Enforce, null);
 
     /// <summary>
-    ///     The chosen posture — the public <see cref="Zphil.LoadBearing.Posture" /> enum, so the pack mints no rival
-    ///     vocabulary.
+    ///     Gets the chosen posture as a <see cref="Zphil.LoadBearing.Posture" /> value:
+    ///     <c>Posture.Enforce</c> or <c>Posture.Migrate</c>.
     /// </summary>
     public Posture Posture { get; }
 
-    /// <summary>The <c>Migrate</c> counter-prior prose, or null at <see cref="Enforce" />.</summary>
+    /// <summary>
+    ///     Gets the line describing what the code does today, as given to <see cref="Migrate" />. Null at
+    ///     <see cref="Enforce" />.
+    /// </summary>
     public string? From { get; }
 
     /// <summary>
-    ///     Ratcheted tech debt: the rule is red today, and <paramref name="from" /> describes the
-    ///     current state in the consuming project's own words.
+    ///     Chooses the migrating posture: the rule does not hold today, and <paramref name="from" />
+    ///     describes in one line of prose the pattern the code still follows. Violations recorded in the
+    ///     rule's baseline file are reported as grandfathered and do not fail the check; any other
+    ///     violation fails it, so the debt can only shrink. The baseline path stays conventional —
+    ///     <c>arch/baselines/{rule-id}.json</c> — so a pack never names one. A blank or multi-line value
+    ///     is reported when the spec is loaded, alongside every other spec error.
     /// </summary>
-    /// <remarks>
-    ///     <paramref name="from" /> is deliberately unguarded here. Blank or multi-line prose flows
-    ///     into the spec's own validation pass and is reported as <c>BlankProse</c>/<c>MultiLineProse</c>
-    ///     at the pack's <c>file:line</c>, alongside every other spec error — a throw from this factory
-    ///     would report one error and lose the rest.
-    /// </remarks>
+    // from is deliberately unguarded here. Blank or multi-line prose flows into the spec's own
+    // validation pass and is reported as BlankProse/MultiLineProse at the pack's file:line, alongside
+    // every other spec error — a throw from this factory would report one error and lose the rest.
     public static PackPosture Migrate(string from)
     {
         return new PackPosture(Posture.Migrate, from);

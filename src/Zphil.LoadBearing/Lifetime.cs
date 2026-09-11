@@ -1,23 +1,30 @@
 namespace Zphil.LoadBearing;
 
 /// <summary>
-///     The service lifetime a container registration was made with, selected by
-///     <c>arch.Registered(Lifetime)</c> (GRAMMAR §4.7, §5.1).
+///     The lifetime a container registration was made with. Pass one to <c>arch.Registered</c> to
+///     select the types registered at that lifetime, service and implementation types alike, as in
+///     <c>arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped))</c>.
 /// </summary>
-/// <remarks>
-///     LoadBearing's own enum — deliberately NOT
-///     <c>Microsoft.Extensions.DependencyInjection.ServiceLifetime</c>: naming it
-///     <c>ServiceLifetime</c> would CS0104-collide with MEDI's type in any spec project that
-///     <c>using</c>s <c>Microsoft.Extensions.DependencyInjection</c>.
-/// </remarks>
+// LoadBearing's own enum, never Microsoft.Extensions.DependencyInjection.ServiceLifetime: naming it
+// ServiceLifetime would CS0104-collide with MEDI's type in any spec project that `using`s
+// Microsoft.Extensions.DependencyInjection.
 public enum Lifetime
 {
-    /// <summary>A single instance for the container's lifetime (<c>AddSingleton</c>).</summary>
+    /// <summary>
+    ///     One instance for the container's lifetime: what <c>AddSingleton</c> registers, and the lifetime
+    ///     <c>AddHostedService</c> carries.
+    /// </summary>
     Singleton,
 
-    /// <summary>One instance per scope (<c>AddScoped</c>).</summary>
+    /// <summary>
+    ///     One instance per scope: what <c>AddScoped</c> registers, and the lifetime <c>AddDbContext</c>
+    ///     carries unless the call says otherwise.
+    /// </summary>
     Scoped,
 
-    /// <summary>A new instance per resolution (<c>AddTransient</c>).</summary>
+    /// <summary>
+    ///     A new instance per resolution: what <c>AddTransient</c> registers, and the lifetime
+    ///     <c>AddHttpClient</c> carries.
+    /// </summary>
     Transient
 }

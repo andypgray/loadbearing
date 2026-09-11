@@ -3,17 +3,16 @@ using Zphil.LoadBearing.Model;
 namespace Zphil.LoadBearing.Fluent;
 
 /// <summary>
-///     The member selection minted by the <c>.Properties</c> projection (GRAMMAR §4.6) — a
-///     <see cref="MemberSelection" /> specialized to properties, which is what makes
-///     <c>MustBeGetOnly</c> available.
+///     The properties the selected types declare, reached with <c>.Properties</c> on a
+///     <see cref="Selection" />. Narrow it with the member adjectives (<c>WithSuffix</c>,
+///     <c>WithPrefix</c>, <c>WithNameMatching</c>, <c>AttributedWith</c>, <c>ThatAreStatic</c>,
+///     <c>Where</c>), each of which hands back a property selection again, so the property-only call
+///     stays reachable whatever the order; finish it with a member verb such as <c>MustHaveSuffix</c>
+///     or <c>MustBePublic</c>, or with <c>MustBeGetOnly</c>, which properties alone accept.
+///     <c>MustBeGetOnly</c> reads the declaration strictly: a property passes only when it declares no
+///     setter at all, so a <c>private set</c> and an <c>init</c> both fail it. Immutable and reusable:
+///     every call hands back a new selection and leaves this one as it was.
 /// </summary>
-/// <remarks>
-///     The get-only verb is properties-only, so it binds by receiver type here and is uncompilable on the
-///     other projections by construction (GRAMMAR §3.2), exactly as <c>.Returning</c> is on
-///     <see cref="MethodSelection" />. The shared member adjectives preserve this type (they are generic
-///     self-type extensions), so <c>.Properties.WithSuffix("Id").ThatAreStatic()</c> type-checks in any
-///     order and the verb stays reachable after either.
-/// </remarks>
 public sealed class PropertySelection : MemberSelection
 {
     internal PropertySelection(Selection source, IReadOnlyList<MemberAdjective> adjectives)

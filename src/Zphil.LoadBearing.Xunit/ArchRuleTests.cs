@@ -14,82 +14,59 @@ using Zphil.LoadBearing.Roslyn.Solutions;
 namespace Zphil.LoadBearing.Xunit;
 
 /// <summary>
-///     The xUnit adapter: derive a sealed test class from
-///     <c>ArchRuleTests&lt;YourSpec&gt;</c>, point <see cref="SolutionPath" /> at the solution to check
-///     (<see cref="FindSolutionUp" /> resolves it by name when the solution is not copied to the test
-///     output), and every post-desugar rule in the spec becomes its own named test — the rule ID
-///     <em>is</em> the test's display name, so a failing architecture rule reads as a failing test in the
-///     test explorer.
+///     The xUnit adapter: derive a sealed class from <c>ArchRuleTests&lt;YourSpec&gt;</c> in your test
+///     project, override <see cref="SolutionPath" /> to name the solution to check, and every rule in
+///     the spec runs as its own named test. The rule ID is the test's display name — a scope
+///     contributing <c>{scope-id}/containment</c> and <c>{scope-id}/tripwire</c> — so a broken
+///     architecture rule reads as a failing test in the test explorer.
+///     <see cref="SolutionPath" /> is the only required override.
 /// </summary>
 /// <remarks>
-///     <para>
-///         A failing rule's message is the exact CLI human block (<see cref="HumanReportRenderer.RuleBlock" />),
-///         a scope tripwire (no diff context in a test run) is reported as skipped, and everything else
-///         passes. A Caution scope is therefore a permanent skip on this adapter — its tripwire is the only
-///         rule it has, and nothing here can supply a diff — so the case is present and never fires. That is
-///         accepted as the adapter's nature rather than papered over: the case still names the scope in the
-///         test explorer, and the verdict a caution wants belongs to <c>check --diff-base</c>, which is a
-///         pull-request concern and not a test-run one. A workspace that fails to load completely fails one named test —
-///         <see cref="Workspace_LoadedCompletely" />, carrying the load diagnostics — and every rule case skips
-///         rather than pass against a partial model. Override <see cref="AllowWorkspaceDiagnostics" /> to opt
-///         into checking the partial model as it loaded. A solution filter is the opposite case — a smaller
-///         model rather than a wrong one — so the rule cases keep their verdicts and only
-///         <see cref="Workspace_LoadedCompletely" /> skips. A solution declaring projects no extractor
-///         reaches (an <c>.fsproj</c>, a shared project) is the same case arrived at from the other side, and
-///         skips it the same way: nothing about the run went wrong, and a test by that name still cannot
-///         claim the whole solution.
-///     </para>
-///     <para>
-///         Rules enumerate at <em>discovery</em> time from the spec alone (no Roslyn, no workspace), so the
-///         test explorer lists one case per rule ID. The workspace load + extraction + check runs once per
-///         closed <typeparamref name="TSpec" /> (statics on a generic type are per-instantiation), lazily,
-///         when the first case executes; every rule case reads its verdict from that shared run.
-///     </para>
-///     <para>
-///         MSBuild is registered inside the run pipeline behind a <see cref="MethodImplOptions.NoInlining" />
-///         wrapper, so a consuming test project needs no <c>[ModuleInitializer]</c> of its own.
-///     </para>
+///     The adapter never builds and never restores: build the target solution first, or the verdicts
+///     are stale. It needs a .NET SDK on the test host, since it loads the solution through MSBuild,
+///     and it registers MSBuild itself, so your test project needs no <c>[ModuleInitializer]</c> of
+///     its own.
 /// </remarks>
 /// <typeparam name="TSpec">The architecture spec to check — must be default-constructible.</typeparam>
 public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new()
 {
     /// <summary>
-    ///     The solution (<c>.sln</c>/<c>.slnx</c>) to check the spec against, or a <c>.slnf</c> filter over
-    ///     one — a narrowed run, whose consequences the class remarks state.
+    ///     Gets the solution to check the spec against: a <c>.sln</c> or <c>.slnx</c> file, or a
+    ///     <c>.slnf</c> filter over one, which checks the projects the filter selects plus everything they
+    ///     reference; <see cref="Workspace_LoadedCompletely" /> then skips, and so does any rule whose whole
+    ///     subject the filter left out. The only required override. A relative path resolves against the
+    ///     test process's current directory, which is not where a solution normally sits, so
+    ///     <see cref="FindSolutionUp" /> covers the usual case where the solution is not copied to the test
+    ///     output.
     /// </summary>
     protected abstract string SolutionPath { get; }
 
     /// <summary>
-    ///     The spec's own project, when the spec is a solution member — the seed of the checked universe's
-    ///     exclusion (mirrors the CLI's spec-member exclusion).
+    ///     Gets the name of the spec's own project, which is left out of the code being checked along with
+    ///     any project only it pulls in — a rule pack, say, or a helper library the solution does not
+    ///     declare. Projects the solution file declares stay in even when the spec references them, so a
+    ///     spec may govern the very code it compiles against. Defaults to the spec assembly's name;
+    ///     override it to <see langword="null" /> when the spec lives outside the checked solution.
     /// </summary>
-    /// <remarks>
-    ///     That project and the private plumbing only it references are dropped; projects the solution file
-    ///     declares stay in, even when the spec references them, because those are the code under law.
-    ///     Defaults to the spec assembly's name; override to <see langword="null" /> when the spec lives
-    ///     outside the target solution.
-    /// </remarks>
     protected virtual string? ExcludeProjectName => typeof(TSpec).Assembly.GetName().Name;
 
     /// <summary>
-    ///     Opts the rule tests into a partially-loaded workspace — the adapter's spelling of the CLI's
-    ///     <c>--allow-workspace-diagnostics</c>.
+    ///     Gets whether the rule tests may report verdicts from a solution that did not load completely —
+    ///     the adapter's form of the CLI's <c>--allow-workspace-diagnostics</c>. False by default: a load
+    ///     failure fails <see cref="Workspace_LoadedCompletely" /> and every rule case skips, because a
+    ///     rule measured over a codebase missing whole projects reports a verdict it never reached.
+    ///     Override it to <see langword="true" /> to take the verdicts the partial model does support;
+    ///     <see cref="Workspace_LoadedCompletely" /> then skips, still naming the projects that failed,
+    ///     rather than pass under a name the run cannot vouch for.
     /// </summary>
-    /// <remarks>
-    ///     By default a load failure fails <see cref="Workspace_LoadedCompletely" /> and skips every rule
-    ///     case — a run against a partial model reports verdicts it never reached. With
-    ///     <see langword="true" />, rule verdicts come from the partial model as it loaded, and
-    ///     <see cref="Workspace_LoadedCompletely" /> skips rather than pass under a name that would then be
-    ///     false.
-    /// </remarks>
     protected virtual bool AllowWorkspaceDiagnostics => false;
 
     /// <summary>
     ///     Resolves a solution file's absolute path by name, for the usual case where the solution is not
     ///     copied to the test output directory. Climbs from <see cref="AppContext.BaseDirectory" /> through
-    ///     its ancestors (the start directory included) and returns the full path of the first one holding a
-    ///     file named <paramref name="fileName" />, so a consumer writes
-    ///     <c>SolutionPath =&gt; FindSolutionUp("MyApp.slnx")</c> rather than hand-rolling the walk.
+    ///     its ancestors, the start directory included, and returns the full path of the first one holding
+    ///     a file named <paramref name="fileName" />, so a consumer writes
+    ///     <c>SolutionPath =&gt; FindSolutionUp("MyApp.slnx")</c> rather than hand-rolling the climb.
     /// </summary>
     /// <param name="fileName">The solution file name to locate (for example, <c>MyApp.slnx</c>).</param>
     /// <returns>The absolute path to the located file.</returns>
@@ -114,14 +91,17 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     }
 
     /// <summary>
-    ///     The discovery-time row source: one row per post-desugar rule ID, its ID doubling as the test
-    ///     display name. Builds the model from the spec alone (no Roslyn).
+    ///     The row source behind <see cref="Rule_Holds" />: one row per rule in the spec, each carrying
+    ///     the rule ID that becomes the test's display name. Runs at test discovery and builds the model
+    ///     from the spec alone, so the test explorer can list the rules without loading a solution. The
+    ///     load, the extraction and the check then run once for each spec type, when its first case
+    ///     executes, and every rule case of that type reads its verdict from that one run. A spec that
+    ///     fails to build collapses to a single row, which fails when the run reaches it and carries the
+    ///     spec's own errors. The test framework calls this; there is nothing to override.
     /// </summary>
-    /// <remarks>
-    ///     A spec-build failure collapses to one sentinel row so it lands red at run time — where the
-    ///     pipeline rebuild rethrows the real <c>SpecValidationException</c> — rather than as a silent
-    ///     discovery diagnostic.
-    /// </remarks>
+    // The sentinel row lands a spec-build failure red at run time — where the pipeline's rebuild
+    // rethrows the real SpecValidationException — rather than as a discovery diagnostic no runner
+    // surfaces.
     public static IEnumerable<ITheoryDataRow> RuleRows()
     {
         ArchitectureModel model;
@@ -142,9 +122,12 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     }
 
     /// <summary>
-    ///     One rule's verdict from the shared check run: a scope tripwire (no diff context) is skipped —
-    ///     permanently, for a Caution, whose tripwire is its only rule — a violated rule fails with the CLI
-    ///     human block, and everything else passes.
+    ///     One rule's verdict, the test named by its rule ID: it passes when the rule holds, fails with
+    ///     the block <c>loadbearing check</c> prints for it — the reason, the fix, and every violation
+    ///     with its file and line — when it does not, and skips when the run reached no verdict, carrying
+    ///     the reason. A scope's tripwire is the usual skip: it has no diff base to compare changed files
+    ///     against, so a <c>Caution</c> scope, whose tripwire is its only rule, is a case that is always
+    ///     skipped and never fires. Rows come from <see cref="RuleRows" />.
     /// </summary>
     [Theory]
     [MemberData(nameof(RuleRows))]
@@ -171,23 +154,16 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     }
 
     /// <summary>
-    ///     The named answer to a partially-loaded workspace: fails naming the projects that failed to load
-    ///     (the rule cases then skip — no verdict is reached against a partial model), skips naming them when
-    ///     <see cref="AllowWorkspaceDiagnostics" /> opted in, and passes silently on a complete load.
+    ///     The named answer to a solution that did not load completely: it fails, naming the projects that
+    ///     failed to load, and every rule case then skips rather than report a verdict reached over a
+    ///     partial model; it skips, naming the same projects, when
+    ///     <see cref="AllowWorkspaceDiagnostics" /> opted into checking the model as it loaded; and it
+    ///     passes silently on a clean load. It also skips on the two runs that are smaller rather than
+    ///     wrong — one through a <c>.slnf</c> solution filter, one over a solution declaring projects the
+    ///     checker cannot read — naming what went unchecked, since this test is the completeness claim
+    ///     itself and neither run can make it. A solution can be both at once, and then it reports one
+    ///     block for each; a solution that failed to load outranks both and is reported alone.
     /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         The two smaller-universe cases the class remarks describe — a narrowing <c>.slnf</c> and a
-    ///         solution declaring projects no extractor reaches — also skip it: the rule cases keep
-    ///         reporting through both, but this test is the completeness claim itself, and neither run can
-    ///         make it.
-    ///     </para>
-    ///     <para>
-    ///         A solution can be both at once, so the causes compose: one block each, in the order the CLI
-    ///         states them. What never composes with them is the broken model above, which outranks both and
-    ///         has already answered.
-    ///     </para>
-    /// </remarks>
     [Fact]
     public async Task Workspace_LoadedCompletely()
     {

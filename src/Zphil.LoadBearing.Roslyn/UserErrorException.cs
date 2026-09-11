@@ -1,14 +1,16 @@
 namespace Zphil.LoadBearing.Roslyn;
 
 /// <summary>
-///     An expected, user-facing error raised by the host layer: a missing or ambiguous solution, an
-///     unresolvable or unbuilt spec, a tampered baseline, a spec DLL with no spec class.
+///     An error whose message is meant to be shown to the person who ran the tool, complete on its own: a
+///     missing or ambiguous solution, an unreadable solution filter, a spec that cannot be resolved or was
+///     never built, a spec assembly declaring no spec class, a baseline file that has been tampered with.
+///     Throw it when the fault is something the reader can fix; anything else is a bug and should surface
+///     as itself.
 /// </summary>
 /// <remarks>
-///     It is shared by both host surfaces — the CLI top-level handler renders the message alone to stderr
-///     and exits 2; the MCP <c>GlobalCallToolFilter</c> returns it to the client as an error result without
-///     logging. Anything else is treated as a bug and gets a full stack trace (CLI) or one logged warning
-///     (MCP).
+///     Both of LoadBearing's own hosts treat it that way: the CLI prints the message alone to stderr and exits 2, and
+///     the MCP server returns it to the client as an error result. Any other exception is treated as a bug instead: the
+///     CLI writes its whole stack trace, and the MCP server logs it once as a warning.
 /// </remarks>
 public sealed class UserErrorException : InvalidOperationException
 {

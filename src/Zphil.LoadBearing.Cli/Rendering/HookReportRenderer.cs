@@ -3,9 +3,9 @@ using System.Text.Json;
 namespace Zphil.LoadBearing.Cli.Rendering;
 
 /// <summary>
-///     Renders a clean check run's report as the JSON a Claude Code <c>PostToolUse</c> hook injects into
-///     the agent's transcript — the fourth render target over the same run, and the only one whose reader
-///     is the agent rather than a human, a code-scanning service, or a client parsing
+///     Renders a clean check run's report as the JSON a Claude Code hook injects into the agent's
+///     transcript — the fourth render target over the same run, and the only one whose reader is the agent
+///     rather than a human, a code-scanning service, or a client parsing
 ///     <see cref="JsonReportRenderer" />'s document.
 /// </summary>
 /// <remarks>
@@ -15,6 +15,12 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///         transcript as a system message. That is exactly a warning's shape: a tripwire warning has no
 ///         verdict to change and everything to say, and until this it travelled through the wrapper into a
 ///         discarded variable.
+///     </para>
+///     <para>
+///         Which event the envelope names is the caller's, because the field is not decoration: Claude Code
+///         reads <c>additionalContext</c> only from a document whose <c>hookEventName</c> is the event the
+///         hook was fired for, so a wrapper wired to <c>Stop</c> and handed a <c>PostToolUse</c> envelope
+///         gets nothing. <see cref="Events" /> is the whole set that carries context to the agent.
 ///     </para>
 ///     <para>
 ///         It lives here, in the product, rather than in the wrappers, because the whole job is escaping a
@@ -30,16 +36,29 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 /// </remarks>
 internal static class HookReportRenderer
 {
-    /// <summary>The hook event this document answers — the only one whose additional context reaches the agent.</summary>
-    private const string HookEventName = "PostToolUse";
+    /// <summary>The event a run renders for when <c>--hook-event</c> names none: the per-edit shape.</summary>
+    public const string DefaultEvent = "PostToolUse";
+
+    /// <summary>The turn-end event the recommended wrapper fires on: the agent claiming it is done.</summary>
+    public const string StopEvent = "Stop";
+
+    /// <summary>The same boundary for a worker: a subagent claiming it is done.</summary>
+    public const string SubagentStopEvent = "SubagentStop";
 
     /// <summary>
-    ///     The one-object document carrying <paramref name="report" /> as additional context, with no
-    ///     trailing newline (the caller's <c>WriteLine</c> supplies it).
+    ///     Every event whose additional context reaches the agent, and so the only names this document may
+    ///     carry. A hook wired to any other event gets nothing from an envelope, whatever it says.
     /// </summary>
-    public static string Document(string report)
+    public static readonly IReadOnlyList<string> Events = [DefaultEvent, StopEvent, SubagentStopEvent];
+
+    /// <summary>
+    ///     The one-object document carrying <paramref name="report" /> as additional context for
+    ///     <paramref name="hookEvent" />, with no trailing newline (the caller's <c>WriteLine</c> supplies
+    ///     it).
+    /// </summary>
+    public static string Document(string report, string hookEvent)
     {
-        var payload = new HookJson(new HookSpecificOutputJson(HookEventName, report));
+        var payload = new HookJson(new HookSpecificOutputJson(hookEvent, report));
         return JsonSerializer.Serialize(payload, LoadBearingJson.Context.HookJson);
     }
 }

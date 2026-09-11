@@ -1,9 +1,8 @@
 namespace Zphil.LoadBearing.Hosting;
 
 /// <summary>
-///     A declared layer in the read model: its name, its globs, its optional purpose, and the rendered
-///     definition fragment (GRAMMAR §5.1) — e.g. <c>**Domain** — `MyApp.Domain.*`</c>, or
-///     <c>**Domain** — `MyApp.Domain.*`. The quote and rate-card model.</c> when the layer has a purpose.
+///     A layer the spec declared, in the finished model: its name, the namespaces it covers, what it is
+///     for, and the line the generated agent context prints for it.
 /// </summary>
 public sealed class LayerDefinition
 {
@@ -17,12 +16,13 @@ public sealed class LayerDefinition
         Definition = definition;
     }
 
-    /// <summary>The layer name.</summary>
+    /// <summary>Gets the layer's name as the spec declared it.</summary>
     public string Name { get; }
 
     /// <summary>
-    ///     The namespace globs that define the layer: the glob form's list, or the namespace region a
-    ///     selection definition names, or empty when it names none.
+    ///     Gets the namespace globs that define the layer: the globs the spec listed, or — for a layer
+    ///     defined by a selection instead — the one namespace that selection names, or empty where it names
+    ///     no single namespace.
     /// </summary>
     public IReadOnlyList<string> Globs { get; }
 
@@ -32,9 +32,13 @@ public sealed class LayerDefinition
     /// </summary>
     internal Selection? Definition { get; }
 
-    /// <summary>The rendered definition fragment for the module map.</summary>
+    /// <summary>
+    ///     Gets the line the generated agent context prints for the layer, such as
+    ///     <c>**Domain** — `MyApp.Domain.*`</c>, with the purpose appended as its own sentence where the
+    ///     layer has one.
+    /// </summary>
     public string DefinitionFragment { get; }
 
-    /// <summary>What the layer is for, as authored, or null when the spec gave it no purpose.</summary>
+    /// <summary>Gets what the layer is for, in the spec's own words, or null where the spec gave none.</summary>
     public string? Purpose { get; }
 }
