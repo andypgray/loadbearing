@@ -385,7 +385,8 @@
       "warnings": [
         {
           "kind": "inertTarget",
-          "message": "This rule is inert: its target selection matched no types."
+          "message": "This rule is inert: its target selection matched no types.",
+          "hint": "A trailing `.*` covers the namespace itself and everything under it, and `Legacy*` never crosses a dot; a rule whose target matches nothing passes forever, so decide before keeping it."
         }
       ]
     },
@@ -400,6 +401,7 @@
         {
           "kind": "emptySubject",
           "detail": "The subject selection matched no solution-declared types.",
+          "hint": "A trailing `.*` covers the namespace itself and everything under it, and `Legacy*` never crosses a dot; check the selection against what the solution declares.",
           "siteCount": 0,
           "sites": []
         }

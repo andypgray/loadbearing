@@ -474,7 +474,7 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
             .Because("MSBuild engine assemblies bind at runtime through the Locator (the csproj's " +
                      "ExcludeAssets=runtime split); an engine type on a public signature would force " +
                      "consumers to compile against MSBuild and break that split.")
-            .Fix("Keep engine types behind internal members; hand callers repo-owned types like MsBuildSelection.");
+            .Fix("Keep engine types behind internal members; hand callers repo-owned types.");
     }
 
     private static void Adapter(Arch arch, Layer adapter)

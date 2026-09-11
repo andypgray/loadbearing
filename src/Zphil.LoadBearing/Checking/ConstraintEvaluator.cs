@@ -114,7 +114,9 @@ internal sealed class ConstraintEvaluator
         if (constraint is MemberConstraint memberConstraint) return EvaluateMember(memberConstraint, admission.Members);
 
         HashSet<TypeNode> subjects = admission.Members;
-        if (subjects.Count == 0) return ([Violation.EmptySubject(EmptySubjectMessage)], NoWarnings, default);
+        if (subjects.Count == 0)
+            return ([Violation.EmptySubject(EmptySubjectMessage, AuthoringHints.ForSubject(constraint.Subject!))],
+                NoWarnings, default);
 
         (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings) =
             Dispatch(constraint, subjects, admission, family);
@@ -300,7 +302,11 @@ internal sealed class ConstraintEvaluator
                                                && violations.Count == 0
                                                && operandSet.Count == 0
                                                && operands.Any(SelectionEvaluator.IsPatternSelection)
-            ? [new CheckWarning(CheckWarningKind.InertTarget, InertTargetMessage)]
+            ?
+            [
+                new CheckWarning(CheckWarningKind.InertTarget, InertTargetMessage,
+                    hint: AuthoringHints.ForInertTarget(operands))
+            ]
             : NoWarnings;
 
         return (violations, warnings);
@@ -806,7 +812,8 @@ internal sealed class ConstraintEvaluator
     }
 
     // Each part collected in subject position with the §9 emptiness verdict beside it, in part order: a
-    // union's operands and a family's cells are loud for the same reason and must report alike.
+    // union's operands and a family's cells are loud for the same reason and must report alike. Each is
+    // cured on its own terms, though — the parts of one union need not share a shape.
     private (List<SelectionAdmission> Collected, List<Violation> Empty) CollectSubjectParts(
         IReadOnlyList<Selection> parts)
     {
@@ -817,7 +824,8 @@ internal sealed class ConstraintEvaluator
             SelectionAdmission matched = SelectionAdmission.Collect(_selections, part, SelectionPosition.Subject);
             collected.Add(matched);
             if (matched.Count == 0)
-                violations.Add(Violation.EmptySubject(EmptyOperandMessage(SentenceRenderer.Reference(part))));
+                violations.Add(Violation.EmptySubject(
+                    EmptyOperandMessage(SentenceRenderer.Reference(part)), AuthoringHints.ForSubject(part)));
         }
 
         return (collected, violations);
@@ -992,7 +1000,9 @@ internal sealed class ConstraintEvaluator
         // this member selection's source types — read from there rather than evaluated a second time. The
         // members themselves take the set alone: a member verb is shape-only, with no edge to attribute.
         IReadOnlyList<MemberNode> members = MemberSelectionEvaluator.Resolve(constraint.MemberSubject, sourceTypes);
-        if (members.Count == 0) return ([Violation.EmptySubject(EmptyMemberSubjectMessage)], NoWarnings, default);
+        if (members.Count == 0)
+            return ([Violation.EmptySubject(EmptyMemberSubjectMessage, AuthoringHints.EmptyMemberSubject)],
+                NoWarnings, default);
 
         (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings) = DispatchMember(constraint, members);
         return (violations, warnings, MemberCoverageOf(members));
@@ -1093,7 +1103,9 @@ internal sealed class ConstraintEvaluator
         ProjectConstraint constraint)
     {
         IReadOnlyList<ProjectNode> subjects = ProjectSelectionEvaluator.Resolve(constraint.ProjectSubject, _projects);
-        if (subjects.Count == 0) return ([Violation.EmptySubject(EmptyProjectSubjectMessage)], NoWarnings, default);
+        if (subjects.Count == 0)
+            return ([Violation.EmptySubject(EmptyProjectSubjectMessage, AuthoringHints.EmptyProjectSubject)],
+                NoWarnings, default);
 
         IReadOnlyList<Violation> violations = DispatchProject(constraint, subjects);
         return (violations, NoWarnings, default);

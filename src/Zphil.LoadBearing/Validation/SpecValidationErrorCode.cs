@@ -26,7 +26,7 @@ public enum SpecValidationErrorCode
     ///     <c>arch.Scope(id)</c> that never reached <c>Quarantine</c> or <c>Caution</c>. Every rule and scope
     ///     takes exactly one posture; the message names the two the declaration could have taken.
     /// </summary>
-    DanglingAnchor,
+    MissingPosture,
 
     /// <summary>
     ///     A rule or scope with no <c>Because</c>. Every rule and every scope, whichever posture it carries,
@@ -58,7 +58,7 @@ public enum SpecValidationErrorCode
     ///     The same call made twice where it is allowed at most once: two <c>Because</c>s, two
     ///     <c>Baseline</c>s, two <c>Citation</c>s on one rule, a layer's <c>Purpose</c> twice. Keep one.
     /// </summary>
-    RepeatedTrailer,
+    RepeatedCall,
 
     /// <summary>
     ///     A rule or scope ID that is not lowercase letters, digits and hyphens in segments joined by

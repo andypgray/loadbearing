@@ -3,12 +3,11 @@ using Zphil.LoadBearing.Internal;
 namespace Zphil.LoadBearing.Checking;
 
 /// <summary>
-///     The files a check is to treat as changed, relative to a git ref. Pass one to a <c>Check</c> call
-///     on <see cref="ArchChecker" /> and a scope's tripwire fires: it warns once for each of these files
-///     that declares a type inside a quarantined or a cautioned scope, and the rule passes either way.
-///     Pass none and every tripwire is skipped instead. Paths may arrive with either separator, and are
-///     matched the way the host file system matches names — ignoring case on Windows and macOS,
-///     exactly on Linux.
+///     The files a check is to treat as changed. Pass one to a <c>Check</c> call on
+///     <see cref="ArchChecker" /> and a scope's tripwire fires: it warns once for each of these files that
+///     declares a type inside a quarantined or a cautioned scope, and the rule passes either way. Pass none
+///     and every tripwire is skipped instead. Paths may arrive with either separator, and are matched the
+///     way the host file system matches names — ignoring case on Windows and macOS, exactly on Linux.
 /// </summary>
 // Pure string logic: no Path.GetRelativePath and no Span, neither being available on netstandard2.0.
 public sealed class DiffContext
@@ -17,16 +16,13 @@ public sealed class DiffContext
     private readonly string _solutionPrefix;
 
     /// <summary>
-    ///     Builds a diff context from the ref the comparison was taken against, the solution directory, and
-    ///     the files that changed. Paths may use either separator and any casing; they are stored with
-    ///     forward slashes and keep the casing given.
+    ///     Builds a diff context from the solution directory and the files that changed. Paths may use
+    ///     either separator and any casing; they are stored with forward slashes and keep the casing given.
     /// </summary>
-    /// <param name="baseRef">The git ref the changed-file set was taken against, such as <c>origin/main</c>.</param>
     /// <param name="solutionDirectory">The directory the paths in a tripwire's warning are made relative to.</param>
-    /// <param name="changedFiles">The files that changed since <paramref name="baseRef" />.</param>
-    public DiffContext(string baseRef, string solutionDirectory, IEnumerable<string> changedFiles)
+    /// <param name="changedFiles">The files the check is to treat as changed.</param>
+    public DiffContext(string solutionDirectory, IEnumerable<string> changedFiles)
     {
-        Guard.NotNull(baseRef, nameof(baseRef));
         SolutionDirectory = Normalize(Guard.NotNull(solutionDirectory, nameof(solutionDirectory))).TrimEnd('/');
         _solutionPrefix = SolutionDirectory + "/";
         _changed = new HashSet<string>(PathComparison.Comparer);

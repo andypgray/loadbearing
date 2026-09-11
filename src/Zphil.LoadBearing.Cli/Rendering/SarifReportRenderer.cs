@@ -318,6 +318,11 @@ internal static class SarifReportRenderer
     // fingerprint keys on that file so one touch stays one alert across runs; the source/target/subject slots
     // a violation fills are empty, because a warning has no edge. `new` is the only honest baseline state — a
     // warning is a fact about this diff, and no baseline has ever held one.
+    //
+    // The message alone, never the warning's Hint: a hint is authoring advice for whoever writes the rule,
+    // and this document is read by code scanning, where an alert stands in front of the whole team. The
+    // empty-subject hint could not join it in any case — those violations are site-less and mint no result
+    // at all — so carrying one here would land a family's cure on one signal of several.
     private static SarifResult WarningResult(string ruleId, CheckWarning warning)
     {
         IReadOnlyList<SarifLocation> locations = warning.File is { } file

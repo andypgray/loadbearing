@@ -55,7 +55,8 @@ internal static class RuleResultAssertions
     /// </summary>
     /// <remarks>
     ///     Holds the warning's pinned wording, which one row also spells out as a literal of its own —
-    ///     the two must agree.
+    ///     the two must agree. The cure beside it is held to being <em>there</em> rather than to its words:
+    ///     which cure a target earns depends on its shape, and every caller here is about its verb.
     /// </remarks>
     internal static RuleResult ShouldHaveWarnedInertTarget(this RuleResult result)
     {
@@ -66,7 +67,8 @@ internal static class RuleResultAssertions
 
         warning.ShouldSatisfyAllConditions(
             () => warning.Kind.ShouldBe(CheckWarningKind.InertTarget, report),
-            () => warning.Message.ShouldBe(InertTargetMessage, report));
+            () => warning.Message.ShouldBe(InertTargetMessage, report),
+            () => warning.Hint.ShouldNotBeNullOrWhiteSpace(report));
 
         return result;
     }
@@ -505,7 +507,7 @@ internal static class RuleResultAssertions
         lines.Add($"  violations ({result.Violations.Count}):");
         lines.AddRange(result.Violations.Select(Describe));
         lines.Add($"  warnings ({result.Warnings.Count}):");
-        lines.AddRange(result.Warnings.Select(warning => $"    {warning.Kind}: {warning.Message}"));
+        lines.AddRange(result.Warnings.Select(warning => $"    {warning.Kind}: {warning.Message}{Cure(warning.Hint)}"));
         lines.Add($"  ratchet: {result.Grandfathered.Count} grandfathered, {result.StaleBaselineEntries} stale, "
                   + $"{result.GrownBaselineEntries} grown, {result.ShrunkBaselineEntries} shrunk, "
                   + $"{result.UncountedBaselineEntries} uncounted, captured: {result.BaselineCaptured}");
@@ -526,7 +528,14 @@ internal static class RuleResultAssertions
             ? " (no sites)"
             : " @ " + string.Join(", ", violation.Sites);
 
-        return $"    {violation.Kind} {what}{sites}";
+        return $"    {violation.Kind} {what}{sites}{Cure(violation.Hint)}";
+    }
+
+    // The cure beside the diagnosis wherever a subject renders one: an assertion that disagreed about the
+    // hint is unreadable if the failure prints only the message both sides already agree on.
+    private static string Cure(string? hint)
+    {
+        return hint is null ? string.Empty : $" [hint: {hint}]";
     }
 
     /// <summary>The edge a violation names, from whichever slots it fills, or null when it fills none.</summary>

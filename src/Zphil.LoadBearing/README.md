@@ -54,6 +54,9 @@ Nothing in it checks or renders anything. That is done by:
 - [`Zphil.LoadBearing.Xunit`](https://www.nuget.org/packages/Zphil.LoadBearing.Xunit), the
   adapter that runs every rule in the spec as an individually named xUnit test.
 
+Baseline files are theirs too. This package describes a captured baseline, and the two runners
+above are what read one off disk and hand it to the check.
+
 ## Documentation
 
 - [Repository and full README](https://github.com/andypgray/loadbearing)

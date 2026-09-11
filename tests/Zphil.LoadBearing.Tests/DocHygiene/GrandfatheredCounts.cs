@@ -101,6 +101,18 @@ internal static class GrandfatheredCounts
     private static readonly string[] Tens =
         ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
 
+    // Declared after Units and Tens because the initializer calls Spell, which reads them: a static field
+    // initializer runs in declaration order, so hoisting this above them would leave the set built from
+    // nulls.
+    private static readonly HashSet<string> CountWords = Enumerable.Range(0, 100)
+        .SelectMany(static count => new[]
+        {
+            Spell(count, CountStyle.Word),
+            Spell(count, CountStyle.TitleWord),
+            Spell(count, CountStyle.Numeral)
+        })
+        .ToHashSet(StringComparer.Ordinal);
+
     private const string RuleIdPattern = "[a-z][a-z0-9.-]*(?:/[a-z0-9-]+)+";
 
     // The site total the remaining term carries whenever its pairs cover more than one site each. Optional
@@ -384,6 +396,22 @@ internal static class GrandfatheredCounts
             .Select(count => (object)Spell(count, style))
             .ToArray();
         return string.Format(CultureInfo.InvariantCulture, template, spelled);
+    }
+
+    /// <summary>
+    ///     Whether <paramref name="written" /> is a count as this repository's prose spells one: a number
+    ///     word in running or sentence-initial case, or a numeral.
+    /// </summary>
+    /// <remarks>
+    ///     The set is derived from <see cref="Spell" /> rather than written out a second time, which is
+    ///     what keeps a claim a scanner accepts and a claim a gate can check from ever diverging. Every
+    ///     gate that scans prose for a claim needs the test: a sentence like "Four new rules over this
+    ///     repository's real code" puts a qualifier where the number goes, so requiring a spelled count
+    ///     there is what tells a total from a delta.
+    /// </remarks>
+    public static bool IsCountWord(string written)
+    {
+        return CountWords.Contains(written);
     }
 
     /// <summary>

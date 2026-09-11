@@ -19,6 +19,33 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 /// </summary>
 public sealed class DeriveSpecPromptTests
 {
+    /// <summary>
+    ///     Ceiling on the body every <c>prompts/get</c> serves, in the same UTF-16 code units
+    ///     <see cref="string.Length" /> counts. Measured at 69,418 characters the day it was set, and
+    ///     rounded up to the next 500.
+    /// </summary>
+    /// <remarks>
+    ///     The recipe arrives whole at every kickoff — some 14,000 tokens before the reader has done
+    ///     anything — and it has only ever grown: 39,348 characters at 0.4.0, 56,555 at 0.7.0, 69,418
+    ///     today. Each of those figures was measured at a release and none of them gated anything, so
+    ///     every addition so far has been free. That is what this constant changes, and the reason it is
+    ///     set close rather than generously.
+    ///     <see cref="DeriveSpecVocabularyTests" /> holds the other side as a floor on content — every
+    ///     shipped constraint verb must be named somewhere in the body — so vocabulary can never be the
+    ///     thing that gets cut here. Prose is what displaces prose.
+    ///     <para>
+    ///         When this reds, cut or move content before reaching for the number. Raising it is a
+    ///         decision in its own right: move the constant in the same commit as the text that needed
+    ///         the room, and say what it bought.
+    ///     </para>
+    ///     <para>
+    ///         What it is not: it is not a claim that a shorter recipe derives better. Nothing here
+    ///         measures the quality of a derivation, and that question is answered by running
+    ///         derivations against real codebases rather than by a character count.
+    ///     </para>
+    /// </remarks>
+    private const int ServedBodyCeiling = 69_500;
+
     // A prompt call never resolves the binding (prompts read no solution/spec), so any working directory
     // serves; a real one keeps StartAsync's host build honest.
     private static McpServerBinding Binding => new(null, null, Directory.GetCurrentDirectory());
@@ -94,12 +121,50 @@ public sealed class DeriveSpecPromptTests
             ArchPrompts.DeriveSpecName, cancellationToken: Ct);
 
         // Assert — the checker's authoring signals must survive prose edits: they are what stop an agent
-        // misreading an empty subject or an inert target as evidence about the code.
+        // misreading an empty subject or an inert target as evidence about the code. The cure itself now
+        // rides each signal as its `hint`, so what the recipe pins is the diagnosis, the route to the hint,
+        // and the rule that ends the loop — never the glob semantics the hint carries.
         string text = result.ShouldHaveTextContent();
         text.ShouldContain("emptySubject");
         text.ShouldContain("This rule is inert: its target selection matched no types.");
-        text.ShouldContain("trailing `.*`");
+        text.ShouldContain("apply the hint rather than guessing");
+        text.ShouldContain("two consecutive re-checks");
+        text.ShouldContain("carry it to step 6 as `undecided`");
+        text.ShouldContain("subject could not be made to match; human to resolve");
         text.ShouldContain("^[a-z0-9-]+(/[a-z0-9-]+)*$");
+    }
+
+    [Fact]
+    public async Task GetPrompt_DeriveSpec_ClosesWithTheFixedKeyReceipt()
+    {
+        // Arrange
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(Binding, Ct);
+
+        // Act
+        GetPromptResult result = await harness.Client.GetPromptAsync(
+            ArchPrompts.DeriveSpecName, cancellationToken: Ct);
+
+        // Assert — the outcome report was a prose list, so every derivation closed in a different shape and
+        // nothing downstream could read one. The keys are the contract a reader or a script finds each claim
+        // under, and the sentence keeping the three claims apart is what stops a spec that builds from being
+        // read as a spec somebody curated, or a pass on a partial model from being read as obedience.
+        string text = result.ShouldHaveTextContent();
+        string[] receiptKeys =
+        [
+            "specBuild: ok",
+            "evidencePass: complete",
+            "check: exit 1, rules 31, passed 2, failed 27, skipped 2, violations 51",
+            "postures: enforce",
+            "leftRed:",
+            "dropped:",
+            "undecided:",
+            "curation: pending",
+            "baseline: not run (human)",
+            "render: not run (human)"
+        ];
+        foreach (string key in receiptKeys) text.ShouldContain(key);
+        text.ShouldContain("none implies another");
+        text.ShouldContain("has *not observed* the rule");
     }
 
     [Fact]
@@ -222,5 +287,15 @@ public sealed class DeriveSpecPromptTests
         // prompts/get; this load-time assertion turns manifest-id drift into a test failure instead.
         ArchPrompts.DeriveSpec()
             .Length.ShouldBeGreaterThan(500);
+    }
+
+    [Fact]
+    public void DeriveSpec_StaysUnderTheServedBodyCeiling()
+    {
+        // The failure this catches is the free append: a paragraph added because it seemed worth saying,
+        // to a document nothing was measuring, that every session then pays for at kickoff whether or not
+        // it ever reads the paragraph.
+        ArchPrompts.DeriveSpec()
+            .Length.ShouldBeLessThanOrEqualTo(ServedBodyCeiling);
     }
 }

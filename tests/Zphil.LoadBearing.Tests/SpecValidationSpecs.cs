@@ -504,7 +504,7 @@ internal sealed class MultipleProblemsSpec : IArchitectureSpec
 {
     public void Define(Arch arch)
     {
-        // Bad_Id → MalformedId; no .Because → MissingBecause; dangling scope → DanglingAnchor.
+        // Bad_Id → MalformedId; no .Because → MissingBecause; dangling scope → MissingPosture.
         arch.Rule("Bad_Id").Enforce(arch.Types.MustHavePrefix("I"));
         arch.Scope("other/scope");
     }

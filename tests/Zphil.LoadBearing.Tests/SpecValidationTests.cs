@@ -22,7 +22,7 @@ public class SpecValidationTests
     // whole claim. The facts below are the arms that pin something more — a message, a null rule ID, or
     // several errors from one pass.
     [Theory]
-    [InlineData(typeof(DanglingRuleSpec), Code.DanglingAnchor, "area/dangling")]
+    [InlineData(typeof(DanglingRuleSpec), Code.MissingPosture, "area/dangling")]
     [InlineData(typeof(MissingBecauseScopeSpec), Code.MissingBecause, "legacy/billing")]
     [InlineData(typeof(MissingDragonsSpec), Code.MissingDragons, "legacy/billing")]
     [InlineData(typeof(BlankDescriptionSpec), Code.BlankProse, "area/rule")]
@@ -142,12 +142,12 @@ public class SpecValidationTests
     }
 
     [Fact]
-    public void RepeatedTrailer_BecauseTwice_IsReported()
+    public void RepeatedCall_BecauseTwice_IsReported()
     {
         SpecValidationException ex = BuildExpectingFailure(new RepeatedBecauseSpec());
 
-        ex.ShouldHaveError(Code.RepeatedTrailer, "area/rule")
-            .Message.ShouldBe("SpecValidationSpecs.cs:92: Repeated trailer 'Because' on 'area/rule'.");
+        ex.ShouldHaveError(Code.RepeatedCall, "area/rule")
+            .Message.ShouldBe("SpecValidationSpecs.cs:92: Repeated .Because(...) on 'area/rule'.");
     }
 
     [Fact]
@@ -199,7 +199,7 @@ public class SpecValidationTests
         // both and "no posture" is the thing the author has to fix.
         SpecValidationException ex = BuildExpectingFailure(new MultipleProblemsSpec());
 
-        ex.ShouldHaveError(Code.DanglingAnchor, "other/scope")
+        ex.ShouldHaveError(Code.MissingPosture, "other/scope")
             .Message
             .ShouldBe("SpecValidationSpecs.cs:509: Scope 'other/scope' has no posture; call .Quarantine(...) or .Caution(...).");
     }
@@ -349,7 +349,7 @@ public class SpecValidationTests
             .ShouldBeGreaterThanOrEqualTo(3);
         ex.ShouldHaveError(Code.MalformedId);
         ex.ShouldHaveError(Code.MissingBecause);
-        ex.ShouldHaveError(Code.DanglingAnchor);
+        ex.ShouldHaveError(Code.MissingPosture);
     }
 
     [Fact]
@@ -529,14 +529,14 @@ public class SpecValidationTests
     }
 
     [Fact]
-    public void RepeatedTrailer_RepeatedLayerPurpose_IsReportedSpecWide()
+    public void RepeatedCall_RepeatedLayerPurpose_IsReportedSpecWide()
     {
         SpecValidationException ex = BuildExpectingFailure(new RepeatedLayerPurposeSpec());
 
-        ex.ShouldHaveError(Code.RepeatedTrailer)
+        ex.ShouldHaveError(Code.RepeatedCall)
             .RuleId.ShouldBeNull();
-        ex.ShouldHaveError(Code.RepeatedTrailer)
-            .Message.ShouldBe("Repeated trailer 'Purpose' on layer 'Core'.");
+        ex.ShouldHaveError(Code.RepeatedCall)
+            .Message.ShouldBe("Repeated .Purpose(...) on layer 'Core'.");
     }
 
     [Fact]
@@ -852,7 +852,7 @@ public class SpecValidationTests
         // The pre-caller-info degradation seam: an error minted without a source location — as a spec DLL
         // compiled against the previous Core yields — renders today's message verbatim, no location prefix
         // and no leading blank. Simulated via the internal ctor since we cannot compile against an older Core.
-        var error = new SpecValidationError(Code.DanglingAnchor, "area/x",
+        var error = new SpecValidationError(Code.MissingPosture, "area/x",
             "Rule 'area/x' has no posture; call .Enforce(...) or .Migrate(...).");
 
         error.Location.ShouldBeNull();
@@ -1229,12 +1229,12 @@ public class SpecValidationTests
     // ---- A rule's citation (GRAMMAR §8 items 5, 6 and 30). ----
 
     [Fact]
-    public void RepeatedTrailer_CitationTwice_IsReported()
+    public void RepeatedCall_CitationTwice_IsReported()
     {
         SpecValidationException ex = BuildExpectingFailure(new RepeatedCitationSpec());
 
-        ex.ShouldHaveError(Code.RepeatedTrailer, "area/rule")
-            .Message.ShouldBe("SpecValidationSpecs.cs:1319: Repeated trailer 'Citation' on 'area/rule'.");
+        ex.ShouldHaveError(Code.RepeatedCall, "area/rule")
+            .Message.ShouldBe("SpecValidationSpecs.cs:1319: Repeated .Citation(...) on 'area/rule'.");
     }
 
     [Fact]

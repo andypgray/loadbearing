@@ -87,7 +87,7 @@ public sealed class TripwireSemanticsTests
     [Fact]
     public void ChangedFileInsideScope_WarnsAndPassesWithoutGating()
     {
-        var diff = new DiffContext("HEAD", "/repo", ["App.Legacy/Alpha.cs"]);
+        var diff = new DiffContext("/repo", ["App.Legacy/Alpha.cs"]);
         CheckReport report = Checker.Run(Codebase, BaselineIndex.Empty, diff, QuarantinedScope);
         RuleResult tripwire = report.ForRule("legacy/quarantined/tripwire");
 
@@ -102,7 +102,7 @@ public sealed class TripwireSemanticsTests
     [Fact]
     public void ChangedFileOutsideScope_YieldsNoWarnings()
     {
-        RuleResult tripwire = Tripwire(new DiffContext("HEAD", "/repo", ["App.Client/User.cs"]));
+        RuleResult tripwire = Tripwire(new DiffContext("/repo", ["App.Client/User.cs"]));
 
         tripwire.ShouldHavePassed();
         tripwire.Warnings.ShouldBeEmpty();
@@ -113,7 +113,7 @@ public sealed class TripwireSemanticsTests
     {
         // A backslash separator in the diff still matches the forward-slash codebase path on every OS;
         // the warning uses the codebase path.
-        RuleResult tripwire = Tripwire(new DiffContext("HEAD", "/repo", [@"App.Legacy\Alpha.cs"]));
+        RuleResult tripwire = Tripwire(new DiffContext("/repo", [@"App.Legacy\Alpha.cs"]));
 
         tripwire.Warnings.Single()
             .Message.ShouldBe(ExpectedWarning("App.Legacy/Alpha.cs"));
@@ -124,7 +124,7 @@ public sealed class TripwireSemanticsTests
     {
         // A differently-cased diff path matches only where the OS file system is case-insensitive.
         Assert.SkipUnless(CaseInsensitiveFileSystem, "Case-insensitive path matching is Windows/macOS behavior.");
-        RuleResult tripwire = Tripwire(new DiffContext("HEAD", "/repo", [@"app.legacy\ALPHA.cs"]));
+        RuleResult tripwire = Tripwire(new DiffContext("/repo", [@"app.legacy\ALPHA.cs"]));
 
         tripwire.Warnings.Single()
             .Message.ShouldBe(ExpectedWarning("App.Legacy/Alpha.cs"));
@@ -135,7 +135,7 @@ public sealed class TripwireSemanticsTests
     {
         // On Linux a case-variant path is a different file, so the tripwire must not fire on it.
         Assert.SkipWhen(CaseInsensitiveFileSystem, "Case-sensitive path matching is Linux behavior.");
-        RuleResult tripwire = Tripwire(new DiffContext("HEAD", "/repo", [@"app.legacy\ALPHA.cs"]));
+        RuleResult tripwire = Tripwire(new DiffContext("/repo", [@"app.legacy\ALPHA.cs"]));
 
         tripwire.Warnings.ShouldBeEmpty();
     }
@@ -151,7 +151,7 @@ public sealed class TripwireSemanticsTests
     [Fact]
     public void ChangedFileInsideCautionedScope_WarnsInItsOwnVoiceAndPasses()
     {
-        var diff = new DiffContext("HEAD", "/repo", ["App.Legacy/Alpha.cs"]);
+        var diff = new DiffContext("/repo", ["App.Legacy/Alpha.cs"]);
         CheckReport report = Checker.Run(Codebase, BaselineIndex.Empty, diff, CautionedScope);
         RuleResult tripwire = report.ForRule("legacy/cautioned/tripwire");
 
@@ -166,7 +166,7 @@ public sealed class TripwireSemanticsTests
     [Fact]
     public void ChangedFileOutsideCautionedScope_YieldsNoWarnings()
     {
-        RuleResult tripwire = CautionTripwire(new DiffContext("HEAD", "/repo", ["App.Client/User.cs"]));
+        RuleResult tripwire = CautionTripwire(new DiffContext("/repo", ["App.Client/User.cs"]));
 
         tripwire.ShouldHavePassed();
         tripwire.Warnings.ShouldBeEmpty();
@@ -178,7 +178,7 @@ public sealed class TripwireSemanticsTests
         // The kind is an enum on the model and a string on `check --json`, cased by the one shared
         // converter — so a kind added to the enum reaches the wire with no renderer edit at all. That is
         // convenient and entirely unproven until something reads the document back, which is this row.
-        var diff = new DiffContext("HEAD", "/repo", ["App.Legacy/Alpha.cs"]);
+        var diff = new DiffContext("/repo", ["App.Legacy/Alpha.cs"]);
 
         Checker.Run(Codebase, BaselineIndex.Empty, diff, QuarantinedScope)
             .JsonReport()
@@ -192,7 +192,7 @@ public sealed class TripwireSemanticsTests
     public void MultipleTouchedFiles_AreOrderedOrdinal()
     {
         // Diff lists Beta before Alpha; the tripwire re-orders ordinal.
-        RuleResult tripwire = Tripwire(new DiffContext("HEAD", "/repo", ["App.Legacy/Beta.cs", "App.Legacy/Alpha.cs"]));
+        RuleResult tripwire = Tripwire(new DiffContext("/repo", ["App.Legacy/Beta.cs", "App.Legacy/Alpha.cs"]));
 
         tripwire.Warnings.Select(w => w.Message)
             .ShouldBe(

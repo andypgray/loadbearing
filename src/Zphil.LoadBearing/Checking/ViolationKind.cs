@@ -81,8 +81,9 @@ public enum ViolationKind
     ProjectShape,
 
     /// <summary>
-    ///     The rule's subject matched no types at all, which fails the rule rather than passing it
-    ///     vacuously. <c>Detail</c> names what was empty, and <c>Sites</c> is empty.
+    ///     The rule's subject matched nothing at all — no types, or on a rule about members or projects
+    ///     none of those — which fails the rule rather than passing it vacuously. <c>Detail</c> names what
+    ///     was empty, <c>Hint</c> says what to change, and <c>Sites</c> is empty.
     /// </summary>
     EmptySubject,
 

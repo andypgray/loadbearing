@@ -86,6 +86,15 @@ public sealed class Violation
     public string? Detail { get; private set; }
 
     /// <summary>
+    ///     Gets what to change so the rule's subject matches something, on a violation that is about the
+    ///     rule rather than about the code: the selection's own semantics, and what to check first. Present
+    ///     on every violation raised because the subject selected nothing, and null on every other kind,
+    ///     whose fix is a change to the code the violation names. The check report prints it on a line
+    ///     under the violation, and <c>--json</c> output carries it as <c>hint</c>.
+    /// </summary>
+    public string? Hint { get; private set; }
+
+    /// <summary>
     ///     This violation's deterministic within-rule report order key: (Source|Subject FullName, Target
     ///     FullName, Member SymbolId, Target|Subject ProjectName), compared ordinal by the checker. A
     ///     MemberUse mirrors Reference's (source, target) as (source FullName, member SymbolId); a
@@ -232,9 +241,12 @@ public sealed class Violation
         return new Violation(ViolationKind.ProjectShape, [package.Site]) { SubjectProject = subject, Package = package };
     }
 
-    internal static Violation EmptySubject(string detail)
+    internal static Violation EmptySubject(string detail, string hint)
     {
-        return new Violation(ViolationKind.EmptySubject, Array.Empty<SourceLocation>()) { Detail = detail };
+        return new Violation(ViolationKind.EmptySubject, Array.Empty<SourceLocation>())
+        {
+            Detail = detail, Hint = hint
+        };
     }
 
     internal static Violation RuleError(string detail)

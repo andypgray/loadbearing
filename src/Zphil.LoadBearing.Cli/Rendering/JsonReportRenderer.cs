@@ -117,7 +117,9 @@ internal static class JsonReportRenderer
             elideViolations
                 ? null
                 : result.Violations.Select(v => ToViolation(v, result, relativizer, grain)).ToList(),
-            result.Warnings.Select(w => new WarningJson(w.Kind, w.Message)).ToList());
+            // A warning's hint is prose and leaves with the rest of it at index: warnings are the one thing
+            // no grain elides, so an un-elided cure would be the only prose left standing on the floor rung.
+            result.Warnings.Select(w => new WarningJson(w.Kind, w.Message, elideProse ? null : w.Hint)).ToList());
     }
 
     // The baseline block is present for any ratcheted rule (Migrate or Quarantine containment); the model's
@@ -165,6 +167,7 @@ internal static class JsonReportRenderer
             violation.SubjectProject?.Name,
             violation.Package?.Name,
             violation.Detail,
+            violation.Hint,
             grandfatheredSiteCount,
             violation.Sites.Count,
             elideSites

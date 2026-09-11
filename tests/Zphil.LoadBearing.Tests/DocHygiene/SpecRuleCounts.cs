@@ -68,20 +68,6 @@ internal static class SpecRuleCounts
         RegexOptions.CultureInvariant);
 
     /// <summary>
-    ///     Every way this repository's prose spells a count, composed from the same vocabulary the gate
-    ///     composes its expected text with. Deriving the set rather than writing a second number table is
-    ///     what keeps a claim the scanner accepts and a claim the gate can check from ever diverging.
-    /// </summary>
-    private static readonly HashSet<string> CountWords = Enumerable.Range(0, 100)
-        .SelectMany(static count => new[]
-        {
-            GrandfatheredCounts.Spell(count, GrandfatheredCounts.CountStyle.Word),
-            GrandfatheredCounts.Spell(count, GrandfatheredCounts.CountStyle.TitleWord),
-            GrandfatheredCounts.Spell(count, GrandfatheredCounts.CountStyle.Numeral)
-        })
-        .ToHashSet(StringComparer.Ordinal);
-
-    /// <summary>
     ///     Every rule bullet the managed block in <paramref name="agentsMarkdown" /> renders, across all
     ///     three posture sections. Reads the block body alone, so prose above or below the markers cannot
     ///     inflate it.
@@ -116,7 +102,7 @@ internal static class SpecRuleCounts
                 // "rules" is the qualifier rather than the number, and the claim is a fact about one past
                 // release rather than about the spec today. Requiring a number there is what tells a total
                 // from a delta, and it is why the CHANGELOG needs no exemption entry.
-                if (!CountWords.Contains(written)) continue;
+                if (!GrandfatheredCounts.IsCountWord(written)) continue;
 
                 claims.Add(new SpecRuleCountClaim(doc, index + 1, written));
             }

@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Both authoring signals carry their cure.** A rule whose subject matched nothing, and a rule whose
+  forbidden target matched nothing, now say what to change beside what went wrong. The check report
+  prints a `hint:` line under the diagnosis, and `check --json` carries it as `hint`: on the violation
+  for an empty subject, on the warning for an inert target. The advice is read off the selection that
+  came up empty rather than fixed, because the shapes fail for different reasons. A namespace glob is
+  answered with what a trailing `.*` covers and where `Legacy*` stops; a project selection with the
+  fact that a project is named by its csproj file name; a `typeof` anchor with the fact that it reaches
+  only a type the solution declares; and every other shape, from a suffix to a predicate, with the one
+  cure true of them all. An empty member subject and an empty project subject carry their own. Nothing
+  else moves: the two pinned messages are unchanged, the key is absent wherever there is nothing to
+  say, `schemaVersion` stays 3, and SARIF output is byte for byte as before, its reader being an alert
+  surface rather than the author of the rule.
+
 - **`check --hook-event` names the Claude Code event the `--hook-json` document answers.**
   `PostToolUse` (the default), `Stop` or `SubagentStop`. Claude Code reads a hook's
   `additionalContext` only from a document naming the event it fired, so a turn-end wrapper handed
@@ -47,7 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `help.text`, angle-bracketed in `help.markdown` — which also fills the `help.text` GitHub marks
   required for a rule carrying no fix of its own. The spec build refuses a value that is not an absolute `http`/`https` URL, so a pasted page
   title or a repository path fails the build rather than reaching a reader as a dead link; blank
-  and multi-line values report as prose, and a second call as a repeated trailer. A rule that
+  and multi-line values report as prose, and a second call as a repeat. A rule that
   cites nothing renders every block, dump and SARIF descriptor byte for byte as before.
 
 - **`.Returning` and `MustAcceptParameter` anchor by string, and `MustAcceptParameter<T>()`.**
@@ -278,6 +291,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   read.
 
 ### Changed
+
+- **The `derive_spec` recipe bounds its own loop and names the rule it could not settle.** Step 4
+  said to iterate globs until the failures that remain are genuine, with no bound. Each rule's
+  `emptySubject` violations and inert-target warnings are now the count: re-check while it reaches a
+  new low, and after two re-checks without one that rule stops and goes to the curation table as
+  `undecided`, its evidence column reading `subject could not be made to match; human to resolve`,
+  never dropped for the human and never kept silently. The step no longer restates namespace-glob
+  semantics, since the cure rides each signal as its `hint`; it says to apply the hint, and spends
+  the room on the honesty the check document already carries: `modelIncomplete`, `failedProjects`
+  and `restoreFailedProjects`, under which a passing rule was not observed rather than obeyed.
+
+- **The `derive_spec` recipe closes with a fixed-key receipt.** Step 8 asked for an outcome report in
+  prose, so every derivation closed in a different shape and nothing downstream could read one. It
+  now ends in a block of fixed camelCase keys: `specBuild`, `evidencePass`, `check` (a transcription
+  of the last document's exit code and `summary`), `postures`, `leftRed`, `dropped`, `undecided`,
+  `curation: pending`, `baseline: not run (human)` and `render: not run (human)`. The receipt keeps
+  three claims apart — that the spec builds, that the evidence pass ran on a complete model, and that
+  a human curated — and none implies another. Step 5 carries the operative half where the claim is
+  made: a rule may be called already-obeyed only from a check on a complete model, and a check
+  stamped `modelIncomplete` has not observed it.
+
+- **The `derive_spec` authoring reference says when a spec has earned area methods.** One method is
+  right for a spec of a dozen rules. Past roughly a hundred lines or three areas, `Define` becomes
+  the table of contents — the layers and any shared selections, then one call per area in reading
+  order — and each area a private static method taking `arch` and only the layers it governs, with
+  the constants an area cites declared beside its method. Selections and constraints are ordinary
+  values, so nothing the checker sees changes: call order is declaration order and every rule still
+  captures its own line. The scaffold itself stays a single `Define`.
+
+- **Breaking: `DiffContext` no longer takes a git ref.** The constructor is
+  `DiffContext(solutionDirectory, changedFiles)`. It took a `baseRef` first, guarded it against null
+  and then discarded it: no property carried it, so the one argument a caller had to supply was the
+  one the object could never report. A git ref has no home in this package in any case. It is
+  `netstandard2.0` with no dependencies and does pure string work on the paths it is handed, while
+  the ref belongs where it is resolved: the `loadbearing` tool takes it as `--diff-base`, runs git
+  with it, and `check --json` already reports it as `diffBase`. A caller that passed one drops the
+  argument, and nothing else moves. Tripwire warnings and the skip a check reports when no diff
+  context is given at all read the same as before.
+
+- **Breaking: two Roslyn types with no outside consumer are internal, and MSBuild registration
+  follows them.** `MsBuildSelection` and `FileFreshness` shipped public from
+  `Zphil.LoadBearing.Roslyn`, a package whose own description says it is not intended for direct
+  reference, and nothing outside this repository named either. `MsBuildSelection` also drops
+  `MsBuildBinPath` and `Version`: nothing read them, and the record carried a suppression
+  justifying them as "this package's public API surface, read by consumers". What is left is the
+  property that is read, `Source`, the one line saying which MSBuild a run chose and why.
+  `MsBuildBootstrap.Initialize()` and `EnsureInitialized()` return that selection, so they are
+  internal too, reachable as before from the `loadbearing` tool, the `Zphil.LoadBearing.Xunit`
+  adapter and this repository's tests. A caller outside that set should register MSBuild through
+  `MSBuildLocator` itself; one that wanted `FileFreshness` was comparing a file's
+  `LastWriteTimeUtc` and `Length` between two captures, with a two-second window in which a
+  matching timestamp proves nothing.
+
+- **Breaking: `BaselineIndex` and `RuleBaseline` no longer have public constructors.** Their read
+  surface is unchanged: `TryGet`, `TryMatch`, `Entries`, `Count` and `BaselineIndex.Empty` stay
+  public, as does `BaselineEntry`'s constructor, which a host receives from
+  `Violation.BaselineIdentity()` and `baseline --add` builds. What closes is the way in. The only
+  code that reads a baseline file off disk is internal to the tool, so a public constructor was an
+  invitation to parse the file format by hand and pass the result to `ArchChecker.Check`.
+  Grandfathering comes from a runner instead, the `loadbearing` tool or the
+  `Zphil.LoadBearing.Xunit` adapter, which is what the type's own summary now says and what the
+  core package README says beside the two runners it already lists; a direct `ArchChecker.Check`
+  passes `BaselineIndex.Empty` and grandfathers nothing. The index also stops asking the caller for
+  an ordinal comparer it could not enforce: it copies the sections into an ordinal dictionary, so a
+  rule ID is matched ordinally whatever the caller's own dictionary carried.
+
+- **Breaking: two spec-validation error codes are renamed, and the repeat message names the call.**
+  `SpecValidationErrorCode.RepeatedTrailer` is `RepeatedCall`, and `DanglingAnchor` is
+  `MissingPosture`. Both old names were built from words a spec author has no way to resolve:
+  "trailer" is one kind of call and the code covers five kinds that are not, and "anchor" is
+  internal vocabulary that reaches no reader at all. The enum declares no numeric values, and the
+  member name is serialized nowhere — no `--json` document, SARIF report or managed block carries
+  it, because a spec that fails validation produces none of them — so nothing but a host naming the
+  code in C# moves. The message a repeat produces moves with the code: `Repeated trailer 'Because'
+  on 'area/rule'.` now reads `Repeated .Because(...) on 'area/rule'.`, spelling the call that was
+  made twice the way the more-than-one-posture message already spells the verbs to choose between.
+  GRAMMAR's validation catalog retitles items 2 and 6 to match; the item numbers everything cites
+  stay put. No alias or shim.
 
 - **The agent hook fires when the turn ends, not after every edit.** The recommended wiring is now a
   `Stop` hook, with a `SubagentStop` twin for workers, and the wrappers check the working tree rather
@@ -511,6 +602,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   storyboard.
 
 ### Fixed
+
+- **A ratcheted rule failing only on an empty subject no longer offers `baseline --init`.** An
+  empty-subject violation has no baseline identity, so there was nothing for `--init` to grandfather
+  and the hint was an instruction that silently did nothing. It now appears only on a rule carrying
+  violations a baseline can hold, where until now it sat directly above the line saying what had
+  actually gone wrong.
 
 - **`baseline --accept-reductions` and `--init` no longer write a file they put nothing into.** For a
   rule with no captured section, `--accept-reductions` says to run `--init` first and then wrote an

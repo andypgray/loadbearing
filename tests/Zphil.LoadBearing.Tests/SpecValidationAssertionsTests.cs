@@ -27,6 +27,6 @@ public sealed class SpecValidationAssertionsTests
         // just not for the rule named.
         var ex = Should.Throw<SpecValidationException>(() => ArchModelBuilder.Build(new DanglingRuleSpec()));
 
-        Should.Throw<ShouldAssertException>(() => ex.ShouldHaveError(Code.DanglingAnchor, "area/nothing"));
+        Should.Throw<ShouldAssertException>(() => ex.ShouldHaveError(Code.MissingPosture, "area/nothing"));
     }
 }

@@ -125,7 +125,7 @@ internal static class SpecValidator
     {
         if (rule.Posture == null)
         {
-            errors.Add(new SpecValidationError(Code.DanglingAnchor, rule.Id,
+            errors.Add(new SpecValidationError(Code.MissingPosture, rule.Id,
                 $"Rule '{rule.Id}' has no posture; call .Enforce(...) or .Migrate(...).", rule.Location));
             return;
         }
@@ -170,7 +170,7 @@ internal static class SpecValidator
         // "which posture is this scope" is the question the rest of this method asks and the one item 2 reports.
         if (scope.Posture == null)
         {
-            errors.Add(new SpecValidationError(Code.DanglingAnchor, scope.Id,
+            errors.Add(new SpecValidationError(Code.MissingPosture, scope.Id,
                 $"Scope '{scope.Id}' has no posture; call .Quarantine(...) or .Caution(...).", scope.Location));
             return;
         }
@@ -188,7 +188,7 @@ internal static class SpecValidator
         CheckRepeated(scope.Baselines.Count, "Baseline", target, errors);
 
         if (scope.BoundaryOnlyViaCount > 1)
-            errors.Add(new SpecValidationError(Code.RepeatedTrailer, scope.Id, $"Repeated trailer 'BoundaryOnlyVia' on '{scope.Id}'.", scope.Location));
+            errors.Add(new SpecValidationError(Code.RepeatedCall, scope.Id, $"Repeated .BoundaryOnlyVia(...) on '{scope.Id}'.", scope.Location));
         else if (scope is { BoundaryOnlyViaCount: 1, Boundary.Count: 0 })
             errors.Add(new SpecValidationError(Code.EmptyBoundary, scope.Id,
                 $"BoundaryOnlyVia() on '{scope.Id}' names no types; omit the call for a hermetic quarantine.", scope.Location));
@@ -216,9 +216,9 @@ internal static class SpecValidator
         CheckRepeated(becauses.Count, "Because", target, errors);
     }
 
-    private static void CheckRepeated(int count, string trailer, ErrorTarget target, List<SpecValidationError> errors)
+    private static void CheckRepeated(int count, string verb, ErrorTarget target, List<SpecValidationError> errors)
     {
-        if (count > 1) errors.Add(new SpecValidationError(Code.RepeatedTrailer, target.Id, $"Repeated trailer '{trailer}' on {target.Subject}.", target.Location));
+        if (count > 1) errors.Add(new SpecValidationError(Code.RepeatedCall, target.Id, $"Repeated .{verb}(...) on {target.Subject}.", target.Location));
     }
 
     // Read by this walk, which reports the multi-line value, and by the citation check that skips what the

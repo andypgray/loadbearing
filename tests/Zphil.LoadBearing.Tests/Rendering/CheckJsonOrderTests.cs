@@ -38,6 +38,20 @@ public sealed class CheckJsonOrderTests
     // WebOpensData: static field initializers run in declaration order, and Render reads it.
     private static readonly string StampedDocument = Render(DocumentGrain.Full);
 
+    // The two authoring signals together: a rule whose subject matched nothing, and a rule inert against a
+    // pattern target. Neither can ride WebOpensData, whose rule fails on a real edge and is cured by
+    // changing the code — so a `hint` appears on no other document here, and this is what can pin it.
+    private static readonly CheckReport TwoAuthoringSignals = Checker.Run(OneController, arch =>
+    {
+        arch.Rule("empty/subject")
+            .Enforce(arch.Namespace("App.Nowhere.*").MustHaveSuffix("X"))
+            .Because("A subject that matches nothing fails loudly.");
+
+        arch.Rule("inert/target")
+            .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Ghost.*")))
+            .Because("Nothing should reference the ghost layer.");
+    });
+
     [Theory]
     [InlineData("summary")]
     [InlineData("modelIncomplete")]
@@ -84,6 +98,66 @@ public sealed class CheckJsonOrderTests
         // "2 types, 1 generated" reads in that order for the same reason it is written in that order: the
         // count comes before the qualifier that narrows it.
         ShouldSerializeBefore(RulesBlock(StampedDocument), "subjectTypes", "subjectGeneratedTypes");
+    }
+
+    [Fact]
+    public void Document_ViolationCure_SerializesRightBelowTheDiagnosisItCures()
+    {
+        // Diagnosis then cure, on the wire exactly as on two consecutive lines of the report — and ahead of
+        // the evidence group, whose counts and sites are about the code rather than about the rule.
+        string rules = RulesBlock(Hinted(DocumentGrain.Full));
+
+        ShouldSerializeBefore(rules, "detail", "hint");
+        ShouldSerializeBefore(rules, "hint", "siteCount");
+    }
+
+    [Fact]
+    public void Document_WarningCure_SerializesBelowTheMessage()
+    {
+        // Anchored on the warning's own kind rather than on the `warnings` array: both key names appear
+        // earlier in the document, and ShouldHaveKeyAt reads the first occurrence of each.
+        string document = Hinted(DocumentGrain.Full);
+        string warning = document[document.IndexOf("\"inertTarget\"", StringComparison.Ordinal)..];
+
+        ShouldSerializeBefore(warning, "message", "hint");
+    }
+
+    [Fact]
+    public void Document_ARuleWithNothingToCure_CarriesNoHintKeyAtAll()
+    {
+        // Absent, never null: a spec raising neither authoring signal renders the document it rendered
+        // before the slot existed, which is what lets the key arrive without moving schemaVersion.
+        StampedDocument.ShouldNotContain("\"hint\"");
+    }
+
+    [Fact]
+    public void Document_IndexGrain_DropsTheWarningCureWithTheRestOfTheProse()
+    {
+        // Warnings are the one thing no grain elides, so an un-elided cure would be the only prose left
+        // standing on the floor rung — beside a rule stripped of its own sentence, reason and fix.
+        string index = Hinted(DocumentGrain.Index);
+
+        index.ShouldSatisfyAllConditions(
+            () => index.ShouldContain("\"inertTarget\""),
+            () => index.ShouldNotContain("\"hint\""),
+            () => index.ShouldNotContain("\"because\""));
+    }
+
+    [Fact]
+    public void Document_SkeletonGrain_KeepsTheWarningCureAndLosesTheViolationsWithTheirs()
+    {
+        // The two cures ride different carriers and so leave at different rungs: the violation's goes with
+        // the array it sits in, and the warning's survives to the rung below it.
+        // Read from `rules` onward: the roll-up summary above them names a `violations` count of its own,
+        // which the rung keeps and which has nothing to do with the array.
+        string skeleton = Hinted(DocumentGrain.Skeleton);
+
+        skeleton.ShouldSatisfyAllConditions(
+            () => RulesBlock(skeleton)
+                .ShouldNotContain("\"violations\":"),
+            () => RulesBlock(skeleton)
+                .ShouldContain("\"violationCount\":"),
+            () => skeleton.ShouldContain("passes forever, so decide before keeping it"));
     }
 
     [Fact]
@@ -147,6 +221,21 @@ public sealed class CheckJsonOrderTests
             grain: DocumentGrain.Index);
 
         index.ShouldNotContain("\"workspaceDiagnosticCount\"");
+    }
+
+    // The two-signal document at one grain: a clean load, so nothing but the signals themselves varies.
+    private static string Hinted(DocumentGrain grain)
+    {
+        return JsonReportRenderer.Document(
+            report: TwoAuthoringSignals,
+            solutionDirectory: Directory.GetCurrentDirectory(),
+            solutionName: "S.sln",
+            specAssembly: "Spec.dll",
+            diffBase: null,
+            workspaceDiagnostics: [],
+            diagnostics: new WorkspaceDiagnostics([], [], [], [], [], [], []),
+            rulesFilter: [],
+            grain: grain);
     }
 
     // The stamped document at one grain; StampedDocument is this at Full.

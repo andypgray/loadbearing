@@ -17,7 +17,7 @@ public sealed class DiffContextTests
 
     private static DiffContext Make(params string[] changed)
     {
-        return new DiffContext("HEAD", @"C:\repo\sln", changed);
+        return new DiffContext(@"C:\repo\sln", changed);
     }
 
     [Fact]
@@ -83,6 +83,6 @@ public sealed class DiffContextTests
     [Fact]
     public void SolutionDirectory_IsNormalizedForwardSlashWithNoTrailingSlash()
     {
-        new DiffContext("HEAD", @"C:\repo\sln\", []).SolutionDirectory.ShouldBe("C:/repo/sln");
+        new DiffContext(@"C:\repo\sln\", []).SolutionDirectory.ShouldBe("C:/repo/sln");
     }
 }

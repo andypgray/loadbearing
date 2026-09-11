@@ -1708,8 +1708,8 @@ carries its sugar overload too, or the verb silently stops compiling after the s
 
 1. Duplicate ID over the **post-desugar** set (rules + scopes + generated children), across
    all spec classes; a declared ID may not extend a scope ID.
-2. Dangling anchor — `Rule()`/`Scope()` without a posture verb (`.Enforce`/`.Migrate` on a rule,
-   `.Quarantine`/`.Caution` on a scope); the message names both of the anchor's verbs.
+2. Missing posture — `Rule()`/`Scope()` without a posture verb (`.Enforce`/`.Migrate` on a rule,
+   `.Quarantine`/`.Caution` on a scope); the message names both verbs the declaration could take.
 3. Missing `Because` on any rule or scope, whichever posture the scope carries.
 4. Missing both `Dragons` and `DragonsDoc` on a scope, quarantined or cautioned; the message names
    the posture.
@@ -1719,7 +1719,7 @@ carries its sugar overload too, or the verb silently stops compiling after the s
    `DragonsDoc`, and every escape-hatch description. A layer's `Purpose` is prose like any other
    and is reported on the layer's spec-wide terms, named by layer and with no location:
    `Blank purpose on layer 'Core'.`
-6. Repeated trailer/option (`Because` twice, two `Baseline`s, two `Citation`s, a layer's
+6. Repeated call (`Because` twice, two `Baseline`s, two `Citation`s, a layer's
    `Purpose` twice, …); the `Purpose` case is spec-wide and named by layer, like item 5.
 7. Malformed ID — must match `^[a-z0-9-]+(/[a-z0-9-]+)*$` (convention: `area/rule-name`).
 8. `BoundaryOnlyVia()` with zero types (omit the call for a hermetic quarantine) — reachable

@@ -25,7 +25,7 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 ///         wholesale reload, or its next run, to pick such a change up.
 ///     </para>
 /// </remarks>
-public readonly record struct FileFreshness(bool Exists, DateTime LastWriteTimeUtc, long Length, DateTime RecordedAtUtc)
+internal readonly record struct FileFreshness(bool Exists, DateTime LastWriteTimeUtc, long Length, DateTime RecordedAtUtc)
 {
     /// <summary>
     ///     The window within which a file's last-write time cannot be trusted on its own: two seconds, which

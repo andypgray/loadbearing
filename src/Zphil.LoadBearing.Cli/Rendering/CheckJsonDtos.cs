@@ -252,6 +252,12 @@ internal sealed record BaselineJson(string Path, int Grandfathered, int Stale, i
 ///     siblings included.
 /// </param>
 /// <param name="Detail">Kind-specific context, or null (omitted) when the kind carries none.</param>
+/// <param name="Hint">
+///     What to change so the rule's subject matches something, on an <c>emptySubject</c> violation — the one
+///     kind that is about the rule rather than about the code; null (omitted) on every other kind, whose fix
+///     is a change to the code it names. It rides its violation, so it needs no grain rule of its own and
+///     leaves with <c>violations</c> at skeleton.
+/// </param>
 /// <param name="GrandfatheredSiteCount">
 ///     How many sites this violation's baseline entry records, present only when the violation is red
 ///     <em>because</em> it carries more than that — a grandfathered pair that grew. Beside
@@ -281,6 +287,7 @@ internal sealed record ViolationJson(
     string? SubjectProject,
     string? Package,
     string? Detail,
+    string? Hint,
     int? GrandfatheredSiteCount,
     int SiteCount,
     IReadOnlyList<SiteJson>? Sites);
@@ -289,7 +296,14 @@ internal sealed record ViolationJson(
 internal sealed record SiteJson(string File, int Line);
 
 /// <summary>A non-fatal warning.</summary>
-internal sealed record WarningJson(CheckWarningKind Kind, string Message);
+/// <param name="Kind">What the warning is about.</param>
+/// <param name="Message">The one line saying what was noticed.</param>
+/// <param name="Hint">
+///     What to change in response, on a warning about a rule whose target matched nothing; null (omitted)
+///     on a warning about a changed file, which has nothing general to advise. Elided at index grain with
+///     the rest of the prose — the floor rung is a menu of ids and verdicts, and a cure is prose.
+/// </param>
+internal sealed record WarningJson(CheckWarningKind Kind, string Message, string? Hint);
 
 /// <summary>The roll-up counts.</summary>
 internal sealed record SummaryJson(

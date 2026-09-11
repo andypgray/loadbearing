@@ -17,7 +17,7 @@ public sealed class RuleBaseline
     ///     entries sharing an identity are collapsed into one: the first of them keeps its reason and its
     ///     site count.
     /// </summary>
-    public RuleBaseline(IReadOnlyCollection<BaselineEntry> entries)
+    internal RuleBaseline(IReadOnlyCollection<BaselineEntry> entries)
     {
         Guard.NotNull(entries, nameof(entries));
         _lookup = new Dictionary<BaselineEntry, BaselineEntry>();

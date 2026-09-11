@@ -54,7 +54,7 @@ internal static class GitChangedFiles
         IReadOnlyList<string> untracked = ParseZTerminated(untrackedOutput);
 
         IReadOnlyList<string> files = ComposeAbsolute(toplevel, tracked.Concat(untracked));
-        return new DiffContext(baseRef, solutionDirectory, files);
+        return new DiffContext(solutionDirectory, files);
     }
 
     /// <summary>Splits git's NUL-terminated output into non-empty entries (tolerates a missing trailing NUL).</summary>

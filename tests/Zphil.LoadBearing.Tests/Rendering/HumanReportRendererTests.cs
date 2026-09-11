@@ -80,6 +80,77 @@ public sealed class HumanReportRendererTests
     }
 
     [Fact]
+    public void RuleBlock_EmptySubject_RendersItsCureOnAHintLineUnderTheDiagnosis()
+    {
+        RuleResult result = Checker.Run(
+                "namespace App { public class Foo {} }",
+                arch => arch.Rule("naming/x")
+                    .Enforce(arch.Namespace("Nowhere.*").MustHavePrefix("I"))
+                    .Because("b"))
+            .Single();
+
+        string block = result.HumanBlock();
+
+        block.ShouldContain("hint: A trailing `.*` covers the namespace itself");
+        block.IndexOf("matched no solution-declared types", StringComparison.Ordinal)
+            .ShouldBeLessThan(block.IndexOf("hint:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void RuleBlock_SeveralEmptyPartsSharingOneCure_PrintItOnce()
+    {
+        // A union with two empty parts names both, then says once what they share: a reader who has met the
+        // sentence learns nothing from meeting it again, and the diagnosis lines are what differ.
+        var result = new RuleResult(
+            EnforceRule("union/x"), RuleStatus.Failed,
+            [
+                Violation.EmptySubject("the first part matched nothing", "SHARED-CURE"),
+                Violation.EmptySubject("the second part matched nothing", "SHARED-CURE")
+            ], [], null, []);
+
+        string block = result.HumanBlock();
+
+        block.ShouldSatisfyAllConditions(
+            () => block.ShouldContain("the first part matched nothing"),
+            () => block.ShouldContain("the second part matched nothing"),
+            () => (block.Split("hint: SHARED-CURE").Length - 1).ShouldBe(1, block));
+    }
+
+    [Fact]
+    public void RuleBlock_InertTargetWarning_RendersItsCureUnderTheWarning()
+    {
+        RuleResult result = Checker.Run(
+                "namespace App.Domain { public class Foo {} }",
+                arch => arch.Rule("inert/x")
+                    .Enforce(arch.Namespace("App.Domain.*").MustNotReference(arch.Namespace("App.Ghost.*")))
+                    .Because("b"))
+            .Single();
+
+        string block = result.HumanBlock();
+
+        block.ShouldContain("warning: This rule is inert");
+        block.IndexOf("warning:", StringComparison.Ordinal)
+            .ShouldBeLessThan(block.IndexOf("hint:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void RuleBlock_RatchetedRuleFailingOnlyOnAnEmptySubject_OmitsTheBaselineHint()
+    {
+        // `baseline --init` grandfathers observed violations, and an empty subject has no identity to
+        // record — so that hint is an instruction which silently does nothing, and printing it beside the
+        // cure that works leaves two `hint:` lines disagreeing about what to do.
+        var result = new RuleResult(
+            MigrateRule("data/x"), RuleStatus.Failed,
+            [Violation.EmptySubject("matched nothing", "THE-REAL-CURE")], [], null, []);
+
+        string block = result.HumanBlock();
+
+        block.ShouldSatisfyAllConditions(
+            () => block.ShouldNotContain("baseline --init"),
+            () => block.ShouldContain("hint: THE-REAL-CURE"));
+    }
+
+    [Fact]
     public void RuleBlock_ShapeSubjectWithoutDeclarationSites_RendersUnlocatedFullName()
     {
         // A Shape violation carrying no site has no file:line, so the renderer emits its bare FullName as
@@ -269,7 +340,8 @@ public sealed class HumanReportRendererTests
         TypeNode located = SyntheticNodes.Type("App.Located", site);
         var result = new RuleResult(
             EnforceRule("shape/x"), RuleStatus.Failed,
-            [Violation.Shape(located, [site]), Violation.EmptySubject("UNLOCATED-MARKER")], [], null, []);
+            [Violation.Shape(located, [site]), Violation.EmptySubject("UNLOCATED-MARKER", "HINT-MARKER")], [], null,
+            []);
 
         string block = result.HumanBlock();
 

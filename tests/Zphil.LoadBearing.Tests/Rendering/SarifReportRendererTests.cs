@@ -36,7 +36,7 @@ public sealed class SarifReportRendererTests
         ("App.Client/User.cs", "namespace App.Client { public class User {} }"));
 
     // The diff that arms the tripwire: one changed file, inside the scope.
-    private static readonly DiffContext TouchedAlpha = new("HEAD", "/repo", ["App.Legacy/Alpha.cs"]);
+    private static readonly DiffContext TouchedAlpha = new("/repo", ["App.Legacy/Alpha.cs"]);
 
     [Fact]
     public void Serialize_RedReference_EmitsErrorLevelNewBaselineStateNoSuppressions()
@@ -232,7 +232,10 @@ public sealed class SarifReportRendererTests
         [
             new RuleResult(
                 Rule("naming/empty", Posture.Enforce), RuleStatus.Failed,
-                [Violation.EmptySubject("The subject selection matched no solution-declared types.")],
+                [
+                    Violation.EmptySubject(
+                        "The subject selection matched no solution-declared types.", "a cure SARIF never carries")
+                ],
                 [], null, []),
             new RuleResult(
                 Rule("ref/error", Posture.Enforce), RuleStatus.Failed,
@@ -510,6 +513,34 @@ public sealed class SarifReportRendererTests
         result.GetProperty("locations")
             .EnumerateArray()
             .ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Serialize_InertTargetWarning_CarriesTheMessageWithoutTheAuthoringCure()
+    {
+        // The warning carries a cure for whoever writes the rule, and this document does not: its reader is
+        // code scanning, where an alert stands in front of the whole team rather than the spec's author. The
+        // empty-subject cure could not join it in any case — those violations are site-less and mint no
+        // result — so carrying one here would land half a family's advice and hide the rest.
+        CheckReport report = Checker.Run(
+            "namespace App { public class Page {} }",
+            arch => arch.Rule("layer/no-ghosts")
+                .Enforce(arch.Namespace("App.*")
+                    .MustNotReference(arch.Namespace("Ghost.*")))
+                .Because("Nothing may reach the ghost layer."));
+
+        report.Single()
+            .Warnings.Single()
+            .Hint.ShouldNotBeNull();
+
+        string json = report.ToSarif();
+
+        json.SarifResults()
+            .ShouldHaveSingleItem()
+            .GetProperty("message")
+            .GetProperty("text")
+            .GetString()
+            .ShouldBe("This rule is inert: its target selection matched no types.");
     }
 
     [Fact]

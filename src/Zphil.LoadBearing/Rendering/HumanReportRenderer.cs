@@ -15,11 +15,13 @@ namespace Zphil.LoadBearing.Rendering;
 /// </summary>
 /// <remarks>
 ///     A Migrate rule and a quarantine's containment rule also report how many violations their baseline
-///     grandfathers; those pass, so they are never listed as sites. When such a rule fails and no
-///     baseline has been captured yet, the block ends with a hint to run
+///     grandfathers; those pass, so they are never listed as sites. When such a rule fails on violations a
+///     baseline could hold and none has been captured yet, the block ends with a hint to run
 ///     <c>loadbearing baseline --init</c>. A rule whose subject swept generated types says so on a
 ///     <c>subject:</c> line, and a tripwire that fired prints its warnings followed by the scope's
-///     dragons prose.
+///     dragons prose. Where the rule itself is what went wrong — a subject that matched nothing, or a
+///     target so a forbidden-set rule can never fire — a <c>hint:</c> line under the diagnosis says what
+///     to change.
 /// </remarks>
 public static class HumanReportRenderer
 {
@@ -87,7 +89,11 @@ public static class HumanReportRenderer
 
         if (result.Rule.BaselinePath is not null) RenderRatchetLines(output, result);
 
-        foreach (CheckWarning warning in result.Warnings) output.WriteLine($"  warning: {warning.Message}");
+        foreach (CheckWarning warning in result.Warnings)
+        {
+            output.WriteLine($"  warning: {warning.Message}");
+            if (warning.Hint is { } hint) output.WriteLine($"  hint: {hint}");
+        }
 
         RenderDragonsLines(output, result);
     }
@@ -128,9 +134,17 @@ public static class HumanReportRenderer
 
         RenderGrownLine(output, result);
 
-        if (result is { Status: RuleStatus.Failed, BaselineCaptured: false })
+        if (result is { Status: RuleStatus.Failed, BaselineCaptured: false } && HoldsBaselinableViolations(result))
             output.WriteLine(
                 "  hint: no baseline captured for this rule; run 'loadbearing baseline --init' to grandfather existing violations");
+    }
+
+    // Whether --init would grandfather anything. An empty-subject violation has no baseline identity, so a
+    // rule failing only on those cannot be baselined at all and the hint above would be an instruction that
+    // silently does nothing — beside the authoring hint that says what actually went wrong.
+    private static bool HoldsBaselinableViolations(RuleResult result)
+    {
+        return result.Violations.Any(violation => violation.Kind != ViolationKind.EmptySubject);
     }
 
     // Why a red site sits on a pair the baseline names. Without this line a reader who looks the pair up
@@ -161,6 +175,7 @@ public static class HumanReportRenderer
     {
         var located = new List<(string Path, int Line, string Text)>();
         var unlocated = new List<string>();
+        var hints = new List<string>();
 
         // Where a one-line violation lands: its first carried site as a jump target, or the unlocated
         // block when it carries none. The site always comes off the violation — every shape kind's
@@ -191,6 +206,7 @@ public static class HumanReportRenderer
                     break;
                 case ViolationKind.EmptySubject:
                     unlocated.Add(violation.Detail ?? "the subject selection matched no types");
+                    if (violation.Hint is { } hint && !hints.Contains(hint)) hints.Add(hint);
                     break;
                 case ViolationKind.RuleError:
                     unlocated.Add($"error: {violation.Detail}");
@@ -198,6 +214,11 @@ public static class HumanReportRenderer
             }
 
         foreach (string text in unlocated) yield return text;
+
+        // One line per DISTINCT cure, under the diagnoses it cures: a union with three empty parts states
+        // all three, then says once what they share, rather than repeating a sentence three times. Ahead of
+        // the located lines so a cure never sits below a site list.
+        foreach (string hint in hints) yield return $"hint: {hint}";
 
         // Ordinal, not culture-aware: the site order is part of the rendered output, which is diffed and
         // pinned, so it must not shift with the machine's locale.

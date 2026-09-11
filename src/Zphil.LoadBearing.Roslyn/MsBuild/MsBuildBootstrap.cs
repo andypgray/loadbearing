@@ -19,6 +19,10 @@ namespace Zphil.LoadBearing.Roslyn.MsBuild;
 // MSBuildLocator honours as a synthetic "developer console" instance, and VSCMD_VER=99.0 is what wins
 // that process's descending-version sort against any other installed VS. VisualStudioVersion must not
 // be used for this: MSBuild itself reads that variable during project evaluation.
+//
+// The type stays public although every member of it is internal: the self-spec records this
+// namespace's sanctioned surface as typeof(MsBuildBootstrap), and the spec project holds no
+// InternalsVisibleTo from here.
 public static class MsBuildBootstrap
 {
     private const string DevConsoleVersion = "99.0";
@@ -69,7 +73,7 @@ public static class MsBuildBootstrap
     ///     <c>MSBuild.exe</c> under <c>MSBuild\Current\Bin</c>, fails with a message naming the variable and the path
     ///     that was probed.
     /// </summary>
-    public static MsBuildSelection Initialize()
+    internal static MsBuildSelection Initialize()
     {
         return SelectAndRegister();
     }
@@ -82,7 +86,7 @@ public static class MsBuildBootstrap
     ///     <c>LOADBEARING_VS_INSTALL_PATH</c> that is not an existing directory, or that holds no <c>MSBuild.exe</c>
     ///     under <c>MSBuild\Current\Bin</c>, fails with a message naming the variable and the path that was probed.
     /// </summary>
-    public static MsBuildSelection? EnsureInitialized()
+    internal static MsBuildSelection? EnsureInitialized()
     {
         return MSBuildLocator.IsRegistered ? null : SelectAndRegister();
     }
@@ -156,7 +160,7 @@ public static class MsBuildBootstrap
         }
 
         MSBuildLocator.RegisterDefaults();
-        return new MsBuildSelection(null, null, "MSBuildLocator default (no Visual Studio install detected via vswhere)");
+        return new MsBuildSelection("MSBuildLocator default (no Visual Studio install detected via vswhere)");
     }
 
     private static MsBuildSelection RegisterFromOverride(string overridePath)
@@ -168,13 +172,13 @@ public static class MsBuildBootstrap
                 "Set it to the VS install root (e.g. " +
                 "'C:\\Program Files\\Microsoft Visual Studio\\2022\\Community').");
 
-        (string msBuildBin, string msBuildExe, bool registered) = TryRegisterFromVsRoot(vsRoot);
+        (_, string msBuildExe, bool registered) = TryRegisterFromVsRoot(vsRoot);
         if (!registered)
             throw new InvalidOperationException(
                 $"{LoadBearingEnvVars.VsInstallPath}='{overridePath}': MSBuild.exe not found at '{msBuildExe}'. " +
                 $"Set the env var to the VS install root (the parent of '{MsBuildBinLayout}').");
 
-        return new MsBuildSelection(msBuildBin, null, $"{LoadBearingEnvVars.VsInstallPath} override ('{vsRoot}')");
+        return new MsBuildSelection($"{LoadBearingEnvVars.VsInstallPath} override ('{vsRoot}')");
     }
 
     private static MsBuildSelection RegisterFromVsInstance(VsInstance instance)
@@ -185,10 +189,10 @@ public static class MsBuildBootstrap
             // VS install missing MSBuild — extremely unusual but degrade gracefully.
             MSBuildLocator.RegisterDefaults();
             return new MsBuildSelection(
-                null, null, $"MSBuildLocator default (selected '{instance.Name}' had no MSBuild at '{msBuildBin}')");
+                $"MSBuildLocator default (selected '{instance.Name}' had no MSBuild at '{msBuildBin}')");
         }
 
-        return new MsBuildSelection(msBuildBin, instance.Version.ToString(), DescribeSelection(instance));
+        return new MsBuildSelection(DescribeSelection(instance));
     }
 
     // The registration sequence both arms run: find the bin directory under the VS root, prove MSBuild.exe is

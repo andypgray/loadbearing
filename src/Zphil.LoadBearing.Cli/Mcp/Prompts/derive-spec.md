@@ -444,35 +444,45 @@ not this document's), camelCase and exact like the step-1 key map:
   This is your edge summary at rule precision. Beside them, `violationCount` and
   `siteCount` are present at every grain — script against the counts (step 5 reads the
   violation count); the arrays are their expansion and are elided at coarser grain.
-- A violation of kind `emptySubject` ("The subject selection matched no solution-declared
-  types.") — **your subject glob is wrong**, not evidence about the code. Check the pattern
-  semantics: a trailing `.*` is the subtree operator and is self-inclusive (`MyApp.Domain.*`
-  matches `MyApp.Domain` itself); `MyApp.Legacy*` matches within a segment and never crosses
-  a dot.
-- A warning "This rule is inert: its target selection matched no types." — the target pattern
-  matched nothing. Either the glob is wrong or that layer genuinely declares no types; decide
-  which before keeping the rule.
+- The two **authoring signals** are about your selection, not the code. A violation of kind
+  `emptySubject` ("The subject selection matched no solution-declared types.") fails the rule;
+  the warning "This rule is inert: its target selection matched no types." leaves a rule that
+  passes forever. Both carry a `hint` (a `hint:` line in the report) with the cure read off the
+  selection that came up empty — a glob, a project name and a `typeof` anchor each fail
+  differently — so apply the hint rather than guessing, and where an inert target names a layer
+  that genuinely declares no types yet, decide before keeping the rule.
+- `modelIncomplete: true` on the document, with `failedProjects` and `restoreFailedProjects`
+  naming the casualties, means the check ran on a partial model: a rule that passed was **not
+  observed**, not obeyed, and an inert target may be an edge that was never extracted. The
+  document arrives either way; the CLI also exits 2 unless `--allow-workspace-diagnostics` is
+  passed. Restore and build the named projects before reading any verdict as evidence.
 - An **error result** (not a violations document) means the run itself failed — an
   unresolvable or unbuilt spec, or spec validation errors. Fix, rebuild, rerun.
 
-Iterate globs until the failures that remain are *genuine* — real edges, real nonconforming
-names. Iterating is cheap over MCP: the server holds the workspace warm and reconciles your
-edits per call, so a re-check after the first load answers in milliseconds; one-shot CLI runs
-pay a workspace load each time (a clean tree with a valid extraction cache skips it). On a
-big solution, narrow instead of leaving: `rules` takes rule-ID globs (`rules:
-"data-access/*"`; the CLI twin is `--rules`), so the evidence pass can walk the draft area
-by area with every response a complete document, and `arch_explain` returns one rule whole.
-You never have to page a report out to read it entire: over your client's budget it comes
-back whole at a coarser grain rather than cut, down to `index` — every rule ID with its
-verdict and violation count, which is the menu those globs pick from.
+Iterate selections until the failures that remain are *genuine* — real edges, real
+nonconforming names — against a count you can read off the document: per rule, its
+`emptySubject` violations plus its inert-target warnings. Re-check while that count reaches a
+new low; when two consecutive re-checks leave a rule's count at its best so far, stop working
+that rule and carry it to step 6 as `undecided`, while every other rule keeps iterating on its
+own count. No derivation has needed the bound yet; it is there so that none can run away.
+Iterating is cheap over MCP: the server holds the workspace warm and reconciles your edits per
+call, so a re-check after the first load answers in milliseconds; one-shot CLI runs pay a
+workspace load each time (a clean tree with a valid extraction cache skips it). On a big
+solution, narrow instead of leaving: `rules` takes rule-ID globs (`rules: "data-access/*"`; the
+CLI twin is `--rules`), so the evidence pass can walk the draft area by area with every
+response a complete document, and `arch_explain` returns one rule whole. You never have to page
+a report out to read it entire: over your client's budget it comes back whole at a coarser
+grain rather than cut, down to `index` — every rule ID with its verdict and violation count,
+which is the menu those globs pick from.
 
 ## 5. Assign postures from the evidence
 
 For each surviving rule, the violation count decides the honest posture:
 
-- **Zero violations → `Enforce`.** The codebase already obeys; making it law costs nothing
-  and protects it from the next change. Keep the rule exactly as drafted; upgrade `Because`
-  to the real rationale.
+- **Zero violations → `Enforce`.** The codebase already obeys — on a complete model only: a
+  check stamped `modelIncomplete` has *not observed* the rule, and a rule not observed can never
+  be called already-obeyed. Making it law costs nothing and protects it from the next change.
+  Keep the rule exactly as drafted; upgrade `Because` to the real rationale.
 - **Violations, and the team wants the target → `Migrate`.** Rewrite as a pair:
 
   ```csharp
@@ -559,7 +569,10 @@ because the reader cannot tell it from a mistake they made.
 Stop. Present every proposed rule to the human with its evidence, one row per rule: ID,
 proposed posture, the rule sentence, violation count, one example `file:line`, and your draft
 `Because`. The human accepts, edits, or drops **each rule individually**. Conflicts you found
-in step 0 (doc says X, code does Y) are decided here, not by you.
+in step 0 (doc says X, code does Y) are decided here, not by you. A rule the step-4 loop could
+not make match takes `undecided` in the posture column, and in place of its evidence
+`subject could not be made to match; human to resolve`: it is never dropped for the human and
+never kept silently.
 
 **Author nothing final until every rule is decided**, and never write a `Because` the human
 would not say in a design review — it renders into the generated context and into every
@@ -618,9 +631,32 @@ Where the human wires `check` into CI, say that the pipeline's invocation wants
 than clean, so the code fenced or flagged because it is dangerous to edit is the one thing CI never
 mentions. The checkout has to be deep enough for that ref to resolve.
 
-Report the outcome: rules by posture, debt counts per Migrate rule, any rule left
-deliberately red with its violation count, dragons documented, and anything you dropped at
-curation (with why) so it is on the record.
+Close with a receipt in exactly this shape, one key per line, so a reader — or a script — finds
+each claim where it expects it:
+
+```text
+specBuild: ok
+evidencePass: complete
+check: exit 1, rules 31, passed 2, failed 27, skipped 2, violations 51
+postures: enforce 12 / migrate 6 / quarantine 2 / caution 1
+leftRed: layering/no-ghost: 3
+dropped: naming/handlers: no owner would stand behind it
+undecided: data/legacy-sql: subject could not be made to match; human to resolve
+curation: pending
+baseline: not run (human)
+render: not run (human)
+```
+
+The `check:` line transcribes the last document's exit code and its `summary` (`rulesChecked`,
+`rulesPassed`, `rulesFailed`, `rulesSkipped`, `violations`) — a transcription, never a recount.
+`evidencePass` reads `incomplete (failedProjects: …; restoreFailedProjects: …)` whenever that
+document was stamped `modelIncomplete`. `leftRed`, `dropped` and `undecided` repeat their key
+once per rule, `dropped` with the reason, and read `none` when there is nothing to list. The
+receipt keeps three claims apart — that the spec builds, that the evidence pass ran on a
+complete model, and that a human curated — and none implies another, so the last three lines
+stay as written: you stop at the gate and cannot witness your own curation, and the two write
+verbs are the human's. Beside the receipt, list each Migrate rule's current violation count and
+the dragons you documented.
 
 ---
 
@@ -628,6 +664,14 @@ curation (with why) so it is on the record.
 
 A spec is one class implementing `IArchitectureSpec` with one method `Define(Arch arch)`, and
 three statement forms: definitions, rules, scopes.
+
+`Define` may delegate: selections and constraints are ordinary values, so a method can build and
+return them. A spec of a dozen rules stays one method. Past roughly a hundred lines or three
+areas, make `Define` the table of contents — the layers and any shared selections, then one call
+per area in reading order — with each area a private static method taking `arch` and only the
+layers it governs, and the constants an area cites declared beside its method. Nothing the
+checker sees changes: call order is declaration order, and every rule still captures its own
+line.
 
 **Nouns** — `arch.Types` (all solution-declared types) · `arch.Layer(name, glob, ...)` or `arch.Layer(name, selection)` (a definition — namespace globs, or any selection: `arch.Project("MyApp.Web")` for an assembly-shaped layer, `core.InNamespace("MyApp.Core.Model.*")` for a cone inside another layer. The layer names exactly what its definition names. Its optional `.Purpose(prose)` trailer is one sentence on what the layer is for, rendered into the layer's module-map row and its card) ·
 `arch.Namespace(glob)` · `arch.Project(name)` · `arch.Type(typeof(X))` (or the sugar
