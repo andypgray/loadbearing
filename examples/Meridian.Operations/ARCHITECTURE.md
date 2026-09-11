@@ -61,7 +61,7 @@ flowchart LR
     end
 ```
 
-Not drawn in full: `modules/dispatch/internals`, `modules/tracking/internals`, `modules/tracking/outbound`, `modules/tracking/event-naming`, `modules/invoicing/internals`, `demurrage/engine/tripwire` (Quarantine). Expand any of them with `loadbearing explain <rule-id>`.
+Not drawn in full: `modules/internals`, `modules/tracking/outbound`, `modules/tracking/event-naming`, `demurrage/engine/tripwire` (Quarantine). Expand any of them with `loadbearing explain <rule-id>`.
 <!-- loadbearing:end -->
 
 Every arrow in the law fence is an `only` arrow, which is how a module graph is written here: a
@@ -74,14 +74,16 @@ lives: the inner box is part of the outer one.
 The graph is acyclic because none of those allow-lists points back, and the drawing is where that is
 easiest to check. Follow the arrows and there is no way home.
 
-Four rules that are genuinely about the module graph appear under the fence rather than in it, and
+Two rules that are genuinely about the module graph appear under the fence rather than in it, and
 they are the interesting half of that list. `modules/tracking/outbound` is
 `tracking.MustOnlyReferenceItself()`, which is how this language spells "tracking is the leaf": a
-rule's subject is always among its own permitted targets, so a leaf has nothing left to name. The
-three `internals` rules each say that a module's interior, once its `Contracts` surface is excepted,
-may be referenced only from inside that same module. In all four there is no second place to draw an
-arrow to, and a self-arrow would tell a reader nothing. They are named instead, which is what keeps
-the claim on this page total: every rule in this spec is either drawn or listed.
+rule's subject is always among its own permitted targets, so a leaf has nothing left to name.
+`modules/internals` is one rule over the three modules, `arch.Each(dispatch, tracking, invoicing)`
+with their `Contracts` surfaces excepted and `.MustOnlyBeReferencedByItself()` as the verb, and it
+says that each module's interior may be referenced only from inside that same module. In both there
+is no second place to draw an arrow to: the leaf names no target, and the family's far end is a
+different module for every cell. They are named instead, which is what keeps the claim on this page
+total: every rule in this spec is either drawn or listed.
 
 The other two are `modules/tracking/event-naming`, which is about a type shape, and the quarantine
 tripwire, which has nothing to draw by design. `loadbearing explain <rule-id>` expands any of them.

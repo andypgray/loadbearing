@@ -1060,3 +1060,221 @@ internal sealed class ValidCautionSpec : IArchitectureSpec
             .Because("The utilities are public API for the whole solution.");
     }
 }
+
+internal sealed class ForeignLayerDefinitionSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        // A definition is use-independent, so a foreign one is caught at the layer whether or not any rule
+        // ever names the layer — and reported spec-wide, named by layer (§8 item 10).
+        var other = new Arch();
+        arch.Layer("Foreign", other.Project("MyApp.Core"));
+    }
+}
+
+internal sealed class BlankProjectNameLayerDefinitionSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Layer("Bad", arch.Project(" "));
+    }
+}
+
+internal sealed class UndefinedLifetimeLayerDefinitionSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Layer("Wiring", arch.Registered((Lifetime)7));
+    }
+}
+
+internal sealed class DeadSubtreeLayerDefinitionSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        // The definition's own Except payload: every walk a rule's selections take reaches a definition's
+        // nesting too.
+        arch.Layer("Bad", arch.Namespace("MyApp.Core.*").Except(arch.Namespace("MyApp.*.Svc.*")));
+    }
+}
+
+// The family specs (§8 items 27–28). Appended at the end of the file on purpose: dozens of expected
+// messages in SpecValidationTests quote this file's anchors as literal line numbers, so an insertion
+// anywhere above would move every one of them.
+
+internal sealed class FamilyAsOperandSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        Layer dispatch = arch.Layer("Dispatch", "Ops.Dispatch.*");
+        Layer tracking = arch.Layer("Tracking", "Ops.Tracking.*");
+        arch.Rule("area/rule")
+            .Enforce(arch.Types.MustNotReference(arch.Each(dispatch, tracking)))
+            .Because("A partition means nothing at the far end of an edge.");
+    }
+}
+
+internal sealed class FamilyAsExceptPayloadSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        Layer dispatch = arch.Layer("Dispatch", "Ops.Dispatch.*");
+        Layer tracking = arch.Layer("Tracking", "Ops.Tracking.*");
+        arch.Rule("area/rule")
+            .Enforce(arch.Types.Except(arch.Each(dispatch, tracking)).MustHaveSuffix("Service"))
+            .Because("An Except payload is a set to subtract, not a partition.");
+    }
+}
+
+internal sealed class FamilyAsUnionOperandSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        Layer dispatch = arch.Layer("Dispatch", "Ops.Dispatch.*");
+        Layer tracking = arch.Layer("Tracking", "Ops.Tracking.*");
+        arch.Rule("area/rule")
+            .Enforce(arch.AnyOf(arch.Each(dispatch, tracking), arch.Namespace("Ops.Client.*"))
+                .MustHaveSuffix("Service"))
+            .Because("A union flattens its operands into one set, which loses the partition.");
+    }
+}
+
+internal sealed class FamilyAsMembershipSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        Layer dispatch = arch.Layer("Dispatch", "Ops.Dispatch.*");
+        Layer tracking = arch.Layer("Tracking", "Ops.Tracking.*");
+        arch.Rule("area/rule")
+            .Enforce(arch.Namespace("Ops.*").MustBelongTo(arch.Each(dispatch, tracking)))
+            .Because("A membership operand is read as one set, like every other operand.");
+    }
+}
+
+internal sealed class FamilyAsCounterpartAmongSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        Layer dispatch = arch.Layer("Dispatch", "Ops.Dispatch.*");
+        Layer tracking = arch.Layer("Tracking", "Ops.Tracking.*");
+        arch.Rule("area/rule")
+            .Enforce(arch.Types.WithSuffix("Service")
+                .MustHaveExactlyOneCounterpart(
+                    among: arch.Each(dispatch, tracking),
+                    named: "I{Name}"))
+            .Because("The among: operand is where a counterpart may stand, which is one set.");
+    }
+}
+
+internal sealed class FamilyAsScopedSelectionSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        Layer dispatch = arch.Layer("Dispatch", "Ops.Dispatch.*");
+        Layer tracking = arch.Layer("Tracking", "Ops.Tracking.*");
+        arch.Scope("legacy/modules")
+            .Quarantine(arch.Each(dispatch, tracking))
+            .Dragons("The rounding is load-bearing.")
+            .Because("A quarantine fences one region, not a partition of several.");
+    }
+}
+
+internal sealed class FamilyAsBoundarySpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        Layer dispatch = arch.Layer("Dispatch", "Ops.Dispatch.*");
+        Layer tracking = arch.Layer("Tracking", "Ops.Tracking.*");
+        arch.Scope("legacy/modules")
+            .Quarantine(arch.Namespace("Ops.Legacy.*"))
+            .BoundaryOnlyVia(arch.Each(dispatch, tracking))
+            .Dragons("The rounding is load-bearing.")
+            .Because("A sanctioned surface is a set of types the fence lets through.");
+    }
+}
+
+internal sealed class FamilyAsLayerDefinitionSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        Layer dispatch = arch.Layer("Dispatch", "Ops.Dispatch.*");
+        Layer tracking = arch.Layer("Tracking", "Ops.Tracking.*");
+        arch.Layer("Modules", arch.Each(dispatch, tracking));
+    }
+}
+
+internal sealed class EachOtherWithoutFamilySpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule")
+            .Enforce(arch.Namespace("Ops.*").MustNotReferenceEachOther())
+            .Because("Over a plain selection there are no others to name.");
+    }
+}
+
+internal sealed class ForeignFamilyCellSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        // A family's layer cells ride the same walks a union's operands do, so a cell minted elsewhere is
+        // found by the ordinary foreign-Arch check rather than by an arm of its own (§8 item 10).
+        var other = new Arch();
+        arch.Rule("area/rule")
+            .Enforce(arch.Each(other.Layer("Dispatch", "Ops.Dispatch.*")).MustNotReferenceEachOther())
+            .Because("A spec assembled from two Arch instances is one mistake.");
+    }
+}
+
+internal sealed class BlankFamilyGlobSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        Layer dispatch = arch.Layer("Dispatch", "Ops.Dispatch.*");
+        Layer tracking = arch.Layer("Tracking", "Ops.Tracking.*");
+        arch.Rule("area/rule")
+            .Enforce(arch.Each(dispatch, tracking).InNamespace("").MustNotReferenceEachOther())
+            .Because("A family carries adjectives of its own, and they are checked like any other.");
+    }
+}
+
+internal sealed class BlankProjectFamilyGlobSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule")
+            .Enforce(arch.Each(arch.Projects.Matching("")).MustNotReferenceEachOther())
+            .Because("The project selection inside a family is reached by the project-stratum walks.");
+    }
+}
+
+internal sealed class ForeignProjectFamilySpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        var other = new Arch();
+        arch.Rule("area/rule")
+            .Enforce(arch.Each(other.Projects.Matching("Nop.Plugin.*")).MustNotReferenceEachOther())
+            .Because("A project selection carries its own Arch, family or not.");
+    }
+}
+
+internal sealed class CircularReferencesOnPlainSubjectSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule")
+            .Enforce(arch.Namespace("Ops.*").MustNotHaveCircularReferences())
+            .Because("Over a plain selection there are no layers to reference each other.");
+    }
+}
+
+internal sealed class CircularReferencesOnProjectFamilySpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule")
+            .Enforce(arch.Each(arch.Projects.Matching("Ops.*")).MustNotHaveCircularReferences())
+            .Because("Projects cannot have circular references, so over a family of projects the law would hold by construction.");
+    }
+}

@@ -11,6 +11,20 @@
       "warnings": 0
     },
     {
+      "id": "layering/projects-independent",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 5,
+      "warnings": 0
+    },
+    {
+      "id": "layering/web-cuts-not-circular",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 2,
+      "warnings": 0
+    },
+    {
       "id": "layering/billing-independent",
       "posture": "enforce",
       "status": "passed",
@@ -288,9 +302,9 @@
     }
   ],
   "summary": {
-    "rulesChecked": 29,
+    "rulesChecked": 31,
     "rulesPassed": 2,
-    "rulesFailed": 25,
+    "rulesFailed": 27,
     "rulesSkipped": 2,
     "grandfatheredRemaining": 2,
     "grandfatheredSites": 3,

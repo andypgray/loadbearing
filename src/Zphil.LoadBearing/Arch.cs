@@ -57,15 +57,31 @@ public sealed class Arch
     {
         var globs = new List<string>(1 + more.Length) { glob };
         globs.AddRange(more);
-        var noun = new LayerNoun(name, globs);
-        _layers.Add(new LayerRegistration(noun));
-        return new Layer(this, noun);
+        return Register(new LayerNoun(name, globs));
+    }
+
+    /// <summary>
+    ///     Defines a named layer as a selection — <c>arch.Layer("Core", arch.Project("MyApp.Core"))</c>,
+    ///     <c>arch.Layer("Model", core.InNamespace("MyApp.Core.Model.*"))</c> (GRAMMAR §3.3). The layer names
+    ///     exactly what <paramref name="definition" /> names and checks identically to it; its own
+    ///     adjectives apply after.
+    /// </summary>
+    /// <remarks>
+    ///     A layer is a set of types, so the artifact stratum is excluded by the type system: a
+    ///     <see cref="ProjectSelection" /> is not a <see cref="Selection" />, and
+    ///     <c>arch.Layer("X", arch.Projects.Named("X"))</c> does not compile.
+    /// </remarks>
+    public Layer Layer(string name, Selection definition)
+    {
+        Guard.NotNull(definition, nameof(definition));
+
+        return Register(new LayerNoun(name, definition));
     }
 
     /// <summary>Appends a <c>Purpose</c> to the registration of the layer minted with <paramref name="noun" />.</summary>
     /// <remarks>
-    ///     The lookup always succeeds: <see cref="Zphil.LoadBearing.Layer" />'s constructor is internal,
-    ///     <see cref="Layer(string,string,string[])" /> is the only mint, and every
+    ///     The lookup always succeeds: <see cref="Zphil.LoadBearing.Layer" />'s constructor is internal, the
+    ///     two <c>Layer</c> overloads are the only mints, and every
     ///     <see cref="Zphil.LoadBearing.Layer" /> built later over a layer subject reuses the same
     ///     <see cref="LayerNoun" /> instance — so there is no null branch and no defensive throw.
     /// </remarks>
@@ -102,7 +118,8 @@ public sealed class Arch
     /// <summary>
     ///     The union of the given selections — <c>arch.AnyOf(arch.Project("A"), arch.Project("B"))</c>
     ///     names every type either operand names (GRAMMAR §5.1). Operands may be any selection: a
-    ///     <see cref="Layer" />, a <see cref="Registered()" /> noun, an already-refined selection, or another
+    ///     <see cref="Zphil.LoadBearing.Layer" />, a <see cref="Registered()" /> noun, an already-refined selection, or
+    ///     another
     ///     union (nested unions flatten at mint). One operand is legal and is an identity. Adjectives apply
     ///     to the union, not through it — <c>AnyOf(a, b).Except(c)</c> is <c>(a ∪ b) − c</c>.
     /// </summary>
@@ -127,6 +144,47 @@ public sealed class Arch
         // ReSharper disable once ConvertClosureToMethodGroup
         IReadOnlyList<Selection> parts = OperandList.OneOrMore(first, more, type => Type(type));
         return UnionSelection.Create(this, parts);
+    }
+
+    /// <summary>
+    ///     A <em>family</em> of declared layers — <c>arch.Each(dispatch, tracking, invoicing)</c> — one
+    ///     rule over a partition into cells rather than one rule per cell (GRAMMAR §5.1). Names every type
+    ///     any cell names; the cells themselves are read by the <c>MustOnly*</c> reference verbs'
+    ///     self-allowance, the three family verbs and card placement. Adjectives apply to the family:
+    ///     <c>arch.Each(a, b, c).Except(x)</c> narrows every cell's members. May stand only as a rule
+    ///     subject (GRAMMAR §8 item 27).
+    /// </summary>
+    /// <remarks>
+    ///     Typed to <see cref="Zphil.LoadBearing.Layer" />, so a cell is bare by construction: an
+    ///     adjective-bearing cell, a union cell and a nested family are compile errors rather than
+    ///     validation items. One cell is legal and reads as the cell — the loop-buildable identity
+    ///     <see cref="AnyOf(Selection,Selection[])" /> carries — and the <c>(first, more)</c> shape makes a
+    ///     zero-cell family uncompilable.
+    /// </remarks>
+    public Selection Each(Layer first, params Layer[] more)
+    {
+        Guard.NotNull(more, nameof(more));
+        IReadOnlyList<Layer> cells = OperandList.OneOrMore(first, more, layer => layer);
+        return new RefinedSelection(this, new EachNoun(cells), Array.Empty<SelectionAdjective>());
+    }
+
+    /// <summary>
+    ///     A <em>family</em> of projects — <c>arch.Each(arch.Projects.Matching("Nop.Plugin.*"))</c> —
+    ///     whose cells are the projects <paramref name="projects" /> names at check time, each cell being
+    ///     what <see cref="Project" /> names (GRAMMAR §5.1). The artifact-stratum twin of the layer form;
+    ///     the same partition rules apply.
+    /// </summary>
+    /// <remarks>
+    ///     One <see cref="Fluent.ProjectSelection" /> rather than a <c>(first, more)</c> list, because
+    ///     <c>.Named</c> and <c>.Matching</c> already say "these" (GRAMMAR §4.10). Its cell count is a
+    ///     codebase fact rather than a spec one, so the sentence always says "each of" and a family naming
+    ///     no project at all is the ordinary empty-subject verdict.
+    /// </remarks>
+    public Selection Each(ProjectSelection projects)
+    {
+        Guard.NotNull(projects, nameof(projects));
+
+        return new RefinedSelection(this, new EachNoun(projects), Array.Empty<SelectionAdjective>());
     }
 
     /// <summary>
@@ -222,5 +280,13 @@ public sealed class Arch
         var registration = new ScopeRegistration(id) { Location = SpecSourceLocation.Capture(filePath, lineNumber) };
         _registrations.Add(registration);
         return new ScopeBuilder(registration);
+    }
+
+    // The tail both Layer overloads share: one registration in authoring order, one handle over the noun
+    // the registration holds, so the purpose lookup finds it by reference whichever form minted it.
+    private Layer Register(LayerNoun noun)
+    {
+        _layers.Add(new LayerRegistration(noun));
+        return new Layer(this, noun);
     }
 }

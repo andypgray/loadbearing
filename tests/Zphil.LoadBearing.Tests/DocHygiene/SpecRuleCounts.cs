@@ -23,8 +23,8 @@ namespace Zphil.LoadBearing.Tests.DocHygiene;
 ///     <para>
 ///         <b>The board is the authority, not the spec source.</b> Counting <c>arch.Rule(</c> call sites
 ///         would miss the two the <c>DotNetGuidance</c> pack contributes and would count a
-///         <c>arch.Scope(</c> as nothing, so it answers 27 where a reader counting the rendered board
-///         answers 30. The managed block is what a reader actually sees, it already carries one bullet per
+///         <c>arch.Scope(</c> as nothing, so it answers 32 where a reader counting the rendered board
+///         answers 35. The managed block is what a reader actually sees, it already carries one bullet per
 ///         declared rule across all three posture sections, and the dogfood self-spec tests hold it to
 ///         what the spec emits — so holding the prose to the board chains it to the spec through a gate
 ///         that already exists.

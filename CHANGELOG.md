@@ -9,6 +9,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A family of layers may reference each other, but not in a circle:
+  `MustNotHaveCircularReferences()`.** `arch.Each(model, checking, rendering)
+  .MustNotHaveCircularReferences()` renders "Each of the Model, Checking and Rendering layers must
+  not have circular references with the others." — the law between the cross-cell ban, which
+  forbids every reference between the cells, and the ordering rules, which state an order arrow by
+  arrow: the law for peers with no intended order, and the first one to write on an estate whose
+  order nobody has stated yet. The cell graph has an arrow from one cell to another for every owned
+  reference crossing between them, and a violation is every type pair on every arrow inside a
+  strongly connected component of that graph — the same `(source, target)` identity every
+  reference verb keys on, so the baseline file, the ratchet, the human report, SARIF and `explain`
+  are untouched; the one addition is a JSON-only `detail` naming the circle ("circular references
+  among the Reporting and Invoicing layers", the cells in declaration order). A broken circle
+  leaves every pair on it stale for `status` to surface and `baseline --accept-reductions` to
+  retire, which is how this repository paid its own (see Changed). The verb is nullary and takes
+  a family of layers only: a plain subject and a family of projects fail spec build under the new
+  `CircularReferencesNeedLayerFamily` error, the second because MSBuild already forbids circular
+  project references, and a rule that cannot go red is a false promise. It is the fourth reader of
+  a family's cells, after the `MustOnly*` self-allowance, the cross-cell ban and the inbound leaf;
+  the `derive_spec` recipe names it beside the family bullet.
+
+- **Rules over a family: `arch.Each`, the per-cell self and two leaf verbs.**
+  `arch.Each(host, adapter, pack).MustNotReferenceEachOther()` says no layer in the family reaches
+  another, and `arch.Each(arch.Projects.Matching("Nop.Plugin.*")).MustNotReferenceEachOther()` says
+  the same over every project a selection names — one rule, one ID, one baseline, one board row,
+  one test row, where until now the only honest spelling was one rule per cell (28 for
+  nopCommerce's plugins) or the law went unwritten. A family is a selection whose noun carries a
+  partition into cells: declared layers, or the projects a project selection names at check time.
+  To every verb but four it is the union of its cells. The `MustOnly*` reference verbs read
+  "self" per cell — the whole layer or project the type sits in, as declared, so a module's
+  `Contracts` cone excluded from the subject still counts as its own — which is what lets
+  Meridian.Operations' three `internals` rules become one:
+  `arch.Each(dispatch, tracking, invoicing).Except(<the three Contracts cones>)
+  .MustOnlyBeReferencedByItself()`, rendering "Types in each of the Dispatch, Tracking and
+  Invoicing layers, except …, must be referenced only by their own layer."
+  `MustOnlyBeReferencedByItself()` is the inbound twin of `MustOnlyReferenceItself()` and works on
+  a plain subject too ("must be referenced only by itself", or "by themselves" once an adjective
+  puts the subject in the types voice); `MustNotReferenceEachOther()` needs a family. A bare
+  family speaks collectively ("Each of the Host, Adapter and Pack layers must not
+  reference the others."), a type sitting in two layer cells fails the rule with a rule error
+  naming both, and an empty cell fails it naming the cell. Two spec-build errors arrive with it:
+  `FamilyMisplaced` (a family anywhere but subject position) and `EachOtherWithoutFamily`.
+  Multi-declarer attribution rides free: a project cell names its types at that project.
+
+- **A layer can be defined by a selection: `arch.Layer(name, Selection)`.**
+  `arch.Layer("Core", arch.Project("MyApp.Core"))` names an assembly, and
+  `arch.Layer("Model", core.InNamespace("MyApp.Core.Model.*"))` names a cone inside another layer.
+  Until now a layer was namespace globs and nothing else, and a layer is the one noun a spec can
+  name: the module-map row, the `Purpose`, the collective voice ("The Domain layer must not …"),
+  the per-directory card and the drawing's label all hang on that name. An estate whose unit of
+  architecture is the assembly had no nameable noun for it — `arch.Project(...)` checks the same
+  law and earns no row, no card and no purpose — and a layer whose honest extent is one cone minus
+  a nested one could not be declared at all, leaving `.Except` on every rule while the row still
+  claimed the whole cone. A layer is transparent to its definition: it names exactly what the
+  definition names, at the projects the definition names them at, so a project-defined layer gives
+  the same verdicts as the bare project noun on every verb, multi-declarer attribution included. Its
+  own adjectives apply after. The glob form is untouched in behaviour and in bytes, and is not
+  desugared to a union: a glob matching nothing is still a scan that found nothing rather than an
+  empty operand that fails the rule. The definition is validated where the layer is declared, with
+  every walk a rule's selections take — foreign `Arch`, blank operands, lifetimes, `Except` payloads
+  — reported spec-wide and named by layer, with no new error codes. The row spells the definition:
+  a glob layer renders exactly what it rendered before, a bare noun renders its locative without the
+  head ("**Core** — project `MyApp.Core`", "**Kernel** — projects `A` or `B`"), and anything else
+  renders its reference phrase ("**Model** — types in the Core layer in `MyApp.Core.Model.*`"). On
+  the law drawing a layer defined as one project collapses with a rule naming that project onto one
+  node under the layer's name, a refinement is drawn inside the layer it refines, and an
+  adjective-free union of places is the box its operands sit in. `ProjectSelection` is not a
+  `Selection`, so `arch.Layer("X", arch.Projects.Named("X"))` does not compile: a layer is a set of
+  types. This repository's own five assembly-shaped layers are now their projects and its three
+  inner layers are cones inside Core.
+
 - **A scope posture without containment: `.Caution(selection)`.**
   `arch.Scope("domain/retry-budget").Caution(arch.Types.Named("RetryPolicy")).Dragons("…").Because("…")`
   puts a dragons card on code that new callers are welcome to reach. Until now a card existed only
@@ -92,7 +162,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is left with once the allow-list default below gives it nothing to name. Nullary, because the
   empty list is the law: the subject is the whole of what the rule permits. It draws no arrow —
   there is no second place to point one at — so a diagram lists it under the fence, exactly where
-  its explicitly self-listing predecessor landed.
+  its explicitly self-listing predecessor landed. A subject that speaks in the types voice takes
+  the plural: "Types in `MyApp.Tracking.*` named `*Service` must reference only themselves
+  (external packages are not constrained by this rule)".
 
 - **The rendered root block now names the install route.** The managed `AGENTS.md` block carries a
   second meta-line directly after the provenance sentence: if the `loadbearing` command is missing
@@ -144,6 +216,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   read.
 
 ### Changed
+
+- **Breaking: `PathComparison` is no longer public, and it has left `Zphil.LoadBearing.Rendering`.**
+  The per-OS path-segment comparison helper was a rendering type in name only: the checker's diff
+  context borrowed it, which closed a circle between the two readers of the model that the new
+  circular-references rule over this repository's own layers then measured and paid. It now lives
+  with Core's internal helpers, visible to the shipping packages and the test project alone. It
+  was consumed nowhere outside this repository; a caller that reached it should compare path
+  segments with `StringComparison.OrdinalIgnoreCase` on Windows and macOS and `Ordinal` elsewhere,
+  which is all it ever did.
+
+- **A rule over a family of layers places its bullet on every cell layer's card.** A layer's
+  per-directory card lists the rules anchored on that layer; a family-of-layers subject is
+  anchored on each of its cells, so the one sentence appears on each cell's card. Nothing else
+  about card placement moves — a union subject still places no card, and a family of projects
+  places none.
+
+- **`LayerDefinition.Globs` is the namespace region a layer names, which can now be none.** For the
+  glob form it is the declared list, exactly as before. For a layer defined by a selection it is the
+  namespace region that definition names — a namespace noun, or `arch.Types` narrowed by one
+  `InNamespace` — and empty for every other definition, a project among them. Nothing else on
+  `LayerDefinition` moves, and `DefinitionFragment` still carries the rendered row for any shape.
 
 - **Breaking: the scope payload is named for what it now is.** `QuarantineData` is `ScopeData`,
   `QuarantineRole` is `ScopeRole`, `ArchRule.Quarantine` is `ArchRule.Scope`, and

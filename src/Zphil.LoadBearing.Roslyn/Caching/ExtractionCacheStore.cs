@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
-using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Roslyn.Diagnostics;
 using Zphil.LoadBearing.Roslyn.Solutions;
 

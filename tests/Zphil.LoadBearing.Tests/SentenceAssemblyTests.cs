@@ -31,6 +31,66 @@ public class SentenceAssemblyTests
     }
 
     [Fact]
+    public void BareFamilySubject_SpeaksCollectively_AndJoinsItsCells()
+    {
+        // A family is a noun of its own, so a bare one reads as its own phrase exactly as a bare layer
+        // does — and its cells are AND-joined, because the rule ranges over every one of them rather than
+        // over one of them (GRAMMAR §5.1, §6).
+        Selection family = Arch.Each(
+            Arch.Layer("Dispatch", "Ops.Dispatch.*"),
+            Arch.Layer("Tracking", "Ops.Tracking.*"),
+            Arch.Layer("Invoicing", "Ops.Invoicing.*"));
+
+        SentenceRenderer.Subject(family)
+            .ShouldBe("Each of the Dispatch, Tracking and Invoicing layers");
+        SentenceRenderer.Reference(family)
+            .ShouldBe("each of the Dispatch, Tracking and Invoicing layers");
+    }
+
+    [Fact]
+    public void TwoCellFamily_AndJoinsWithoutACommaAtAll()
+    {
+        // The two-item join has no comma; three or more take one before every item but the last.
+        SentenceRenderer.Reference(Arch.Each(Arch.Layer("Reporting", "MyApp.Report.*"), Arch.Layer("Billing", "MyApp.Billing.*")))
+            .ShouldBe("each of the Reporting and Billing layers");
+    }
+
+    [Fact]
+    public void OneCellFamily_RendersExactlyAsTheCell()
+    {
+        // The loop-buildable identity (GRAMMAR §5.1): a family of one says what its cell says, in both
+        // positions, though it keeps the noun that makes the family verbs applicable to it.
+        Selection family = Arch.Each(Arch.Layer("Reporting", "MyApp.Report.*"));
+
+        SentenceRenderer.Subject(family)
+            .ShouldBe("The Reporting layer");
+        SentenceRenderer.Reference(family)
+            .ShouldBe("the Reporting layer");
+    }
+
+    [Fact]
+    public void ProjectFamilySubject_WearsTheProjectSelectionsOwnPhrase()
+    {
+        // The project form quantifies over a codebase fact, so it always says "each of" — and what it
+        // quantifies over is the artifact-stratum phrase, unchanged (GRAMMAR §4.10, §5.1).
+        SentenceRenderer.Subject(Arch.Each(Arch.Projects.Matching("Nop.Plugin.*")))
+            .ShouldBe("Each of the projects matching `Nop.Plugin.*`");
+        SentenceRenderer.Reference(Arch.Each(Arch.Projects.Named("A", "B")))
+            .ShouldBe("each of the projects `A` or `B`");
+    }
+
+    [Fact]
+    public void FamilySubjectWithAnyAdjective_SwitchesToTypesVoice()
+    {
+        // The switch is structural for a family exactly as for a layer: the locative is the collective
+        // phrase, and the head becomes "types".
+        Selection family = Arch.Each(Arch.Layer("Dispatch", "Ops.Dispatch.*"), Arch.Layer("Tracking", "Ops.Tracking.*"));
+
+        SentenceRenderer.Subject(family.WithSuffix("Engine"))
+            .ShouldBe("Types in each of the Dispatch and Tracking layers named `*Engine`");
+    }
+
+    [Fact]
     public void BareTypesSubject_IsCapitalizedHead()
     {
         SentenceRenderer.Subject(Arch.Types)

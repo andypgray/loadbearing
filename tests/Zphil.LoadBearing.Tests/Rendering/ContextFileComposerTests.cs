@@ -48,48 +48,49 @@ public class ContextFileComposerTests
     });
 
     // A quarantined scope over a namespace no type in the codebase occupies.
-    private static readonly IArchitectureSpec AbsentScopeSpec = new InlineSpec(arch =>
-        arch.Scope("legacy/billing")
-            .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
-            .Dragons("Banker's rounding is line-item level.")
-            .Because("Replacement scheduled."));
+    private static readonly IArchitectureSpec AbsentScopeSpec = new InlineSpec(QuarantineBilling);
 
     // A layer and a quarantined scope over the same namespace, so both cards resolve to one directory.
-    private static readonly IArchitectureSpec CoLocatedSpec = new InlineSpec(arch =>
-    {
-        Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
-        arch.Rule("layering/billing-not-web")
-            .Enforce(billing.MustNotReference(arch.Namespace("MyApp.Web.*")))
-            .Because("Billing is downstream of the web layer.");
+    private static readonly IArchitectureSpec CoLocatedSpec = CoLocatedWith(QuarantineBilling);
 
+    // The caution twin of AbsentScopeSpec: a posture the cost gate must recognize as something to place.
+    private static readonly IArchitectureSpec AbsentCautionSpec = new InlineSpec(CautionBilling);
+
+    // A layer and a cautioned scope over the same namespace, so both cards resolve to one directory.
+    private static readonly IArchitectureSpec CoLocatedCautionSpec = CoLocatedWith(CautionBilling);
+
+    private const string SpecName = "MyApp.ArchSpec";
+
+    // The layer half of a co-located fixture, with the scope declared by the caller: the layer-cards-first
+    // ordering is a property of the composer, so both postures prove it against one spec shape.
+    private static IArchitectureSpec CoLocatedWith(Action<Arch> declareScope)
+    {
+        return new InlineSpec(arch =>
+        {
+            Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
+            arch.Rule("layering/billing-not-web")
+                .Enforce(billing.MustNotReference(arch.Namespace("MyApp.Web.*")))
+                .Because("Billing is downstream of the web layer.");
+
+            declareScope(arch);
+        });
+    }
+
+    private static void QuarantineBilling(Arch arch)
+    {
         arch.Scope("legacy/billing")
             .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
             .Dragons("Banker's rounding is line-item level.")
             .Because("Replacement scheduled.");
-    });
+    }
 
-    // The caution twin of AbsentScopeSpec: a posture the cost gate must recognize as something to place.
-    private static readonly IArchitectureSpec AbsentCautionSpec = new InlineSpec(arch =>
-        arch.Scope("legacy/billing")
-            .Caution(arch.Namespace("MyApp.Legacy.Billing.*"))
-            .Dragons("Banker's rounding is line-item level.")
-            .Because("Every caller depends on the exact rounding."));
-
-    // A layer and a cautioned scope over the same namespace, so both cards resolve to one directory.
-    private static readonly IArchitectureSpec CoLocatedCautionSpec = new InlineSpec(arch =>
+    private static void CautionBilling(Arch arch)
     {
-        Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
-        arch.Rule("layering/billing-not-web")
-            .Enforce(billing.MustNotReference(arch.Namespace("MyApp.Web.*")))
-            .Because("Billing is downstream of the web layer.");
-
         arch.Scope("legacy/billing")
             .Caution(arch.Namespace("MyApp.Legacy.Billing.*"))
             .Dragons("Banker's rounding is line-item level.")
             .Because("Every caller depends on the exact rounding.");
-    });
-
-    private const string SpecName = "MyApp.ArchSpec";
+    }
 
     [Fact]
     public void Compose_NoCodebase_ReturnsTheRootFileAlone()

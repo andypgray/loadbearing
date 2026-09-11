@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace Zphil.LoadBearing.Rendering;
+namespace Zphil.LoadBearing.Internal;
 
 /// <summary>
 ///     The one per-OS rule for comparing file-system path segments: case-insensitive on Windows and
@@ -11,7 +11,7 @@ namespace Zphil.LoadBearing.Rendering;
 ///     Core is netstandard2.0, so the platform test uses <see cref="RuntimeInformation.IsOSPlatform" />
 ///     rather than the net5+ <c>OperatingSystem.IsWindows()</c> helpers.
 /// </remarks>
-public static class PathComparison
+internal static class PathComparison
 {
     private static readonly bool CaseInsensitive =
         RuntimeInformation.IsOSPlatform(OSPlatform.Windows) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX);

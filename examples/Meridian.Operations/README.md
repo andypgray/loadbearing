@@ -4,14 +4,17 @@ Module isolation is the enforceable law here: five modules as namespace subtrees
 
 ## The card beside the rules
 
-Two rules govern the Invoicing module, from [arch/Meridian.Operations.ArchSpec/OperationsArchSpec.cs](arch/Meridian.Operations.ArchSpec/OperationsArchSpec.cs):
+Two rules govern the Invoicing module, from [arch/Meridian.Operations.ArchSpec/OperationsArchSpec.cs](arch/Meridian.Operations.ArchSpec/OperationsArchSpec.cs), the first of them over all three modules at once:
 
 ```csharp
-        arch.Rule("modules/invoicing/internals")
-            .Enforce(invoicing.Except(arch.Namespace("Meridian.Operations.Invoicing.Contracts.*"))
-                         .MustOnlyBeReferencedBy(invoicing))
-            .Because("Invoicing is reached only through its Contracts surface, so the assembler, the reconciler, and the invoice-line types stay internal; a reference into them from another module would turn billing's private assembly steps into a contract it can no longer revise.")
-            .Fix("Depend on `IInvoiceRun` or another `Invoicing.Contracts` type instead of the internal assembler or reconciler.");
+        arch.Rule("modules/internals")
+            .Enforce(arch.Each(dispatch, tracking, invoicing)
+                         .Except(arch.Namespace("Meridian.Operations.Dispatch.Contracts.*"),
+                                 arch.Namespace("Meridian.Operations.Tracking.Contracts.*"),
+                                 arch.Namespace("Meridian.Operations.Invoicing.Contracts.*"))
+                         .MustOnlyBeReferencedByItself())
+            .Because("Every module is reached only through its Contracts surface, so the dispatch board and roster, the milestone store and log, and the invoice assembler and reconciler all stay swappable; a reference into any of them from another module turns a private implementation detail into a contract its owner can no longer revise without breaking a caller.")
+            .Fix("Depend on the module's `Contracts` type — `IDispatchBoard`, `ITrackingLog`, `IInvoiceRun` — instead of reaching into its internals.");
 
         arch.Rule("modules/invoicing/outbound")
             .Enforce(invoicing.MustOnlyReference(
@@ -19,6 +22,8 @@ Two rules govern the Invoicing module, from [arch/Meridian.Operations.ArchSpec/O
                 demurrage))
             .Because("Invoicing prices a shipment from tracking's milestone contracts and the demurrage charge and integrates with nothing else, so billing's dependencies stay the two it actually needs and the module graph stays legible.");
 ```
+
+`modules/internals` is one rule where the spec used to carry three. `arch.Each` makes the three modules the subject, one cell each, and "their own layer" means the cell a type sits in, so Invoicing's `Contracts` types, carved out of the subject, still count as Invoicing's own: a reference into the assembler from another module is red, and one from inside Invoicing, `Contracts` included, is not.
 
 `loadbearing render` turns those into the card it writes beside the module's code, [src/Meridian.Operations/Invoicing/AGENTS.md](src/Meridian.Operations/Invoicing/AGENTS.md):
 
@@ -30,7 +35,7 @@ Two rules govern the Invoicing module, from [arch/Meridian.Operations.ArchSpec/O
 
 This directory holds the `Invoicing` layer. Invoicing assembles a shipment's invoice from its milestones and its demurrage charge. Its architecture rules:
 
-- `modules/invoicing/internals` — Types in the Invoicing layer, except types in `Meridian.Operations.Invoicing.Contracts.*`, must be referenced only by the Invoicing layer. Invoicing is reached only through its Contracts surface, so the assembler, the reconciler, and the invoice-line types stay internal; a reference into them from another module would turn billing's private assembly steps into a contract it can no longer revise.
+- `modules/internals` — Types in each of the Dispatch, Tracking and Invoicing layers, except types in `Meridian.Operations.Dispatch.Contracts.*`, `Meridian.Operations.Tracking.Contracts.*` or `Meridian.Operations.Invoicing.Contracts.*`, must be referenced only by their own layer. Every module is reached only through its Contracts surface, so the dispatch board and roster, the milestone store and log, and the invoice assembler and reconciler all stay swappable; a reference into any of them from another module turns a private implementation detail into a contract its owner can no longer revise without breaking a caller.
 - `modules/invoicing/outbound` — The Invoicing layer must reference only types in `Meridian.Operations.Tracking.Contracts.*` or the Demurrage layer (external packages are not constrained by this rule). Invoicing prices a shipment from tracking's milestone contracts and the demurrage charge and integrates with nothing else, so billing's dependencies stay the two it actually needs and the module graph stays legible.
 - Expand any rule above with `loadbearing explain <rule-id>`.
 <!-- loadbearing:end -->
@@ -60,27 +65,27 @@ The three law modules each publish a `Contracts` namespace and keep the rest to 
 - Invoicing reads `Tracking.Contracts` and the Demurrage layer to price a shipment.
 - Host is the composition root: it wires the three module `Contracts` surfaces and the demurrage calculator facade, and sees no module's internals.
 
-Those allow-lists are the module graph. v1 has no cycle-detection combinator: the graph is acyclic because each module's allow-list names its outbound arrows by hand, and none of them point back. Draw an arrow the spec does not list, and `check` goes red.
+Those allow-lists are the module graph. The language has a cycle gate, `arch.Each(dispatch, tracking, invoicing).MustNotHaveCircularReferences()`, which would let the three modules reference each other so long as no circle closes; Operations does not write it, because its allow-lists say more. Each module's `MustOnlyReference` names its outbound arrows by hand, none of them points back, and an arrow the spec does not list is red whether or not it closes a circle. The cycle gate is the law for peers whose order nobody has stated yet. Here the order is the spec.
 
-[ARCHITECTURE.md](ARCHITECTURE.md) is that map, drawn rather than listed. Its law fence has ten nodes; the codebase survey beside it has two, because MSBuild sees one project and the module lines exist only in the spec. Tracking's leaf rule names no target at all, and the three `internals` rules name a single place at both ends, so all four are listed under the fence instead of drawn as arrows to themselves.
+[ARCHITECTURE.md](ARCHITECTURE.md) is that map, drawn rather than listed. Its law fence has ten nodes; the codebase survey beside it has two, because MSBuild sees one project and the module lines exist only in the spec. Tracking's leaf rule names no target at all, and `modules/internals` ranges over three modules whose far end is a different module for every cell, so both are listed under the fence instead of drawn as arrows to themselves.
 
 ## One edit, two rules
 
 An agent working in Dispatch wants a quick invoice preview and constructs Invoicing's internal `InvoiceAssembler` directly. It compiles: `internal` is assembly-wide in a monolith, so nothing at the language level stops one module from reaching into another's internals. `dotnet build` is green. `check` is not, and it fails twice on the one reference:
 
 ```text
-FAIL modules/invoicing/internals — Types in the Invoicing layer, except types in `Meridian.Operations.Invoicing.Contracts.*`, must be referenced only by the Invoicing layer.
-  because: Invoicing is reached only through its Contracts surface, so the assembler, the reconciler, and the invoice-line types stay internal; a reference into them from another module would turn billing's private assembly steps into a contract it can no longer revise.
-  fix: Depend on `IInvoiceRun` or another `Invoicing.Contracts` type instead of the internal assembler or reconciler.
+FAIL modules/internals — Types in each of the Dispatch, Tracking and Invoicing layers, except types in `Meridian.Operations.Dispatch.Contracts.*`, `Meridian.Operations.Tracking.Contracts.*` or `Meridian.Operations.Invoicing.Contracts.*`, must be referenced only by their own layer.
+  because: Every module is reached only through its Contracts surface, so the dispatch board and roster, the milestone store and log, and the invoice assembler and reconciler all stay swappable; a reference into any of them from another module turns a private implementation detail into a contract its owner can no longer revise without breaking a caller.
+  fix: Depend on the module's `Contracts` type — `IDispatchBoard`, `ITrackingLog`, `IInvoiceRun` — instead of reaching into its internals.
   src/Meridian.Operations/Dispatch/InvoicePreview.cs:9 — Meridian.Operations.Dispatch.InvoicePreview references Meridian.Operations.Invoicing.InvoiceAssembler
 FAIL modules/dispatch/outbound — The Dispatch layer must reference only types in `Meridian.Operations.Tracking.Contracts.*` (external packages are not constrained by this rule).
   because: The module dependency graph is kept explicit and acyclic: dispatch consumes tracking's milestone contracts to gate a haulage leg and reaches nothing else, so the only arrow out of dispatch is the one drawn here and the monolith can still be split along its module lines.
   src/Meridian.Operations/Dispatch/InvoicePreview.cs:9 — Meridian.Operations.Dispatch.InvoicePreview references Meridian.Operations.Invoicing.InvoiceAssembler
 
-Checked 10 rules: 7 passed, 2 failed, 1 skipped (2 violations, 0 warnings).
+Checked 8 rules: 5 passed, 2 failed, 1 skipped (2 violations, 0 warnings).
 ```
 
-`modules/invoicing/internals` is the reached module's guard, and it carries all four message components: the rule ID, the `because`, the `fix` naming `IInvoiceRun` as the surface to use instead, and the exact `file:line`. `modules/dispatch/outbound` is the reaching module's cap: Dispatch may point only at itself and `Tracking.Contracts`, and the new arrow into Invoicing is neither. Both fire on one reference, and that double fire is the modularity guarantee: the guarded side and the reaching side catch it independently, so deleting either rule would still leave the reach red. Remove the file, rebuild, and `check` is back to `9 passed, 0 failed, 1 skipped`.
+`modules/internals` is the reached module's guard, one rule over the three modules that fires here because the reach lands inside Invoicing's cell, and it carries all four message components: the rule ID, the `because`, the `fix` naming the `Contracts` types to use instead, and the exact `file:line`. `modules/dispatch/outbound` is the reaching module's cap: Dispatch may point only at itself and `Tracking.Contracts`, and the new arrow into Invoicing is neither. Both fire on one reference, and that double fire is the modularity guarantee: the guarded side and the reaching side catch it independently, so deleting either rule would still leave the reach red. Remove the file, rebuild, and `check` is back to `7 passed, 0 failed, 1 skipped`.
 
 ## A module can also be quarantined
 
@@ -114,7 +119,7 @@ pass demurrage/engine/containment (quarantine) — 1 grandfathered remaining (2 
 
 Spring Modulith is the nearest tool in another ecosystem, and the overlap is worth stating precisely. The shared idea is real: one module model drives both verification and generated documentation, so the docs and the checks cannot drift apart.
 
-The differences are as real. Spring Modulith is Java and Spring, and it reads the module model from package conventions and annotations. Its `verify()` adds automatic cycle detection, and its `Documenter` emits human-facing component diagrams and module canvases; it also carries runtime module features. This tool is .NET, and its boundaries are explicit reified rules, each carrying its own `because` and `fix`. It renders two targets from the one spec: a deterministic `check` for CI and agent hooks, and generated agent context, including the per-directory cards this example is built around. Postures compose, so a module can be law and a quarantined scope at once, as Demurrage is. And v1 has no automatic cycle detection: the `MustOnlyReference` allow-lists pin the DAG by hand instead.
+The differences are as real. Spring Modulith is Java and Spring, and it reads the module model from package conventions and annotations. Its `verify()` adds automatic cycle detection, and its `Documenter` emits human-facing component diagrams and module canvases; it also carries runtime module features. This tool is .NET, and its boundaries are explicit reified rules, each carrying its own `because` and `fix`. It renders two targets from the one spec: a deterministic `check` for CI and agent hooks, and generated agent context, including the per-directory cards this example is built around. Postures compose, so a module can be law and a quarantined scope at once, as Demurrage is. And where Spring Modulith detects cycles automatically, this spec states the order: the `MustOnlyReference` allow-lists pin the DAG by hand, and the cycle gate the language does have, `MustNotHaveCircularReferences()`, goes unused here because an allow-list says more than "not in a circle".
 
 ## Run it yourself
 
@@ -131,7 +136,7 @@ dotnet build examples/Meridian.Operations/Meridian.Operations.slnx
 loadbearing check examples/Meridian.Operations/Meridian.Operations.slnx
 ```
 
-Without the global tool, run the CLI from source: `dotnet run --project src/Zphil.LoadBearing.Cli -- check examples/Meridian.Operations/Meridian.Operations.slnx`. `check` exits 0 here: `Checked 10 rules: 9 passed, 0 failed, 1 skipped (0 violations, 0 warnings)`. `loadbearing render` regenerates the root block, all five module cards and the [ARCHITECTURE.md](ARCHITECTURE.md) drawings, `loadbearing status` prints the quarantine burndown, and `loadbearing explain <rule-id>` expands any rule, as does the `arch_context` MCP tool. Introduce the reach from "One edit, two rules" and `check` exits 1 with the two blocks shown there.
+Without the global tool, run the CLI from source: `dotnet run --project src/Zphil.LoadBearing.Cli -- check examples/Meridian.Operations/Meridian.Operations.slnx`. `check` exits 0 here: `Checked 8 rules: 7 passed, 0 failed, 1 skipped (0 violations, 0 warnings)`. `loadbearing render` regenerates the root block, all five module cards and the [ARCHITECTURE.md](ARCHITECTURE.md) drawings, `loadbearing status` prints the quarantine burndown, and `loadbearing explain <rule-id>` expands any rule, as does the `arch_context` MCP tool. Introduce the reach from "One edit, two rules" and `check` exits 1 with the two blocks shown there.
 
 ## From here
 

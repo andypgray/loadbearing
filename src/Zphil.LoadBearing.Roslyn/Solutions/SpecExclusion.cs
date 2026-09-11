@@ -1,5 +1,5 @@
 using Microsoft.CodeAnalysis;
-using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Internal;
 
 namespace Zphil.LoadBearing.Roslyn.Solutions;
 

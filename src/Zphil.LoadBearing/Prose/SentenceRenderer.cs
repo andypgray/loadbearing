@@ -65,6 +65,53 @@ internal static class SentenceRenderer
         return ProjectPhrase(selection);
     }
 
+    /// <summary>
+    ///     Whether a subject speaks in the collective voice (GRAMMAR §6) — a bare layer or a bare family,
+    ///     which read as their own noun phrase rather than through the "types" head.
+    /// </summary>
+    /// <remarks>
+    ///     The same structural test <see cref="Phrase(Selection,string,string)" /> makes, exposed because
+    ///     the family verbs' phrases have to agree with the voice the subject was assembled in.
+    /// </remarks>
+    internal static bool IsCollective(Selection selection)
+    {
+        return selection is not UnionSelection
+               && selection.Adjectives.Count == 0
+               && selection.Noun is LayerNoun or EachNoun;
+    }
+
+    /// <summary>
+    ///     The singular cell word — "layer" or "project" — a family subject speaking in the <em>types</em>
+    ///     voice names its cells by, and null for every other subject: a plain selection, or a family in
+    ///     the collective voice. <c>MustNotReferenceEachOther</c> and <c>MustNotHaveCircularReferences</c>
+    ///     branch on it directly and <see cref="SelfReference" /> folds it into the leaf verbs' self phrase,
+    ///     so null means the subject has no cells to name (GRAMMAR §5.3, §6).
+    /// </summary>
+    internal static string? FamilyCellWord(Selection selection)
+    {
+        if (selection is UnionSelection || selection.Noun is not EachNoun family) return null;
+
+        return IsCollective(selection) ? null : family.CellWord;
+    }
+
+    /// <summary>
+    ///     How a subject names itself as a reference target — the "self" the two leaf verbs allow (GRAMMAR
+    ///     §5.3): "their own layer" or "their own project" for a family in the types voice, "themselves" for
+    ///     any other subject in the types voice, and "itself" in the collective voice, where the subject is
+    ///     one layer, or one family read as a whole.
+    /// </summary>
+    /// <remarks>
+    ///     The reflexive agrees in number with the head the sentence was assembled under (§6): a plain
+    ///     types-voice subject is the plural "types", so a singular "itself" would misagree with it, and a
+    ///     family in that voice names the cell instead, because its self is the cell rather than the family.
+    /// </remarks>
+    internal static string SelfReference(Selection selection)
+    {
+        if (FamilyCellWord(selection) is { } cell) return $"their own {cell}";
+
+        return IsCollective(selection) ? "itself" : "themselves";
+    }
+
     /// <summary>How a selection reads in reference position (lowercase; joins union members).</summary>
     internal static string Reference(Selection selection)
     {
@@ -145,12 +192,47 @@ internal static class SentenceRenderer
     ///     The layer definition fragment for the module map: <c>**Domain** — `MyApp.Domain.*`</c>, and with a
     ///     purpose <c>**Domain** — `MyApp.Domain.*`. {purpose}</c> — prefix-preserving, the purpose verbatim.
     /// </summary>
+    /// <remarks>
+    ///     A definition spells the row's first half instead of the globs: a bare noun as its locative without
+    ///     the head — <c>project `MyApp.Core`</c>, <c>projects `A` or `B`</c> — which is how the glob row
+    ///     already reads its own noun, and anything else (a refinement, a heterogeneous union) as its
+    ///     reference phrase: <c>types in the Core layer in `MyApp.Core.Model.*`</c>.
+    /// </remarks>
     internal static string LayerDefinition(LayerNoun noun, string? purpose)
     {
-        string globs = string.Join(", ", noun.Globs.Select(ProseFormat.Backtick));
-        var fragment = $"**{noun.Name}** — {globs}";
+        var fragment = $"**{noun.Name}** — {DefinitionPhrase(noun)}";
         if (purpose is not null) fragment += $". {purpose}";
         return fragment;
+    }
+
+    // The row's first half: the glob list, or what the definition names.
+    private static string DefinitionPhrase(LayerNoun noun)
+    {
+        if (noun.Definition is not { } definition) return string.Join(", ", noun.Globs.Select(ProseFormat.Backtick));
+
+        return BareLocative(definition) ?? Reference(definition);
+    }
+
+    // A bare noun's locative with the "types" head dropped, or null for a definition that has no such
+    // reading — one carrying adjectives, a union whose operands do not collapse, or a noun whose whole
+    // phrase is its head (a type, a registration, bare Types). Null falls through to the reference phrase,
+    // which those nouns read correctly on their own.
+    private static string? BareLocative(Selection definition)
+    {
+        if (definition.Adjectives.Count > 0) return null;
+
+        string? locative = definition is UnionSelection union ? CollapsedLocativeOf(union) : definition.Noun.Locative;
+        const string head = " in ";
+        return locative is not null && locative.StartsWith(head, StringComparison.Ordinal)
+            ? locative.Substring(head.Length)
+            : null;
+    }
+
+    // The hoisted locative of a union whose operands agree, or null when they do not.
+    private static string? CollapsedLocativeOf(UnionSelection union)
+    {
+        IReadOnlyList<SelectionNoun>? nouns = CollapsibleNouns(union);
+        return nouns is null ? null : nouns[0].CollapsedLocative(nouns);
     }
 
     private static string Phrase(Selection selection)
@@ -169,9 +251,11 @@ internal static class SentenceRenderer
         SelectionNoun noun = selection.Noun;
         IReadOnlyList<SelectionAdjective> adjectives = selection.Adjectives;
 
-        // Collective voice: a bare layer with no adjectives ("the Domain layer"). Any adjective
-        // switches to types voice — the switch is structural, hence deterministic (GRAMMAR §6).
-        if (noun is LayerNoun && adjectives.Count == 0 && headOverride is null && headPrefixOverride is null)
+        // Collective voice: a bare layer or a bare family with no adjectives ("the Domain layer", "each
+        // of the Host, Adapter and Pack layers"). Any adjective switches to types voice — the switch is
+        // structural, hence deterministic (GRAMMAR §6). IsCollective states the same test for the verb
+        // phrases, which have to agree with the voice assembled here.
+        if (noun is LayerNoun or EachNoun && adjectives.Count == 0 && headOverride is null && headPrefixOverride is null)
             return noun.ReferenceFragment;
 
         // The head defaults to "types" (the type nouns) but is taken from the noun for a noun whose

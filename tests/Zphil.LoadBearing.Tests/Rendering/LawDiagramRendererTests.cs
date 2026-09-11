@@ -162,6 +162,68 @@ public sealed class LawDiagramRendererTests
     }
 
     [Fact]
+    public void Block_TheInboundLeafVerb_DrawsNoEdgeAndIsListedLikeTheOutboundOne()
+    {
+        // Arrange — the inbound twin of the row above. It is drawable so that its subject's place is
+        // registered (a hermetic set is a node of the graph), and it names no operand, so it draws nothing.
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Rule("r/hermetic")
+                .Enforce(arch.Namespace("A.*").MustOnlyBeReferencedByItself())
+                .Because("x"));
+
+        // Act
+        string block = LawDiagramRenderer.Block(model, SpecName);
+
+        // Assert
+        Edges(block)
+            .ShouldBeEmpty();
+        block.ShouldContain("s_A[\"A.*\"]");
+        block.ShouldEndWith("Not drawn in full: `r/hermetic`. Expand any of them with `loadbearing explain <rule-id>`.");
+    }
+
+    [Fact]
+    public void Block_TheCrossCellBan_DrawsNothingAtAllAndIsListed()
+    {
+        // Arrange — a family's far end is a different place for every cell, so no arrow could say the law
+        // and the family is not one place either. The drawing narrows; the law joins the compact list.
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Rule("r/leaves")
+                .Enforce(arch.Each(arch.Layer("A", "A.*"), arch.Layer("B", "B.*")).MustNotReferenceEachOther())
+                .Because("x"));
+
+        // Act
+        string block = LawDiagramRenderer.Block(model, SpecName);
+
+        // Assert — not even the cells' places are registered: the classifier declines the verb before any
+        // place is read, which is what keeps a node off the drawing that no edge would ever reach.
+        Edges(block)
+            .ShouldBeEmpty();
+        block.ShouldNotContain("s_A[\"A\"]");
+        block.ShouldEndWith("Not drawn in full: `r/leaves`. Expand any of them with `loadbearing explain <rule-id>`.");
+    }
+
+    [Fact]
+    public void Block_TheCircularReferencesVerb_DrawsNothingAtAllAndIsListed()
+    {
+        // Arrange — the cycle gate forbids a property of a path rather than an edge, so no arrow could say
+        // it however the cells are drawn. The drawing narrows; the law joins the compact list.
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Rule("r/no-circles")
+                .Enforce(arch.Each(arch.Layer("A", "A.*"), arch.Layer("B", "B.*")).MustNotHaveCircularReferences())
+                .Because("x"));
+
+        // Act
+        string block = LawDiagramRenderer.Block(model, SpecName);
+
+        // Assert — the cells' places are not registered either, for the cross-cell ban's reason: the
+        // classifier declines the verb before any place is read.
+        Edges(block)
+            .ShouldBeEmpty();
+        block.ShouldNotContain("s_A[\"A\"]");
+        block.ShouldEndWith("Not drawn in full: `r/no-circles`. Expand any of them with `loadbearing explain <rule-id>`.");
+    }
+
+    [Fact]
     public void Block_AMigrateRule_SwitchesTheSameEdgeToGrandfatheredDebt()
     {
         // Arrange — one banned relation and one exposure, each as Migrate rather than Enforce.
@@ -472,6 +534,118 @@ public sealed class LawDiagramRendererTests
                 "subgraph l_legend[\"Legend\"]",
                 "l_ban[\"--x = must not reference\"]",
                 "l_outside[\"Rounded box = a place named only as the target of a rule\"]",
+                "end"
+            ]);
+    }
+
+    [Fact]
+    public void Block_AProjectDefinedLayerAndItsProject_DrawOneNodeUnderTheLayerName()
+    {
+        // Arrange — the glob collapse's twin, in both directions: a rule naming the layer and a rule naming
+        // the project it is defined as.
+        ArchitectureModel model = Checker.Model(arch =>
+        {
+            Layer core = arch.Layer("Core", arch.Project("MyApp.Core"));
+            arch.Rule("r/one")
+                .Enforce(core.MustNotReference(arch.Namespace("Z.*")))
+                .Because("x");
+            arch.Rule("r/two")
+                .Enforce(arch.Project("MyApp.Core").MustNotReference(arch.Namespace("Y.*")))
+                .Because("x");
+        });
+
+        // Act
+        string block = LawDiagramRenderer.Block(model, SpecName);
+
+        // Assert — one node, named in the spec's own vocabulary, exactly as the single-glob layer earns.
+        MermaidBlock.Diagram(block)
+            .ShouldBe([
+                "s_Core[\"Core\"]",
+                "s_Z(\"Z.*\")",
+                "s_Y(\"Y.*\")",
+                "",
+                "s_Core --x s_Z",
+                "s_Core --x s_Y",
+                "",
+                "subgraph l_legend[\"Legend\"]",
+                "l_ban[\"--x = must not reference\"]",
+                "l_outside[\"Rounded box = a place named only as the target of a rule\"]",
+                "end"
+            ]);
+    }
+
+    [Fact]
+    public void Block_ARefinementDefinedLayer_IsDrawnInsideTheLayerItRefines()
+    {
+        // Arrange — the head layer anchors no rule of its own, so the box it gets comes from the inner
+        // layer's definition and from nothing else. Neither place carries a glob, so glob implication
+        // could not have drawn this.
+        ArchitectureModel model = Checker.Model(arch =>
+        {
+            Layer core = arch.Layer("Core", arch.Project("MyApp.Core"));
+            Layer inner = arch.Layer("Model", core.InNamespace("MyApp.Core.Model.*"));
+            arch.Rule("r/one")
+                .Enforce(inner.MustNotReference(arch.Namespace("Z.*")))
+                .Because("x");
+        });
+
+        // Act
+        string block = LawDiagramRenderer.Block(model, SpecName);
+
+        // Assert — the container is drawn before its content, and the nesting legend row comes with it.
+        MermaidBlock.Diagram(block)
+            .ShouldBe([
+                "subgraph s_Core[\"Core\"]",
+                "s_Model[\"Model\"]",
+                "end",
+                "s_Z(\"Z.*\")",
+                "",
+                "s_Model --x s_Z",
+                "",
+                "subgraph l_legend[\"Legend\"]",
+                "l_ban[\"--x = must not reference\"]",
+                "l_outside[\"Rounded box = a place named only as the target of a rule\"]",
+                "l_nesting[\"A box inside a box = the inner place is part of the outer\"]",
+                "end"
+            ]);
+    }
+
+    [Fact]
+    public void Block_AUnionDefinedLayer_DrawsEachOperandInsideIt()
+    {
+        // Arrange — a union of places is the box its operands sit in, and one of those operands is also
+        // named by a rule of its own, so the collapse and the nesting have to agree on one node.
+        ArchitectureModel model = Checker.Model(arch =>
+        {
+            Layer shipping = arch.Layer("Shipping", arch.AnyOf(arch.Project("MyApp.Core"), arch.Namespace("MyApp.Web.*")));
+            arch.Rule("r/one")
+                .Enforce(shipping.MustNotReference(arch.Namespace("Z.*")))
+                .Because("x");
+            arch.Rule("r/two")
+                .Enforce(arch.Namespace("MyApp.Web.*").MustNotReference(arch.Namespace("Y.*")))
+                .Because("x");
+        });
+
+        // Act
+        string block = LawDiagramRenderer.Block(model, SpecName);
+
+        // Assert — one Web node, drawn inside Shipping and carrying both its own edge and none of the box's.
+        MermaidBlock.Diagram(block)
+            .ShouldBe([
+                "subgraph s_Shipping[\"Shipping\"]",
+                "s_MyApp_Core[\"MyApp.Core\"]",
+                "s_MyApp_Web[\"MyApp.Web.*\"]",
+                "end",
+                "s_Z(\"Z.*\")",
+                "s_Y(\"Y.*\")",
+                "",
+                "s_Shipping --x s_Z",
+                "s_MyApp_Web --x s_Y",
+                "",
+                "subgraph l_legend[\"Legend\"]",
+                "l_ban[\"--x = must not reference\"]",
+                "l_outside[\"Rounded box = a place named only as the target of a rule\"]",
+                "l_nesting[\"A box inside a box = the inner place is part of the outer\"]",
                 "end"
             ]);
     }

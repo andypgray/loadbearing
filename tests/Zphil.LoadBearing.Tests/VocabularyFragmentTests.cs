@@ -35,6 +35,119 @@ public class VocabularyFragmentTests
     }
 
     [Fact]
+    public void MustOnlyBeReferencedByItself_RendersTheInboundLeaf()
+    {
+        // §5.3: the inbound twin of the outbound leaf, and it takes no caveat for the same reason
+        // MustOnlyBeReferencedBy does not — only solution types can be observed referencing (§4.1).
+        SentenceRenderer.Sentence(Arch.Layer("Tracking", "MyApp.Tracking.*").MustOnlyBeReferencedByItself())
+            .ShouldBe("The Tracking layer must be referenced only by itself.");
+    }
+
+    [Fact]
+    public void MustNotReferenceEachOther_OverAFamily_SpeaksOfTheOthers()
+    {
+        // §5.1/§5.3: the cross-cell ban's targets are the subject's own cells, so the collective voice
+        // needs no list — "the others" is every cell but the one the sentence is speaking of.
+        Selection family = Arch.Each(
+            Arch.Layer("Host", "MyApp.Host.*"), Arch.Layer("Adapter", "MyApp.Adapter.*"), Arch.Layer("Pack", "MyApp.Pack.*"));
+
+        SentenceRenderer.Sentence(family.MustNotReferenceEachOther())
+            .ShouldBe("Each of the Host, Adapter and Pack layers must not reference the others.");
+    }
+
+    [Fact]
+    public void MustNotReferenceEachOther_OverAProjectFamily_SpeaksOfTheProjects()
+    {
+        SentenceRenderer.Sentence(Arch.Each(Arch.Projects.Matching("MyApp.*")).MustNotReferenceEachOther())
+            .ShouldBe("Each of the projects matching `MyApp.*` must not reference the others.");
+    }
+
+    [Fact]
+    public void MustNotHaveCircularReferences_OverAFamily_SpeaksOfTheOthers()
+    {
+        // §5.1/§5.3: the cycle gate's nodes are the subject's own cells, so it borrows the cross-cell ban's
+        // collective phrasing — "the others" is every cell but the one the sentence is speaking of.
+        Selection family = Arch.Each(
+            Arch.Layer("Model", "Zphil.LoadBearing.Model.*"),
+            Arch.Layer("Checking", "Zphil.LoadBearing.Checking.*"),
+            Arch.Layer("Rendering", "Zphil.LoadBearing.Rendering.*"));
+
+        SentenceRenderer.Sentence(family.MustNotHaveCircularReferences())
+            .ShouldBe("Each of the Model, Checking and Rendering layers must not have circular references with the others.");
+    }
+
+    [Fact]
+    public void FamilyVerbs_InTypesVoice_NameTheCellWord()
+    {
+        // §5.3/§6: the four family-aware phrases are voice-aware, and only on a family — an adjective
+        // switches the subject to types voice, where "the others" and "itself" have to say what a cell is.
+        Selection layers = Arch.Each(Arch.Layer("Dispatch", "Ops.Dispatch.*"), Arch.Layer("Tracking", "Ops.Tracking.*"))
+            .WithSuffix("Engine");
+        Selection projects = Arch.Each(Arch.Projects.Matching("Nop.Plugin.*"))
+            .Authored();
+
+        SentenceRenderer.Sentence(layers.MustNotReferenceEachOther())
+            .ShouldBe("Types in each of the Dispatch and Tracking layers named `*Engine` must not reference the other layers.");
+        SentenceRenderer.Sentence(layers.MustNotHaveCircularReferences())
+            .ShouldBe(
+                "Types in each of the Dispatch and Tracking layers named `*Engine` must not have circular references "
+                + "with the other layers.");
+        SentenceRenderer.Sentence(layers.MustOnlyBeReferencedByItself())
+            .ShouldBe("Types in each of the Dispatch and Tracking layers named `*Engine` must be referenced only by their own layer.");
+        SentenceRenderer.Sentence(layers.MustOnlyReferenceItself())
+            .ShouldBe(
+                "Types in each of the Dispatch and Tracking layers named `*Engine` must reference only their own layer "
+                + "(external packages are not constrained by this rule).");
+        SentenceRenderer.Sentence(projects.MustNotReferenceEachOther())
+            .ShouldBe("Authored types in each of the projects matching `Nop.Plugin.*` must not reference the other projects.");
+        SentenceRenderer.Sentence(projects.MustOnlyReferenceItself())
+            .ShouldBe(
+                "Authored types in each of the projects matching `Nop.Plugin.*` must reference only their own project "
+                + "(external packages are not constrained by this rule).");
+    }
+
+    [Fact]
+    public void TheTwoLeafVerbs_OnAPlainSubject_AgreeInNumberWithTheTypesHead()
+    {
+        // §5.3/§6: a plain subject in types voice is plural — its head is "types" — so the reflexive is
+        // "themselves"; only the collective voice (a bare layer, above) says "itself", and only a family
+        // names its cell instead. A union is types voice too, and has no cell.
+        Selection refined = Arch.Namespace("MyApp.Tracking.*")
+            .WithSuffix("Service");
+        Selection union = Arch.AnyOf(Arch.Namespace("MyApp.Tracking.*"), Arch.Namespace("MyApp.Billing.*"));
+
+        SentenceRenderer.Sentence(refined.MustOnlyReferenceItself())
+            .ShouldBe(
+                "Types in `MyApp.Tracking.*` named `*Service` must reference only themselves "
+                + "(external packages are not constrained by this rule).");
+        SentenceRenderer.Sentence(refined.MustOnlyBeReferencedByItself())
+            .ShouldBe("Types in `MyApp.Tracking.*` named `*Service` must be referenced only by themselves.");
+        SentenceRenderer.Sentence(union.MustOnlyBeReferencedByItself())
+            .ShouldBe("Types in `MyApp.Tracking.*` or `MyApp.Billing.*` must be referenced only by themselves.");
+    }
+
+    [Fact]
+    public void FamilyOfThreeModules_RendersTheOperationsSentence()
+    {
+        // The corpus witness (GRAMMAR §5.1): one sentence where the spec used to state three, with the
+        // three Contracts cones carved out of the subject and still counting as each module's own.
+        Selection modules = Arch.Each(
+                Arch.Layer("Dispatch", "Meridian.Operations.Dispatch.*"),
+                Arch.Layer("Tracking", "Meridian.Operations.Tracking.*"),
+                Arch.Layer("Invoicing", "Meridian.Operations.Invoicing.*"))
+            .Except(
+                Arch.Namespace("Meridian.Operations.Dispatch.Contracts.*"),
+                Arch.Namespace("Meridian.Operations.Tracking.Contracts.*"),
+                Arch.Namespace("Meridian.Operations.Invoicing.Contracts.*"));
+
+        SentenceRenderer.Sentence(modules.MustOnlyBeReferencedByItself())
+            .ShouldBe(
+                "Types in each of the Dispatch, Tracking and Invoicing layers, except types in "
+                + "`Meridian.Operations.Dispatch.Contracts.*`, `Meridian.Operations.Tracking.Contracts.*` or "
+                + "`Meridian.Operations.Invoicing.Contracts.*`, must be referenced only by their own layer.");
+    }
+
+    [Fact]
     public void MustOnlyBeReferencedBy_OmitsCaveat()
     {
         // §4.1: only solution types can be observed referencing, so no caveat is needed.

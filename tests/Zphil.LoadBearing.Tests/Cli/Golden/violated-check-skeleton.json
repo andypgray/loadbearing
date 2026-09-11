@@ -4,11 +4,11 @@
   "specAssembly": "Zphil.LoadBearing.MyAppViolatedSpec.dll",
   "grain": "skeleton",
   "summary": {
-    "rulesChecked": 29,
+    "rulesChecked": 31,
     "rulesPassed": 2,
-    "rulesFailed": 25,
+    "rulesFailed": 27,
     "rulesSkipped": 2,
-    "violations": 44,
+    "violations": 51,
     "warnings": 1
   },
   "rules": [
@@ -19,6 +19,26 @@
       "sentence": "The Domain layer must not reference the Web layer.",
       "because": "Domain is UI-agnostic; transaction boundaries live in services.",
       "fix": "Define an abstraction in Domain and implement it in Web.",
+      "violationCount": 2,
+      "warnings": []
+    },
+    {
+      "id": "layering/projects-independent",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Each of the projects matching `MyApp.*` must not reference the others.",
+      "because": "Each MyApp project is its own deployable unit; a reference from one into another couples their release cadences.",
+      "fix": "Move the shared type into a project both may reference, or reach the other project through an abstraction it owns.",
+      "violationCount": 5,
+      "warnings": []
+    },
+    {
+      "id": "layering/web-cuts-not-circular",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Each of the Reporting and Invoicing layers must not have circular references with the others.",
+      "because": "Reporting and invoicing are two cuts of the web layer with no intended order between them; a circle means neither can be extracted without dragging the other along.",
+      "fix": "Move what one cut borrows from the other into a type both may reach, or pick a direction and state it as an ordering rule.",
       "violationCount": 2,
       "warnings": []
     },

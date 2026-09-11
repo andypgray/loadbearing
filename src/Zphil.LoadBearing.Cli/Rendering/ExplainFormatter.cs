@@ -44,12 +44,11 @@ internal static class ExplainFormatter
 
     private static string Header(ArchRule rule)
     {
-        string posture = rule.Posture switch
-        {
-            Posture.Quarantine or Posture.Caution when rule.Scope is { } scope =>
-                $"{rule.Posture.ToString().ToLowerInvariant()}/{scope.Role.ToString().ToLowerInvariant()}",
-            _ => rule.Posture.ToString().ToLowerInvariant()
-        };
+        // Keyed on the payload rather than the posture: only a scope's children carry one, so a posture
+        // added later gets its role in the header with no edit here.
+        string posture = rule.Posture.ToString().ToLowerInvariant();
+        if (rule.Scope is { } scope) posture += "/" + scope.Role.ToString().ToLowerInvariant();
+
         return $"{rule.Id} ({posture})";
     }
 

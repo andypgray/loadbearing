@@ -33,6 +33,14 @@ public sealed class HumanReportRendererTests
 
     private static readonly CodebaseModel AsyncModel = CompilationFactory.Extract(AsyncSource);
 
+    // The shared/utilities caution both the fired and the silent row are about — the same scope, so the
+    // only difference between them is whether a warning reached the block.
+    private static readonly ArchRule SharedUtilitiesTripwire = Checker.Tripwire(arch =>
+        arch.Scope("shared/utilities")
+            .Caution(arch.Namespace("MyApp.Shared.*"))
+            .Dragons("Argument order is load-bearing.")
+            .Because("Every caller passes them positionally."));
+
     [Fact]
     public void RuleBlock_RuleError_RendersErrorPrefixedDetailLine()
     {
@@ -304,7 +312,7 @@ public sealed class HumanReportRendererTests
     [Fact]
     public void RuleBlock_FiredQuarantineTripwire_PrintsTheDragonsOnceBeneathTheWarnings()
     {
-        ArchRule tripwire = Tripwire(arch =>
+        ArchRule tripwire = Checker.Tripwire(arch =>
             arch.Scope("legacy/billing")
                 .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
                 .Dragons("Banker's rounding happens at line-item level.")
@@ -324,13 +332,7 @@ public sealed class HumanReportRendererTests
     [Fact]
     public void RuleBlock_FiredCautionTripwire_PrintsTheDragonsBeneathTheWarning()
     {
-        ArchRule tripwire = Tripwire(arch =>
-            arch.Scope("shared/utilities")
-                .Caution(arch.Namespace("MyApp.Shared.*"))
-                .Dragons("Argument order is load-bearing.")
-                .Because("Every caller passes them positionally."));
-
-        Touched(tripwire, CheckWarningKind.CautionedScopeTouched, "Helpers.cs")
+        Touched(SharedUtilitiesTripwire, CheckWarningKind.CautionedScopeTouched, "Helpers.cs")
             .HumanBlock()
             .ShouldEndWith("\n  dragons: Argument order is load-bearing.");
     }
@@ -338,15 +340,9 @@ public sealed class HumanReportRendererTests
     [Fact]
     public void RuleBlock_SilentTripwire_PrintsNoDragonsLine()
     {
-        ArchRule tripwire = Tripwire(arch =>
-            arch.Scope("shared/utilities")
-                .Caution(arch.Namespace("MyApp.Shared.*"))
-                .Dragons("Argument order is load-bearing.")
-                .Because("Every caller passes them positionally."));
-
         // Nothing in the change set touched the scope. The dragons are still true, but stating them under a
         // rule that did not fire puts them on every clean run of every check.
-        var quiet = new RuleResult(tripwire, RuleStatus.Passed, []);
+        var quiet = new RuleResult(SharedUtilitiesTripwire, RuleStatus.Passed, []);
 
         quiet.HumanBlock()
             .ShouldNotContain("dragons");
@@ -355,7 +351,7 @@ public sealed class HumanReportRendererTests
     [Fact]
     public void RuleBlock_FiredTripwireWithBothDragonsForms_PrintsBothLinesInOrder()
     {
-        ArchRule tripwire = Tripwire(arch =>
+        ArchRule tripwire = Checker.Tripwire(arch =>
             arch.Scope("shared/utilities")
                 .Caution(arch.Namespace("MyApp.Shared.*"))
                 .Dragons("Argument order is load-bearing.")
@@ -370,7 +366,7 @@ public sealed class HumanReportRendererTests
     [Fact]
     public void RuleBlock_FiredTripwireWithDragonsDocOnly_PrintsTheDocLineAlone()
     {
-        ArchRule tripwire = Tripwire(arch =>
+        ArchRule tripwire = Checker.Tripwire(arch =>
             arch.Scope("shared/utilities")
                 .Caution(arch.Namespace("MyApp.Shared.*"))
                 .DragonsDoc("arch/utilities-dragons.md")
@@ -404,14 +400,6 @@ public sealed class HumanReportRendererTests
     private static ArchRule EnforceRule(string id)
     {
         return new ArchRule(id, Posture.Enforce, "b", null, "s", null, null, null);
-    }
-
-    // A scope's tripwire, built through the spec so it carries the real scope payload the dragons lines
-    // read; the caller declares the scope so each row spells the posture and the dragons forms it is about.
-    private static ArchRule Tripwire(Action<Arch> declareScope)
-    {
-        return Checker.Model(declareScope)
-            .Rules.Single(rule => rule.Scope is { Role: ScopeRole.Tripwire });
     }
 
     // A tripwire that fired: one warning per changed file, which is what the checker produces and what lets

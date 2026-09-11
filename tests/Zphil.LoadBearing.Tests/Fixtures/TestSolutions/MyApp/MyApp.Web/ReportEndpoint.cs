@@ -17,4 +17,8 @@ public class ReportEndpoint
             return -1;
         }
     }
+
+    // The Reporting half of the web layer's circle: Reporting reaches Invoicing here, and
+    // InvoiceCreatedHandler reaches back — the layering/web-cuts-not-circular red.
+    public InvoiceService Invoices;
 }

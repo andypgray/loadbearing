@@ -15,8 +15,9 @@ namespace Zphil.LoadBearing.Rendering;
 ///     which types inside it the rule governs, and no adjective moves the node, because a diagram has no
 ///     room to say "except these four types" and <c>loadbearing explain</c> carries the exact subject. A
 ///     union has no single noun (and <see cref="Selection.Noun" /> throws on one), a registration is a
-///     lifetime rather than a location, and bare <c>arch.Types</c> is the whole solution — none of the
-///     three is a place, so all three go to the list.
+///     lifetime rather than a location, bare <c>arch.Types</c> is the whole solution, and a family
+///     (<c>arch.Each</c>) is several places at once — none of the four is a place, so all four go to the
+///     list.
 /// </remarks>
 internal static class LawPlaceClassifier
 {
@@ -31,9 +32,14 @@ internal static class LawPlaceClassifier
 
     /// <summary>
     ///     What the fence draws for a verb, or null when the verb draws nothing. The drawable verbs are
-    ///     the four dependency-direction verbs, the leaf form of the outbound allow-list, and the exposure
+    ///     the four dependency-direction verbs, the two leaf forms of the allow-lists, and the exposure
     ///     verb; every other verb constrains a shape, a name, or a member rather than a relation between
-    ///     two places, and an arrow would misrepresent it.
+    ///     two places, and an arrow would misrepresent it. The cross-cell ban
+    ///     (<c>MustNotReferenceEachOther</c>) is not among them: its far end is a different place for every
+    ///     cell, so one arrow could not say it and its subject is not a place either. Neither is the cycle
+    ///     gate (<c>MustNotHaveCircularReferences</c>), and for a further reason: no arrow can say "no
+    ///     circle" — the law forbids a property of a path, not an edge. Both fall to the compact list under
+    ///     the fence with their subject.
     /// </summary>
     /// <remarks>
     ///     One reading answers the whole drawing — the arrow's direction, the self-edge an allow-list makes
@@ -51,7 +57,7 @@ internal static class LawPlaceClassifier
             MustNotReferenceConstraint => new DrawableVerb(inbound: false, only: false, verbWord: null),
             MustNotBeReferencedByConstraint => new DrawableVerb(inbound: true, only: false, verbWord: null),
             MustOnlyReferenceConstraint or MustOnlyReferenceItselfConstraint => new DrawableVerb(inbound: false, only: true, verbWord: OnlyVerb),
-            MustOnlyBeReferencedByConstraint => new DrawableVerb(inbound: true, only: true, verbWord: OnlyVerb),
+            MustOnlyBeReferencedByConstraint or MustOnlyBeReferencedByItselfConstraint => new DrawableVerb(inbound: true, only: true, verbWord: OnlyVerb),
             MustNotExposeConstraint => new DrawableVerb(inbound: false, only: false, verbWord: ExposeVerb),
             _ => null
         };
@@ -132,12 +138,6 @@ internal static class LawPlaceClassifier
 
         switch (selection.Noun)
         {
-            case LayerNoun layer:
-                return FromLayer(layer);
-            case NamespaceNoun @namespace:
-                return FromGlob(@namespace.Glob, layers);
-            case ProjectNoun project:
-                return new LawPlace("project:" + project.Name, project.Name, project.Name, [], false);
             case TypeNoun type when position == PlacePosition.Facade:
                 return FromFacade(type.Type);
             case TypeNoun type when position == PlacePosition.Operand:
@@ -145,16 +145,89 @@ internal static class LawPlaceClassifier
             case TypesNoun:
                 return FromTypes(selection, layers);
             default:
-                return null;
+                // A region noun — a layer, a namespace, a project — is the same place in every position,
+                // and a layer definition's own head is read through the same arm.
+                return NounPlace(selection.Noun, layers);
         }
     }
 
-    // A layer's name is its identity in the spec's own vocabulary, so it is the label whatever the globs
-    // say. The key follows the collapse rule: one glob and the layer IS that glob.
-    private static LawPlace FromLayer(LayerNoun layer)
+    // The place a bare noun stands on, or null for a noun that is not a region of the codebase.
+    private static LawPlace? NounPlace(SelectionNoun noun, IReadOnlyList<LayerDefinition> layers)
+    {
+        return noun switch
+        {
+            LayerNoun layer => FromLayer(layer, layers),
+            NamespaceNoun @namespace => FromGlob(@namespace.Glob, layers),
+            ProjectNoun project => FromProject(project.Name, layers),
+            _ => null
+        };
+    }
+
+    // A layer's name is its identity in the spec's own vocabulary, so it is the label whatever defines it.
+    // The key follows the collapse rules: a layer that IS one glob or one project takes that place's key, so
+    // a rule naming the layer and a rule naming its definition draw one node. Anything else is a place of
+    // the layer's own — nested inside what it refines, holding what it unions — or no place at all.
+    private static LawPlace? FromLayer(LayerNoun layer, IReadOnlyList<LayerDefinition> layers)
+    {
+        // The glob form, and the definition that names a namespace region: Globs carries the region, so
+        // both take the glob place and collapse with a rule naming the glob itself.
+        if (layer.Definition is not { } definition || layer.Globs.Count > 0) return FromGlobs(layer);
+
+        if (definition is UnionSelection union) return FromUnion(layer, union, layers);
+
+        if (definition.Adjectives.Count == 0 && definition.Noun is ProjectNoun project)
+            return FromProject(project.Name, layers);
+
+        // A refinement of a place — most often another layer's cone — is its own box drawn inside the
+        // place it refines. Structural, because nesting everywhere else is glob implication, and neither a
+        // project nor a refinement has globs to imply anything with.
+        LawPlace? parent = NounPlace(definition.Noun, layers);
+        return parent is null
+            ? null
+            : new LawPlace("layer:" + layer.Name, layer.Name, layer.Name, [], true) { Parent = parent };
+    }
+
+    private static LawPlace FromGlobs(LayerNoun layer)
     {
         string key = layer.Globs.Count == 1 ? layer.Globs[0] : "layer:" + layer.Name;
         return new LawPlace(key, layer.Name, layer.Name, layer.Globs, true);
+    }
+
+    // An adjective-free union of places is the box its operands sit in: it covers no region of its own, and
+    // each operand's place is drawn inside it. A union carrying adjectives, or one holding an operand this
+    // classifier cannot place, is not a place at all — its rules join the compact list rather than drawing a
+    // box that is missing part of itself.
+    private static LawPlace? FromUnion(LayerNoun layer, UnionSelection union, IReadOnlyList<LayerDefinition> layers)
+    {
+        if (union.Adjectives.Count > 0) return null;
+
+        var children = new List<LawPlace>(union.Parts.Count);
+        foreach (Selection part in union.Parts)
+        {
+            LawPlace? child = PlaceOf(part, layers, PlacePosition.Subject);
+            if (child is null) return null;
+
+            children.Add(child);
+        }
+
+        return new LawPlace("layer:" + layer.Name, layer.Name, layer.Name, [], true) { StructuralChildren = children };
+    }
+
+    // The project twin of FromGlob's identity collapse: a layer defined as exactly this project IS the
+    // project, so a rule naming the project and a rule naming the layer draw one node under the layer's
+    // name. A definition that narrows the project is a subset no project equals, so it never collapses.
+    private static LawPlace FromProject(string name, IReadOnlyList<LayerDefinition> layers)
+    {
+        LayerDefinition? owner = layers.FirstOrDefault(layer => IsBareProject(layer.Definition, name));
+        string label = owner is null ? name : owner.Name;
+        return new LawPlace("project:" + name, label, label, [], owner is not null);
+    }
+
+    private static bool IsBareProject(Selection? definition, string name)
+    {
+        if (definition is null or UnionSelection || definition.Adjectives.Count > 0) return false;
+
+        return definition.Noun is ProjectNoun project && string.Equals(project.Name, name, StringComparison.Ordinal);
     }
 
     // A type node stands alone on the fence with no sentence around it, so it carries the full name: an
@@ -165,14 +238,12 @@ internal static class LawPlaceClassifier
         return new LawPlace(TypeKey(type), name, name, [], false);
     }
 
-    // Bare `arch.Types` is the whole solution and places nothing. Exactly one InNamespace adjective
-    // narrows it to a region, and that region is a place — the other adjectives (Except, OfKind, Where,
-    // …) narrow which types inside it are governed, which is not a question of where. Two InNamespace
-    // adjectives are an intersection of regions, and the honest node for that is none.
+    // Bare `arch.Types` is the whole solution and places nothing. Whether a narrowing names a region is the
+    // model's call (LayerNoun.RegionOf), so the drawing and a layer's payload cannot disagree about it.
     private static LawPlace? FromTypes(Selection selection, IReadOnlyList<LayerDefinition> layers)
     {
-        List<InNamespaceAdjective> globs = selection.Adjectives.OfType<InNamespaceAdjective>().ToList();
-        return globs.Count == 1 ? FromGlob(globs[0].Glob, layers) : null;
+        IReadOnlyList<string> region = LayerNoun.RegionOf(selection);
+        return region.Count == 1 ? FromGlob(region[0], layers) : null;
     }
 
     private static string TypeKey(Type type)

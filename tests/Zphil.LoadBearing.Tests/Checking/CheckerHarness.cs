@@ -73,6 +73,15 @@ internal static class Checker
         return ArchModelBuilder.Build(new InlineSpec(define));
     }
 
+    /// <summary>
+    ///     The tripwire a scope spec desugars to — a caution's only child, or a quarantine's second.
+    /// </summary>
+    public static ArchRule Tripwire(Action<Arch> define)
+    {
+        return Model(define)
+            .Rules.Single(rule => rule.Scope is { Role: ScopeRole.Tripwire });
+    }
+
     /// <summary>The rule <paramref name="id" /> names, for the tests that reach into a multi-rule model.</summary>
     /// <remarks>
     ///     A raw <c>Rules.Single(rule =&gt; rule.Id == id)</c> reds "Sequence contains no matching element",

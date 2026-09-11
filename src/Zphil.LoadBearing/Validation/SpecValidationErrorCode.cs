@@ -148,5 +148,30 @@ public enum SpecValidationErrorCode
     ///     rule states a cardinality claim rather than a correspondence — and the <c>{name}</c> typo that
     ///     causes it would otherwise be discovered only as a whole subject set going red at check time.
     /// </summary>
-    CounterpartTemplateWithoutPlaceholder
+    CounterpartTemplateWithoutPlaceholder,
+
+    /// <summary>
+    ///     A family (<c>arch.Each</c>) standing anywhere but as a rule subject (§8 item 27) — an operand,
+    ///     an <c>Except</c> payload, a union operand, a layer definition, a scoped selection or a boundary.
+    ///     A partition means nothing in a position that consumes a set: every one of those reads the
+    ///     family's membership and nothing would read its cells, so the rule would silently be the union
+    ///     of them. The message names the position, because that is what the author has to move.
+    /// </summary>
+    FamilyMisplaced,
+
+    /// <summary>
+    ///     <c>MustNotReferenceEachOther</c> over a subject that is not a family (§8 item 28). The verb's
+    ///     targets are the subject's own cells, so a cell-free subject names nothing to forbid — and the
+    ///     verb the author meant over a plain selection has a name, which the message gives.
+    /// </summary>
+    EachOtherWithoutFamily,
+
+    /// <summary>
+    ///     <c>MustNotHaveCircularReferences</c> over a subject that is not a family of layers (§8 item 29).
+    ///     Two wordings share this code, because the two shapes are wrong for different reasons: a plain
+    ///     selection has no layers to reference each other at all, and a family of projects is refused
+    ///     because projects cannot have circular references — the build forbids them — so over one the law
+    ///     would hold by construction, and a rule that cannot red is a false promise.
+    /// </summary>
+    CircularReferencesNeedLayerFamily
 }

@@ -28,6 +28,42 @@
               }
             },
             {
+              "id": "layering/projects-independent",
+              "shortDescription": {
+                "text": "Each of the projects matching `MyApp.*` must not reference the others."
+              },
+              "fullDescription": {
+                "text": "Each MyApp project is its own deployable unit; a reference from one into another couples their release cadences."
+              },
+              "help": {
+                "text": "Move the shared type into a project both may reference, or reach the other project through an abstraction it owns."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "layering/web-cuts-not-circular",
+              "shortDescription": {
+                "text": "Each of the Reporting and Invoicing layers must not have circular references with the others."
+              },
+              "fullDescription": {
+                "text": "Reporting and invoicing are two cuts of the web layer with no intended order between them; a circle means neither can be extracted without dragging the other along."
+              },
+              "help": {
+                "text": "Move what one cut borrows from the other into a type both may reach, or pick a direction and state it as an ordering rule."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
               "id": "layering/billing-independent",
               "shortDescription": {
                 "text": "Types in `MyApp.Legacy.Billing.*` must not reference types in `MyApp.Web.*`."
@@ -615,6 +651,270 @@
           ],
           "partialFingerprints": {
             "loadBearingViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.WebTextExtensions||MyApp.Domain/OrderService.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/projects-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 9
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.HomeController||MyApp.Domain/OrderService.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/projects-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.HomeController||MyApp.Domain/OrderService.cs|1"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/projects-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 13
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.HomeController||MyApp.Domain/OrderService.cs|2"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/projects-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.WebTextExtensions"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.WebTextExtensions||MyApp.Domain/OrderService.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/projects-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController references MyApp.Legacy.Billing.IBillingFacade"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 17
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.HomeController|T:MyApp.Legacy.Billing.IBillingFacade||MyApp.Web/HomeController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/projects-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController references MyApp.Legacy.Billing.IBillingFacade"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 20
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.HomeController|T:MyApp.Legacy.Billing.IBillingFacade||MyApp.Web/HomeController.cs|1"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/projects-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 9
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:MyApp.Legacy.Billing.BillingCalculator||MyApp.Web/InvoiceController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/projects-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:MyApp.Legacy.Billing.BillingCalculator||MyApp.Web/InvoiceController.cs|1"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/projects-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.RoundingMode"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:MyApp.Legacy.Billing.RoundingMode||MyApp.Web/InvoiceController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/web-cuts-not-circular",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.InvoiceCreatedHandler references MyApp.Web.ReportEndpoint"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceCreatedHandler.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceCreatedHandler|T:MyApp.Web.ReportEndpoint||MyApp.Web/InvoiceCreatedHandler.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/web-cuts-not-circular",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.ReportEndpoint references MyApp.Web.InvoiceService"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/ReportEndpoint.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 23
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.ReportEndpoint|T:MyApp.Web.InvoiceService||MyApp.Web/ReportEndpoint.cs|0"
           },
           "baselineState": "new"
         },

@@ -187,6 +187,22 @@ internal static class ProseFormat
     /// </summary>
     internal static string JoinReferences(IReadOnlyList<string> references, bool closeBeforeOr)
     {
+        return Join(references, closeBeforeOr ? ", or " : " or ");
+    }
+
+    /// <summary>
+    ///     The and-joined twin of <see cref="JoinReferences(IReadOnlyList{string})" />, with no Oxford
+    ///     comma either (GRAMMAR §6): 1 → <c>A</c>; 2 → <c>A and B</c>; 3+ → <c>A, B and C</c>. The join a
+    ///     family's cell list reads with, where an or-list would say the rule ranges over one of them.
+    /// </summary>
+    internal static string JoinReferencesAnd(IReadOnlyList<string> references)
+    {
+        return Join(references, " and ");
+    }
+
+    // The one join both conjunctions take: everything but the last, comma-separated, then the joiner.
+    private static string Join(IReadOnlyList<string> references, string joiner)
+    {
         switch (references.Count)
         {
             case 0:
@@ -195,7 +211,6 @@ internal static class ProseFormat
                 return references[0];
             default:
                 string head = string.Join(", ", references.Take(references.Count - 1));
-                string joiner = closeBeforeOr ? ", or " : " or ";
                 return head + joiner + references[references.Count - 1];
         }
     }

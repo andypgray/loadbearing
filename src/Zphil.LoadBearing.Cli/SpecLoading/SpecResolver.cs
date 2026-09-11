@@ -1,6 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Zphil.LoadBearing.Cli.Pipeline;
-using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.Diagnostics;
 using Zphil.LoadBearing.Roslyn.Solutions;

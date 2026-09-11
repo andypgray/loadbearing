@@ -4,16 +4,30 @@
   "specAssembly": "Zphil.LoadBearing.MyAppViolatedSpec.dll",
   "grain": "index",
   "summary": {
-    "rulesChecked": 29,
+    "rulesChecked": 31,
     "rulesPassed": 2,
-    "rulesFailed": 25,
+    "rulesFailed": 27,
     "rulesSkipped": 2,
-    "violations": 44,
+    "violations": 51,
     "warnings": 1
   },
   "rules": [
     {
       "id": "layering/domain-independent",
+      "posture": "enforce",
+      "status": "failed",
+      "violationCount": 2,
+      "warnings": []
+    },
+    {
+      "id": "layering/projects-independent",
+      "posture": "enforce",
+      "status": "failed",
+      "violationCount": 5,
+      "warnings": []
+    },
+    {
+      "id": "layering/web-cuts-not-circular",
       "posture": "enforce",
       "status": "failed",
       "violationCount": 2,

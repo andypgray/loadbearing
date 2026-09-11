@@ -91,13 +91,11 @@ public sealed class TripwireSemanticsTests
         CheckReport report = Checker.Run(Codebase, BaselineIndex.Empty, diff, QuarantinedScope);
         RuleResult tripwire = report.ForRule("legacy/quarantined/tripwire");
 
-        tripwire.ShouldHavePassed();
-        CheckWarning warning = tripwire.Warnings.Single();
-        warning.Kind.ShouldBe(CheckWarningKind.QuarantinedScopeTouched);
-        warning.Message.ShouldBe(ExpectedWarning("App.Legacy/Alpha.cs"));
         // The same path the message names, carried structurally: a renderer that needs a location — SARIF
         // does — must not have to read one back out of the prose.
-        warning.File.ShouldBe("App.Legacy/Alpha.cs");
+        tripwire.ShouldHaveWarnedOnce(
+            CheckWarningKind.QuarantinedScopeTouched, ExpectedWarning("App.Legacy/Alpha.cs"),
+            "App.Legacy/Alpha.cs");
         report.HasViolations.ShouldBeFalse();
     }
 
@@ -157,11 +155,9 @@ public sealed class TripwireSemanticsTests
         CheckReport report = Checker.Run(Codebase, BaselineIndex.Empty, diff, CautionedScope);
         RuleResult tripwire = report.ForRule("legacy/cautioned/tripwire");
 
-        tripwire.ShouldHavePassed();
-        CheckWarning warning = tripwire.Warnings.Single();
-        warning.Kind.ShouldBe(CheckWarningKind.CautionedScopeTouched);
-        warning.Message.ShouldBe(ExpectedCautionWarning("App.Legacy/Alpha.cs"));
-        warning.File.ShouldBe("App.Legacy/Alpha.cs");
+        tripwire.ShouldHaveWarnedOnce(
+            CheckWarningKind.CautionedScopeTouched, ExpectedCautionWarning("App.Legacy/Alpha.cs"),
+            "App.Legacy/Alpha.cs");
         // A caution has no second rule, so this is the whole run: the posture with no red state cannot
         // produce one however loudly its tripwire fires.
         report.HasViolations.ShouldBeFalse();

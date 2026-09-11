@@ -77,6 +77,37 @@ public static class SelectionConstraints
         return new MustOnlyBeReferencedByConstraint(subject, WrappedTypes(subject, first, more));
     }
 
+    /// <summary>
+    ///     The subject may be referenced by nothing outside itself — the inbound leaf, a hermetic set
+    ///     (GRAMMAR §4.1). Over a family subject (<c>arch.Each</c>, GRAMMAR §5.1) "itself" is each cell as
+    ///     declared, which states "each module's internals are reached only through its own surface".
+    /// </summary>
+    public static Constraint MustOnlyBeReferencedByItself(this Selection subject)
+    {
+        return new MustOnlyBeReferencedByItselfConstraint(Subject(subject));
+    }
+
+    /// <summary>
+    ///     No cell of the subject family may reference any other cell — the cross-cell ban over
+    ///     <c>arch.Each</c> (GRAMMAR §5.1). Symmetric, so there is no inbound twin; a plain (cell-free)
+    ///     subject fails spec build (GRAMMAR §8 item 28).
+    /// </summary>
+    public static Constraint MustNotReferenceEachOther(this Selection subject)
+    {
+        return new MustNotReferenceEachOtherConstraint(Subject(subject));
+    }
+
+    /// <summary>
+    ///     No two cells of the subject family may reference each other in a circle — the cycle gate over
+    ///     <c>arch.Each</c> (GRAMMAR §5.1): cells may reference one another, but the cell graph must have
+    ///     no strongly connected component of more than one cell. Takes a family of layers only; a plain
+    ///     subject and a family of projects both fail spec build (GRAMMAR §8 item 29).
+    /// </summary>
+    public static Constraint MustNotHaveCircularReferences(this Selection subject)
+    {
+        return new MustNotHaveCircularReferencesConstraint(Subject(subject));
+    }
+
     /// <summary>The subject must not use any of the member targets (GRAMMAR §4.5).</summary>
     public static Constraint MustNotUse(this Selection subject, Member first, params Member[] more)
     {

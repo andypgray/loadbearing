@@ -23,8 +23,8 @@ internal static class ScopeDesugarer
     {
         // Validation refuses a dangling scope before desugaring, so the posture is always there.
         return scope.Posture == Posture.Caution
-            ? [Tripwire(scope, Posture.Caution)]
-            : [Containment(scope), Tripwire(scope, Posture.Quarantine)];
+            ? [Tripwire(scope)]
+            : [Containment(scope), Tripwire(scope)];
     }
 
     private static ArchRule Containment(ScopeRegistration scope)
@@ -51,31 +51,40 @@ internal static class ScopeDesugarer
             containment,
             null,
             new ScopeData(
-                ScopeRole.Containment, boundary, baseline, scope.Dragons.FirstOrDefault(),
-                scope.DragonsDocs.FirstOrDefault(), scope.Id, quarantined));
+                ScopeRole.Containment, boundary, baseline, Dragons(scope), DragonsDoc(scope), scope.Id, quarantined));
     }
 
     // The one tripwire builder both postures take, so the diff-aware touch check is the same rule node
     // whichever verb declared the scope: no constraint, no sentence, no boundary, no baseline — just the
     // scoped selection its changed-file mapping reads, plus the dragons every child carries.
-    private static ArchRule Tripwire(ScopeRegistration scope, Posture posture)
+    private static ArchRule Tripwire(ScopeRegistration scope)
     {
         return new ArchRule(
             scope.Id + "/tripwire",
-            posture,
+            scope.Posture!.Value,
             Because(scope),
             null,
             string.Empty,
             null,
             null,
             new ScopeData(
-                ScopeRole.Tripwire, Array.Empty<Selection>(), null, scope.Dragons.FirstOrDefault(),
-                scope.DragonsDocs.FirstOrDefault(), scope.Id, scope.Scoped));
+                ScopeRole.Tripwire, Array.Empty<Selection>(), null, Dragons(scope), DragonsDoc(scope),
+                scope.Id, scope.Scoped!));
     }
 
     private static string Because(ScopeRegistration scope)
     {
         return scope.Becauses.FirstOrDefault() ?? string.Empty;
+    }
+
+    private static string? Dragons(ScopeRegistration scope)
+    {
+        return scope.Dragons.FirstOrDefault();
+    }
+
+    private static string? DragonsDoc(ScopeRegistration scope)
+    {
+        return scope.DragonsDocs.FirstOrDefault();
     }
 
     private static Constraint BuildContainment(Selection quarantined, IReadOnlyList<Selection> boundary)

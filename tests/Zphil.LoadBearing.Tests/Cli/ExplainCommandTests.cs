@@ -90,8 +90,10 @@ public sealed class ExplainCommandTests
                 "  layering/domain-independent\n" +
                 "  layering/no-ghost\n" +
                 "  layering/no-ungoverned-types\n" +
+                "  layering/projects-independent\n" +
                 "  layering/services-behind-contracts\n" +
                 "  layering/services-in-web\n" +
+                "  layering/web-cuts-not-circular\n" +
                 "  legacy/billing/containment\n" +
                 "  legacy/billing/tripwire\n" +
                 "  naming/async-suffix\n" +

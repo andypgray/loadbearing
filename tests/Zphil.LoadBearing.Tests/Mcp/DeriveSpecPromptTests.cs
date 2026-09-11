@@ -69,6 +69,16 @@ public sealed class DeriveSpecPromptTests
         // The scope recipe teaches the second scope posture and the rule that picks between the two.
         text.ShouldContain(".Caution(");
         text.ShouldContain("new callers welcome");
+        // The family recipe: one rule over a partition of plugins or modules, the three family verbs, and
+        // what "itself" means on a family — the cell, as declared — so the recipe never proposes one
+        // rule per cell where one sentence says it. The cycle gate is taught as the law for peers whose
+        // order nobody has stated, so an adopter reaches for it before writing an order they do not know.
+        text.ShouldContain("arch.Each(arch.Projects.Matching(\"MyApp.Plugin.*\"))");
+        text.ShouldContain("MustNotReferenceEachOther()");
+        text.ShouldContain("MustOnlyBeReferencedByItself()");
+        text.ShouldContain("MustNotHaveCircularReferences()");
+        text.ShouldContain("but never in a circle");
+        text.ShouldContain("over the family, not one per unit");
         text.ShouldContain("arch_graph"); // the survey tool
         text.ShouldContain("arch_check"); // the evidence tool
     }

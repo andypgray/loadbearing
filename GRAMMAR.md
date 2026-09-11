@@ -59,10 +59,12 @@ A spec is a class implementing `IArchitectureSpec` with one method, `Define(Arch
 Inside it there are exactly three statement forms:
 
 ```
-definition :=  var x = arch.Layer(name, glob, globs...)[.Purpose(prose)] | arch.Namespace(glob)
+definition :=  var x = arch.Layer(name, glob, globs...)[.Purpose(prose)]
+             | arch.Layer(name, selection)[.Purpose(prose)] | arch.Namespace(glob)
              | arch.Project(name) | arch.Type(typeof(X)) | arch.Type<X>()
              | arch.Registered(lifetime) | arch.Registered()
              | arch.AnyOf(selection, selections...) | arch.AnyOf(typeof(X), types...)
+             | arch.Each(layer, layers...) | arch.Each(project-selection)
              | arch.Member(typeof(X), nameof(X.M))
              | arch.Member<T>(x => x.M) | arch.Member(() => X.M)
 rule       :=  arch.Rule(id) . posture-verb . trailer*
@@ -89,7 +91,10 @@ Modal-verb targets are selections for the dependency verbs (§3.3) and members f
 member-access verb `MustNotUse` (§4.5). Selection-valued *operands* are a different position:
 `MustBelongTo`'s memberships and `MustHaveExactlyOneCounterpart`'s `among:` are selections
 resolved in subject position, naming where a subject may live or where its counterpart may
-stand — never the far end of an edge. The member-modal verbs (§4.6) take no target — they
+stand — never the far end of an edge. A *family* — `arch.Each` over declared layers or over a
+project selection (§5.1) — is a selection whose noun carries a partition into cells; it may
+stand only as a rule subject, directly or as the source of a member projection, never in an
+operand position (§8 item 27). The member-modal verbs (§4.6) take no target — they
 are shape/naming assertions over the projected member set, so `member-selection` is itself the
 whole subject side of a member-shape sentence. The one exception is the methods-only
 `.MustAcceptParameter(Type)` (§5.7), whose `Type` anchor renders on the verb side of the
@@ -100,6 +105,9 @@ sentence.
 ```
 Arch
  ├─ .Layer(name, string glob, params string[] more) → Layer (: Selection; .Purpose(prose) → Layer)
+ ├─ .Layer(name, Selection definition)             → Layer (the layer names what the definition
+ │                                                    names; ProjectSelection is not a Selection,
+ │                                                    so the artifact stratum cannot be a layer)
  ├─ .Namespace(glob)  → Selection
  ├─ .Project(name)    → Selection
  ├─ .Type(Type)       → Selection      (single type; there is deliberately no
@@ -225,7 +233,11 @@ in a public signature position, most often through the bare `typeof` sugar
 `(first, more)` shape makes zero-argument calls **uncompilable** and keeps single-argument
 overload resolution unambiguous. Mixing selections and types in one call = wrap the type:
 `MustNotReference(web, arch.Type(typeof(SqlConnection)))`. The same `(first, more)` shape
-applies to `Layer(name, glob, more)` — a layer with zero globs is uncompilable.
+applies to `Layer(name, glob, more)` — a layer with zero globs is uncompilable — and to
+`Each(Layer first, params Layer[] more)` — a family with zero cells is uncompilable, and its cells
+are typed to `Layer`, so an adjective-bearing cell, a union cell or a nested family is a compile
+error rather than a §8 item; the project form takes one `ProjectSelection`, whose `.Named` and
+`.Matching` already say "these".
 
 The member-access verb (§4.5) carries the same shape over `Member` targets — a zero-member
 call is uncompilable:
@@ -318,9 +330,14 @@ list is static and one form: `web.MustNotUse(() => DateTime.Now, () => DateTime.
   once. A selection names a node **at** a project when it matches the node and either one
   project declares it, or a head that is not a project admitted it, or that project is among
   the ones its project-headed selections spelled. Heads that are not projects therefore stay
-  attribution-insensitive: `typeof`, `arch.Namespace`, `arch.Types`, `arch.Layer`,
-  `arch.Registered`, and `MustNotUse`'s string-keyed member anchors, so
-  `MustNotReference(typeof(T))` reds even on a project's own copy. `MustOnly*` allows its own
+  attribution-insensitive: `typeof`, `arch.Namespace`, `arch.Types`, `arch.Registered`, and
+  `MustNotUse`'s string-keyed member anchors, so `MustNotReference(typeof(T))` reds even on a
+  project's own copy. A layer takes its definition's stance: the glob form is
+  attribution-insensitive like the globs it is made of, and a layer defined as a project noun
+  names its nodes at that project, exactly as the bare noun would. A family (`arch.Each`, §5.1)
+  takes each cell's stance: a family of layers names a node wherever the cell holding it does,
+  and a family of projects names its nodes at each project, exactly as the bare project nouns
+  would — which is what lets a file compiled into two cells be judged at each. `MustOnly*` allows its own
   subject (below), and the subject is an allow entry like any other here: an intra-copy edge is
   satisfied by an entry naming the compiling project, by a non-project entry containing the
   type, or by the subject at the projects it names the node at. Where the edge runs between two
@@ -369,12 +386,31 @@ list is static and one form: `web.MustNotUse(() => DateTime.Now, () => DateTime.
   `{id}/containment` desugaring spells its allowed set (§7), its hermetic branch needing an
   operand to name. The subject-only shape has a verb of its own, `MustOnlyReferenceItself()`
   (§5.3). (Self-edges never arise — extraction drops them.)
+- **On a family, self is the cell as declared.** Over an `arch.Each` subject (§5.1) the four
+  `MustOnly*` reference verbs — `MustOnlyReference`, `MustOnlyReferenceItself`,
+  `MustOnlyBeReferencedBy`, `MustOnlyBeReferencedByItself` — read "self" per cell: the cell the
+  owned instance sits in, as declared — the whole layer or the whole project, not the family's
+  refined membership. A plain selection declares no unit, so its only honest self is what it
+  resolved to; a family declares its units, and the unit is what "own" means — a module's
+  `Contracts` cone, excluded from the subject by `Except`, still counts as that module's self.
+  Evaluation is the per-cell desugar in one rule: for each cell C, the subject is C ∩ the
+  family's membership, the allow-set is the operands ∪ C as declared, and a violation is minted
+  once per (source, target) pair whichever cell says so, so the baseline keys exactly as it
+  always has. `MustNotReferenceEachOther()` (§5.3) reads the same cells with the other polarity:
+  an owned instance whose far end lies in any *other* cell, as declared, is a violation.
+  `MustNotHaveCircularReferences()` (§5.3) reads the cells as a graph: an arrow from cell A to
+  cell B for every owned instance whose far end lies in B, and a violation for every pair on an
+  arrow inside a strongly connected component of that graph (§4.3) — the cells may reference
+  each other, but not in a circle.
 - `MustOnlyBeReferencedBy` needs no caveat: only solution types can be observed referencing.
 - Checker behavior: an empty *subject* selection **fails** the rule by default
   (ArchUnit and ArchUnitNET precedent, with a pinned message). For a **union** subject the
   default sharpens per operand: every operand must match at least one type, and each empty one
   fails the rule in its own right with the operand named, so a typo'd operand is never masked by
-  its siblings (§5.1, §9). A run a solution filter (§4.4) narrowed skips instead: a rule *all* of
+  its siblings (§5.1, §9). A **family** subject sharpens the same way per cell: a layer cell
+  matching nothing, or a project cell declaring no solution type, fails the rule naming that
+  cell; a project form naming no project at all is the plain empty-subject failure, there being
+  no cell to name. A run a solution filter (§4.4) narrowed skips instead: a rule *all* of
   whose violations are these empty-selection failures reports **skipped**, one line naming the
   filter and the unchecked-project count, because under a narrowing filter an empty selection is
   the expected consequence of the narrowing rather than evidence of a typo'd spec. The cost is
@@ -449,6 +485,21 @@ Per verb class — this is grammar-level semantics, not baseline file format:
   red"). Multiple reference sites within one (source, target) pair ride together under that
   one identity, and the entry records how many it grandfathers: more sites than it recorded is
   NEW and red, fewer is a reduction (the site-count paragraph below).
+- **Circular-references verb** (`MustNotHaveCircularReferences`, §5.1/§5.3): the same edge key,
+  `(ruleId, source symbol ID, target symbol ID)`, minted for every type pair on every arrow inside
+  a strongly connected component of the cell graph — an arrow being every owned instance whose
+  source sits in one cell of the family and whose target sits in another (externals exempt, as on
+  every reference verb; a target outside every cell is no node at all). Keying on cycles was
+  declined: a baseline of cycles churns by dozens of entries on one new arrow, enumerating cycles
+  is exponential in the component (ArchUnit caps it), and blaming the one edge that closed the
+  circle depends on discovery order. The cost is stated rather than hidden: the intended direction
+  is blamed beside the stray back-reference, and the author who knows the direction writes the
+  ordering rule (§11). The ratchet falls out of the key: a new pair on a circle's arrow is red, a
+  new site inside a grandfathered pair is red under the site count, a cell joining the component
+  mints new pairs, and a broken circle leaves every entry on it stale for `status` to surface and
+  `baseline --accept-reductions` to retire. The circle itself rides the JSON channel's `detail`
+  only — "circular references among the A and B layers", the component's cells in declaration
+  order — and no other renderer changes shape for it.
 - **Construction verb** (`MustNotConstruct`, §4.5/§5.3): `(ruleId, source symbol ID,
   constructed symbol ID)` — the same edge-key shape as a dependency reference, the constructed
   type keying the target slot. Overload-indifferent: every constructor overload of the constructed
@@ -993,12 +1044,13 @@ declares as package references, whether it locks restore and whether it packs.
 | Combinator | Fragment (reference position) |
 |---|---|
 | `arch.Types` | "types" |
-| `arch.Layer("Domain", "MyApp.Domain.*")` | "the Domain layer" — definition fragment: "**Domain** — `MyApp.Domain.*`", and with a `.Purpose(prose)` "**Domain** — `MyApp.Domain.*`. {purpose}": prefix-preserving, the purpose verbatim (§5.5). The reference fragment never carries the purpose. |
+| `arch.Layer("Domain", "MyApp.Domain.*")` / `arch.Layer("Core", arch.Project("MyApp.Core"))` | "the Domain layer" — definition fragment: "**Domain** — `MyApp.Domain.*`", and with a `.Purpose(prose)` "**Domain** — `MyApp.Domain.*`. {purpose}": prefix-preserving, the purpose verbatim (§5.5). A layer defined by a **selection** names exactly what that selection names, at the projects it names them at (§4.1), and its own adjectives apply after; its row spells the definition instead of globs — a bare noun as its locative without the head ("**Core** — project `MyApp.Core`", "**Kernel** — projects `A` or `B`"), anything else as its reference phrase ("**Model** — types in the Core layer in `MyApp.Core.Model.*`"). The reference fragment never carries the purpose. |
 | `arch.Namespace("MyApp.Legacy.Billing.*")` | "types in `MyApp.Legacy.Billing.*`" |
 | `arch.Project("MyApp.Web")` | "types in project `MyApp.Web`" |
 | `arch.Type(typeof(SqlConnection))` / `arch.Type<SqlConnection>()` | "`SqlConnection`" — simple name; FQN retained in the model |
 | `arch.Registered(Lifetime.Singleton)` / `arch.Registered()` | "singleton-registered types" (per lifetime: "scoped-registered types", "transient-registered types") / "registered types" — types named in a source-visible container registration (§4.7). The fragment is the noun's **head** and survives adjectives ("Singleton-registered types, except `X`, must not inject scoped-registered types." — never a false bare "Types, …"); the §5.2 `OfKind` head-substitution mechanic, pinned by an adjective-bearing-subject test. |
 | `arch.AnyOf(a, b, …)` / `arch.AnyOf(typeof(X), typeof(Y), …)` | the union of its operands: "types in projects `A` or `B`" when they collapse, "types in project `A` or types in `B.*`" when they do not (§6). A union has no single noun — it is the one noun-position node that renders through its own assembly arm. |
+| `arch.Each(a, b, …)` / `arch.Each(arch.Projects.Matching("Nop.Plugin.*"))` | a *family* — one rule over a partition into cells: "each of the Dispatch, Tracking and Invoicing layers" (and-joined, no Oxford comma; a one-cell layer family renders as the cell) / "each of the projects matching `Nop.Plugin.*`", "each of the projects `A` or `B`" (the project selection's own phrase, §4.10; the project form always says "each of"). Locative " in each of the Dispatch, Tracking and Invoicing layers". A bare family speaks in the collective voice (§6). |
 | `arch.Member(typeof(DateTime), nameof(DateTime.Now))` / `arch.Member(() => DateTime.Now)` | "`DateTime.Now`" — member leaf, target-only (§4.5); parens iff method: "`Task.Wait()`" (`arch.Member<Task>(t => t.Wait())`) |
 
 **The union noun (`arch.AnyOf`)** names every type any operand names. Pinned semantics:
@@ -1023,6 +1075,35 @@ declares as package references, whether it locks restore and whether it packs.
   position keeps the softer per-rule inert-target warning unchanged.
 - **A union subject anchors no scoped card**: even when a `Layer` is an operand, a union has no
   single home directory, so its rule renders into the root block only (§6).
+
+**The family noun (`arch.Each`)** names every type any cell names, and additionally carries the
+partition. Pinned semantics:
+
+- **Cells are declared layers or projects.** `Each(Layer first, params Layer[] more)` takes bare
+  layers — the typing excludes adjective-bearing cells, union cells and nested families;
+  `Each(ProjectSelection)` takes one project selection, whose cells are the projects it names at
+  check time, each cell being exactly what `arch.Project(name)` names (N-way declarer membership,
+  generated types included). Cells are never a capture in a pattern.
+- **Adjectives apply to the family**: `arch.Each(a, b, c).Except(x)` narrows every cell's members,
+  and a cell's own subject is the cell intersected with what the family's adjectives left
+  standing. `.Authored()` on a project family drops the generated types the cells otherwise carry.
+- **One layer cell is legal and is an identity** in rendering — it reads as the cell in both
+  positions — and the family verbs still apply to it; the project form's cell count is a codebase
+  fact, so its sentence always says "each of".
+- **A family may stand only as a rule subject** — directly, or as the source of a member
+  projection (`arch.Each(a, b).Methods…`). As an operand, an `Except` payload, a union operand, a
+  layer definition, a scoped selection or a boundary it is spec-build item 27 (§8): a partition
+  means nothing in a position that consumes a set.
+- **Exactly three places read the cells**: the `MustOnly*` reference verbs' self-allowance
+  (§4.1), the three family verbs `MustNotReferenceEachOther`, `MustOnlyBeReferencedByItself` and
+  `MustNotHaveCircularReferences` (§5.3), and card placement (§6). To every other verb, walk and renderer a family is the union
+  of its cells — one ID, one sentence, one baseline, one board row, one test row.
+- **Cells partition the subject.** A layer-family subject type that sits in two cells fails the
+  rule with a rule error naming the type and both cells (the same layer listed twice is the
+  degenerate case); a project family needs no such check, because a multiply-declared type sits
+  in every declarer's cell and is judged per instance (§4.1). Emptiness sharpens per cell as it
+  does per union operand (§4.1, §9).
+- **A family of layers anchors every cell's card** (§6); the project form anchors none.
 
 ### 5.2 Adjectives (reduced relative clauses)
 
@@ -1143,9 +1224,12 @@ from the model rather than misclassified in it, so no arm here can reach it.
 |---|---|
 | `.MustNotReference(target, ...)` | "must not reference {list}" |
 | `.MustOnlyReference(target, ...)` | "must reference only {list} (external packages are not constrained by this rule)" |
-| `.MustOnlyReferenceItself()` | "must reference only itself (external packages are not constrained by this rule)" — the leaf form: the refined subject is the whole allow-set, which every `MustOnlyReference` carries implicitly (§4.1) |
+| `.MustOnlyReferenceItself()` | "must reference only itself (external packages are not constrained by this rule)" — the leaf form: the refined subject is the whole allow-set, which every `MustOnlyReference` carries implicitly (§4.1). On a family subject (§5.1) the allow-set is each cell as declared, and the types voice reads "must reference only their own layer (external packages are not constrained by this rule)" — "project" for a project family; on a plain subject the types voice reads "must reference only themselves (external packages are not constrained by this rule)" and the collective voice keeps "itself" (§6) |
 | `.MustNotBeReferencedBy(source, ...)` | "must not be referenced by {list}" |
 | `.MustOnlyBeReferencedBy(source, ...)` | "must be referenced only by {list}" |
+| `.MustOnlyBeReferencedByItself()` | "must be referenced only by itself" — the inbound leaf: on a plain subject the allowed sources are the refined subject, a hermetic set; on a family (§5.1) each cell as declared, and the types voice reads "must be referenced only by their own layer" / "their own project"; on a plain subject in types voice "must be referenced only by themselves" (§6). Nullary (§10): the operand is the subject's own structure |
+| `.MustNotReferenceEachOther()` | "must not reference the others" (collective) / "must not reference the other layers" / "must not reference the other projects" (types voice) — family subjects only (§5.1, §8 item 28): an owned instance whose far end lies in any other cell, as declared, is a violation. Symmetric, so it has no inbound twin. Nullary (§10) |
+| `.MustNotHaveCircularReferences()` | "must not have circular references with the others" (collective) / "must not have circular references with the other layers" (types voice) — families of layers only (§5.1, §8 item 29): the cells may reference one another, but the cell graph — an arrow from cell to cell for every owned instance crossing between them — must hold no strongly connected component of more than one cell, and a violation is every type pair on every arrow inside such a component (§4.3). A one-cell family passes. Nullary (§10) |
 | `.MustNotUse(member, ...)` | "must not use {list}" — member targets (§4.5) |
 | `.MustNotConstruct(target, ...)` | "must not construct {list}" — selection/type targets; the DI-construction verb (§3.3) |
 | `.MustNotInject(target, ...)` | "must not inject {list}" — selection/type targets; the captive-dependency verb (§3.3, §4.7). Never warns: an empty `Registered` operand means no such registrations exist — the win condition, the §4.1 bare-`typeof` precedent |
@@ -1408,7 +1492,20 @@ carries its sugar overload too, or the verb silently stops compiling after the s
 - **Layer voice**: a bare `Layer` subject speaks collectively — *"The Domain layer must not
   reference the Web layer."* Any adjective switches to types voice — *"Types in the Web layer
   named `*Controller` must not reference `SqlConnection`."* The switch is structural
-  (adjective count > 0), hence deterministic.
+  (adjective count > 0), hence deterministic. What defines the layer never reaches the sentence:
+  a layer named as its project speaks the same collective sentence a glob-defined one does.
+  A bare family (§5.1) speaks collectively too — *"Each of the Host, Adapter and Pack layers
+  must not reference the others."*, *"Each of the projects matching `Nop.Plugin.*` must not
+  reference the others."* — and any adjective switches it to types voice: *"Types in each of
+  the Dispatch, Tracking and Invoicing layers, except types in
+  `Meridian.Operations.Dispatch.Contracts.*`, `Meridian.Operations.Tracking.Contracts.*` or
+  `Meridian.Operations.Invoicing.Contracts.*`, must be referenced only by their own layer."* The
+  family verbs' phrases follow the voice — "the others" / "with the others" / "itself"
+  collectively, "the other layers" / "with the other layers" / "their own layer" (or "projects" /
+  "project") in types voice; the circular-references tail names the layers so that a types-voice
+  subject is not heard as a claim about the types inside one layer — and on a plain subject
+  the leaf verbs' reflexive agrees with the head the same way: "itself" collectively, where the
+  subject is one layer, and "themselves" in types voice, where the head is the plural "types".
 - **Canonicalization**: `Except` and `Where` clauses render sentence-final regardless of
   chain position. Safe because selection algebra commutes — (T∖X)∩S = (T∩S)∖X — and it
   prevents garden-path sentences ("types, except `Foo`, named `*Service`").
@@ -1451,9 +1548,13 @@ carries its sugar overload too, or the verb silently stops compiling after the s
   always reaches the sentence. A bare (adjective-free) union reads as its own reference in both
   positions, which is what makes the single-operand identity hold in subject position too.
 - **Scoped placement**: a rule earns a layer's per-directory card only when its subject's noun
-  head *is* that layer, so a refinement (adjective / `Except`) still anchors. A union subject
-  never does (§5.1) — it has no single home directory even when a `Layer` is one of its
-  operands — so a union rule renders into the root block only.
+  head *is* that layer, so a refinement (adjective / `Except`) still anchors. The card lands at
+  the deepest common ancestor of the layer's own types, whatever defines it: a project's types
+  share the project directory, so a project-defined layer places its card exactly where a
+  glob-defined one did. A family of layers (§5.1) anchors on every cell: its bullet lands on each
+  cell layer's card, and the sentence names every cell, so it reads correctly on each; the
+  project form anchors none. A union subject never does (§5.1) — it has no single home directory even
+  when a `Layer` is one of its operands — so a union rule renders into the root block only.
 - **Colliding simple names**: when two targets in one sentence share a simple name, both are
   qualified with the minimal distinguishing trailing namespace segments
   ("`Billing.Order` or `Sales.Order`"). Pinned rule. The negative hierarchy and attribute anchor
@@ -1576,7 +1677,9 @@ carries its sugar overload too, or the verb silently stops compiling after the s
    through the `Type` overload alone; the `Selection` form takes `(first, more)`.
 9. Duplicate layer name.
 10. Selection minted on a different `Arch` instance ("selection not registered with this
-    model").
+    model"). A layer's selection definition is walked here too — reported spec-wide, named by
+    layer and location-free, because a definition is use-independent: a bad one is caught
+    whether or not any rule ever names the layer.
 11. Blank member name on an `arch.Member` used by a rule.
 12. Member not **declared** on its anchored type (reflection `DeclaredOnly` typo guard);
     when the member is declared on a base type the error names that base and the `typeof`
@@ -1594,7 +1697,8 @@ carries its sugar overload too, or the verb silently stops compiling after the s
     an exact type name (`Named`, reported as `Blank type name on '{id}'.` — blank is the whole
     check, a name having no structure to validate), a project name, or a suffix/prefix left empty. A blank affix is vacuously true and a blank
     glob throws at check time; both are almost always an authoring slip. Applies on the type and
-    member sides alike, to layer globs (reported spec-wide, named by layer), and to the project
+    member sides alike, to layer globs and to every operand of a layer's selection definition,
+    its `Except` payloads included (both reported spec-wide, named by layer), and to the project
     name on the noun and the verb alike — `arch.Project("")` in any position and
     `MustResideInProject("")`, each as `Blank project name on '{id}'.` String anchors (§5.2) report
     through this same family in every position of both families, adjective and
@@ -1635,11 +1739,11 @@ carries its sugar overload too, or the verb silently stops compiling after the s
     for the `typeof` form. The poison rides on the `Member` leaf itself: the diagnostic is stored
     on the leaf, whose `DeclaringType`/`Name`/`IsMethod` throw if read (fail closed), so it is
     collected in the same all-at-once pass as every other error.
-19. Undefined `Lifetime` value on an `arch.Registered` noun used by a rule — a cast like
-    `(Lifetime)7` names no defined lifetime; the error names the undefined value and the
-    defined ones ("`(Lifetime)7` is not a defined `Lifetime` — use `Lifetime.Singleton`,
-    `Lifetime.Scoped`, or `Lifetime.Transient`") and reports in the same all-at-once pass
-    (`SpecValidationErrorCode.UndefinedLifetime`).
+19. Undefined `Lifetime` value on an `arch.Registered` noun used by a rule, a scope, or a layer's
+    definition — a cast like `(Lifetime)7` names no defined lifetime; the error names the
+    undefined value and the defined ones ("`(Lifetime)7` is not a defined `Lifetime` — use
+    `Lifetime.Singleton`, `Lifetime.Scoped`, or `Lifetime.Transient`") and reports in the same
+    all-at-once pass (`SpecValidationErrorCode.UndefinedLifetime`).
 20. Closed-generic `MustAcceptParameter` anchor (§5.7): a
     `.MustAcceptParameter(typeof(IProgress<int>))` is refused because parameter-type matching
     is definition-level — the error names the closed construction and the open definition to
@@ -1698,6 +1802,26 @@ carries its sugar overload too, or the verb silently stops compiling after the s
     Substitution replaces every occurrence and matches case-sensitively, which is what lets the
     likeliest slip, `{name}`, fail at spec build instead of checking a constant name. A blank
     template is item 25's alone, on item 18's reported-before pattern.
+27. A family (`arch.Each`, §5.1) anywhere but subject position (`` A family (`arch.Each`) used as
+    an operand by '{id}'; a family may stand only as a rule subject. `` — the position word
+    varies: `an operand`, `an Except payload`, `a union operand`, `a scoped selection`, `a
+    boundary`; a layer definition reports spec-wide, named by layer: `` … used as a layer
+    definition by layer 'X'; … ``). A partition means nothing in a position that consumes a set,
+    and every walk below reaches each of those positions. A family as the source of a member
+    projection is a subject, and legal.
+28. `MustNotReferenceEachOther` on a plain selection (`` `MustNotReferenceEachOther` on '{id}'
+    needs a family subject (`arch.Each`); over a plain selection write `MustNotReference`. ``).
+    The verb's targets are the subject's own cells (§5.3), so a subject without cells names
+    nothing to forbid, and the verb the author meant has a name.
+29. `MustNotHaveCircularReferences` on anything but a family of layers, in two wordings: a plain
+    selection (`` `MustNotHaveCircularReferences` on '{id}' needs a family of layers
+    (`arch.Each`); over a plain selection there are no layers to reference each other. ``) and a
+    family of projects (`` `MustNotHaveCircularReferences` on '{id}' needs a family of layers;
+    projects cannot have circular references, so over a family of projects the law holds by
+    construction. Write `MustNotReferenceEachOther` or an ordering rule. ``). A plain selection
+    has no cells to close a circle; a family of projects cannot close one, because the build
+    refuses circular project references, and a rule that cannot go red is a promise the checker
+    never keeps.
 
 Item 5 also reaches the member escape-hatch descriptions: a blank or multi-line member `Where`
 (`Func<IMemberInfo,bool>`) or member `Must` description is caught by the same prose walk,
@@ -1710,11 +1834,19 @@ own adjectives — so `AnyOf(a, b).Where(p, "")` reaches item 5, `AnyOf(a, b).In
 reaches items 15–16, and a foreign operand or a foreign `Except` payload inside a union reaches
 item 10. **Per-operand emptiness is not a §8 error**: whether an operand matches any type is a
 fact about the codebase, not the spec, so it is check-time — one empty-subject violation naming
-the operand (§5.1, §9).
+the operand (§5.1, §9). The walks descend through a family the same way: a family's layer cells
+and its own adjectives are walked (a foreign cell reaches item 10, a blank glob on a family's
+adjective item 15), and the project selection inside a project family reaches items 22 and 23. A
+family's cells overlapping is likewise a codebase fact and is check-time — a rule error naming
+the type and both cells (§5.1).
 
-Enforced at compile time instead (no catalog entry): zero-target dependency verbs — the one
-shape that legitimately names no target has a verb of its own, `MustOnlyReferenceItself()`
-(§5.3) — zero-member `MustNotUse`, and zero-glob layers (`(first, more)` signatures); missing
+Enforced at compile time instead (no catalog entry): zero-target dependency verbs — the shapes
+that legitimately name no target have verbs of their own, `MustOnlyReferenceItself()` and
+`MustOnlyBeReferencedByItself()`, and `MustNotReferenceEachOther()` and
+`MustNotHaveCircularReferences()` name their targets through the subject's cells (§5.3) —
+zero-member `MustNotUse`, zero-glob layers and zero-cell families
+(`(first, more)` signatures), and adjective-bearing, union or nested family cells (`Each` takes
+`Layer`s); missing
 escape-hatch descriptions (required parameters); trailers before postures (absent from stage
 types); adjectives or modal verbs on a `Member` (a leaf outside the selection hierarchy,
 §3.2); `.Returning` and `MustAcceptParameter` off any projection but `.Methods` (they live
@@ -1727,8 +1859,8 @@ warning CS8974) and so is caught at spec build (item 18), not by the compiler.
 Every error that names a rule, scope, or member additionally renders the offending anchor's
 spec-source `file:line` (file name only, captured by `[CallerFilePath]`/`[CallerLineNumber]`
 on the `Rule`/`Scope`/five `Member` factories) so each lands as a jump target — e.g.
-`ArchSpec.cs:17: …`. Duplicate-layer and layer-glob errors are location-free (a layer name is
-already a unique greppable string).
+`ArchSpec.cs:17: …`. Duplicate-layer and layer-definition errors are location-free (a layer name
+is already a unique greppable string).
 
 All-errors-at-once is a deliberate divergence from EF Core's fail-fast `ModelValidator`: an
 agent fixing a spec sees every problem in one pass.
@@ -1750,12 +1882,15 @@ agent fixing a spec sees every problem in one pass.
 | All-errors spec validation | EF Core fail-fast `ModelValidator` | agents fix specs in one pass |
 | Deterministic multi-spec discovery, loud failures | EF `ApplyConfigurationsFromAssembly` (order undefined, silent skips) | specs are law; law must load predictably |
 | "reference", not "depend on" | ArchUnit family "depend on"/"access" | v1 edges are literally Roslyn type references; "depends on" over-claims for a type-level edge |
+| One rule over a family, never N | ArchUnit `slices().matching("..(*)..").should().notDependOnEachOther()` | a family's cells are declared layers or the projects a selection names, never a capture in a pattern, and the rule stays one rule — one ID, one sentence, one baseline, one test row — because a cell is read by the self-allowance, the family verbs and card placement alone (§5.1); child rules minted from the codebase would put the codebase into the committed block and into the adapter's spec-time rows |
+| A circle's debt is the pairs on its arrows, never the circle | ArchUnit `slices().should().beFreeOfCycles()` — cycles as findings, capped at `cycles.maxNumberToDetect` (100) and `cycles.maxNumberOfDependenciesPerEdge` (20) | a violation of `MustNotHaveCircularReferences` is every type pair on every arrow inside a strongly connected component of the cell graph (§4.3), so the edge key, the baseline, the ratchet and every renderer are untouched, nothing is capped, and a broken circle leaves stale entries rather than a rewritten cycle list; the intended direction is blamed beside the stray back-reference by design, and the author who knows the direction writes the ordering rule |
 
 ## 10. Naming morphology (style guide for vocabulary growth)
 
 - **Nouns**: bare plurals or PascalCase names (`Types`, `Projects`, `Layer`, `Project`); the registration
   noun is a bare participle (`Registered`) — it names the set by the fact that admits
-  membership.
+  membership. The family noun is a bare quantifier (`Each`): it names the set by how the sentence
+  ranges over it, and reads as its own "each of" head.
 - **Projections**: bare plurals naming the member kind (`Members`, `Methods`, `Properties`,
   `Fields`, `Events`) — they read as "{plural} of {selection}" (§4.6, §5.7).
 - **Adjectives**: participles (`Implementing`, `DerivedFrom`, `Returning`, `Named`) or prepositional
@@ -1785,7 +1920,12 @@ agent fixing a spec sees every problem in one pass.
   composite: `MustNotCatchUnfilteredUnrethrown` enumerates the conditions instead of naming what
   they add up to, and reads as a fourth qualifier rather than a law. *Swallow* is the word the
   code review already uses for holding a failure and continuing, and it is a verb, so it takes
-  the `Must[Not]` + verb-phrase form directly. The glossary clause glosses the *fact*
+  the `Must[Not]` + verb-phrase form directly. `MustNotHaveCircularReferences` takes the same
+  licence on the reference axis: a circular reference is a composite of references that together
+  close a circle, no bare participle names it, and "have" carries the noun phrase every .NET
+  developer already knows — the build's own word for the project case — so the verb word is
+  "have circular references" rather than an "acyclic" that would not spell its law in the
+  sentence. The glossary clause glosses the *fact*
   (*"catch = a source-level `catch` clause"*), not the verb, so a spec that swaps one catch
   verb for another renders that clause byte-identically — the axis-gating discipline, one
   level down.
@@ -1824,7 +1964,11 @@ agent fixing a spec sees every problem in one pass.
   registration facts (§4.7), not an authored operand. `MustBeGetOnly` and `MustBeReadonly` are
   nullary for the same reason and a different one: what they test is a fact of the declaration
   itself, so there is no operand to take — the receiver type carries everything the verb needs
-  to know. `MustLockPackages` and `MustNotBePackable` are nullary on that same clause (§5.8),
+  to know. `MustOnlyBeReferencedByItself`, `MustNotReferenceEachOther` and
+  `MustNotHaveCircularReferences` are nullary on the outbound leaf's clause: their operand is
+  the subject's own structure — the refined subject, or the cells a family declares (§5.1) —
+  and there is nothing to list.
+  `MustLockPackages` and `MustNotBePackable` are nullary on that same clause (§5.8),
   and `MustReferenceNoPackages()` is the deliberate inversion of this bullet's rule: the empty
   list is the law it states, so the emptiness takes its own verb rather than an empty argument
   list, while `MustOnlyTarget` keeps `(first, more)` — an empty allow-list would be meaningless
@@ -1959,15 +2103,18 @@ arm distinction in the document — `Violation.Detail` reaches the JSON channel 
 report reads it for the identity-less kinds alone and SARIF never does, so the site policy
 carries missing-versus-ambiguous until a design reaches all three channels.
 
-Elsewhere: `MustBeAcyclic()` on namespace slices (ArchUnit `slices()` analog); an intersection
+Elsewhere: a family whose cells are the matches
+of one namespace pattern (ArchUnit's `(*)` capture) — no consumer, the field's families being
+projects and the corpus's declared layers; an intersection
 combinator (`arch.AnyOf` is union only; `Except` covers difference); unions of *member*
 selections (the projections compose over a union subject already); a layered-architecture
-macro for the ordering half (it would mint N rules under one ID, muddying baselines; the
-coverage half is `MustBelongTo`, and ordering stays explicit `MustNotReference` pairs);
-assembly-anchored layers (the constraint side exists — `MustResideInProject`, or `MustBelongTo`
-over project memberships — the layer *noun* anchored to a project does not); type-side shape
-adjectives (`.ThatAreSealed()`, `.ThatAreStatic()`, …) — the constraint-side verbs and the
-`ITypeInfo` flags exist (§5.3, §5.6); only the adjective position is missing; a
+macro for the ordering half (the coverage half is `MustBelongTo`, the independence half is
+`arch.Each(…).MustNotReferenceEachOther()`, the no-order law — peers that may reference each
+other but not in a circle — is `arch.Each(…).MustNotHaveCircularReferences()`, and ordering
+stays explicit `MustNotReference` pairs — N overlapping sentences under one ID would muddy a
+baseline where a partition's cells do not);
+type-side shape adjectives (`.ThatAreSealed()`, `.ThatAreStatic()`, …) — the constraint-side
+verbs and the `ITypeInfo` flags exist (§5.3, §5.6); only the adjective position is missing; a
 `.MayMatchNothing()` opt-out from the fail-on-empty default (§4.1); a `MustBeOfKind` constraint
 twin; canonicalizing `Except` last among the sentence-final adjectives, so a `Where` written after
 one stops reading as attached to the exception (§6).

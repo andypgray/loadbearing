@@ -90,6 +90,18 @@ internal static class CliResultAssertions
         }
     }
 
+    /// <summary>
+    ///     Asserts stdout is the one hook document and hands back its <c>additionalContext</c> — the text the
+    ///     wrapper passes through to Claude Code.
+    /// </summary>
+    internal static string ShouldHaveHookAdditionalContext(this CliResult result)
+    {
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        return document.RootElement.GetProperty("hookSpecificOutput")
+            .GetProperty("additionalContext")
+            .GetString()!;
+    }
+
     private static CliResult ShouldExitWith(CliResult result, int exit, string channel, string[] fragments)
     {
         string report = Describe(result);

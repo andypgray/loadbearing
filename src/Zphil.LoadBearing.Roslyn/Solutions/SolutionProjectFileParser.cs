@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
-using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Roslyn.Diagnostics;
 
 namespace Zphil.LoadBearing.Roslyn.Solutions;

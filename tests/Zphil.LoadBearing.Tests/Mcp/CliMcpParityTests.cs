@@ -65,14 +65,29 @@ public sealed class CliMcpParityTests
         "and every caller relies on the filter.\n" +
         "- Expand: `loadbearing explain domain/retry-budget/tripwire`.";
 
-    // The AgentContextRenderer.LayerCard body arch_context returns for the Web layer of MyAppLayerSpec —
-    // no provenance line (that is a render file-splice concern), mirroring the quarantined-scope card above.
-    private const string ExpectedWebLayerCard =
+    // The AgentContextRenderer.LayerCard bodies arch_context returns for the MyApp.Web directory of
+    // MyAppLayerSpec — no provenance line (that is a render file-splice concern), mirroring the
+    // quarantined-scope card above. Two cards, because two layers are placed there: the Web layer, defined
+    // as its project, and the Reporting layer that refines it. Both cover the queried path, and the tool
+    // returns whichever cards do.
+    private const string ExpectedWebLayerCards =
         "## Layer `Web`\n\n" +
         "This directory holds the `Web` layer. The HTTP surface: controllers and the views they serve. " +
         "Its architecture rules:\n\n" +
         "- `layering/web-not-billing` — The Web layer must not reference types in `MyApp.Legacy.Billing.*`. " +
         "The web layer must reach billing only through the sanctioned facade.\n" +
+        "- Expand any rule above with `loadbearing explain <rule-id>`.\n\n" +
+        "## Layer `Reporting`\n\n" +
+        "This directory holds the `Reporting` layer. Its architecture rules:\n\n" +
+        "- `layering/reporting-not-billing` — The Reporting layer must not reference types in " +
+        "`MyApp.Legacy.Billing.*`. The reporting slice takes its numbers from the domain, never from the " +
+        "legacy biller.\n" +
+        "- `layering/leaves-independent` — Each of the Reporting and Billing layers must not reference " +
+        "the others. Reporting and billing are the two leaves of this solution; neither may grow a " +
+        "dependency on the other.\n" +
+        "- `layering/leaves-not-circular` — Each of the Reporting and Billing layers must not have " +
+        "circular references with the others. Reporting and billing may only ever point one way; a circle " +
+        "between the two leaves would make the reporting slice part of the legacy biller.\n" +
         "- Expand any rule above with `loadbearing explain <rule-id>`.";
 
     // The truncator's own token → character multiple, restated here because the budget row has to work
@@ -247,12 +262,12 @@ public sealed class CliMcpParityTests
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
             McpServerBindings.For(CliRunner.MyAppSolution, CliRunner.LayerSpecDll), Ct);
 
-        // A path inside the Web layer directory → that layer's local-rules card.
+        // A path inside the Web layer directory → the local-rules cards of both layers placed there.
         CallToolResult inLayer = await harness.Client.CallToolAsync(
             "arch_context", new Dictionary<string, object?> { ["path"] = "MyApp.Web/HomeController.cs" }, cancellationToken: Ct);
         inLayer.ShouldHaveTextContent()
             .NormalizedTrimmed()
-            .ShouldBe(ExpectedWebLayerCard);
+            .ShouldBe(ExpectedWebLayerCards);
 
         // A path no layer or quarantined scope covers → the reworded pointer line (echoing the query path).
         CallToolResult outScope = await harness.Client.CallToolAsync(

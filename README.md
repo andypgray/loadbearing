@@ -45,7 +45,7 @@ The compiler is the source of truth for your code. LoadBearing is the source of 
 
 ## This repo's own spec
 
-LoadBearing governs itself. Thirty-four rules over this repository's real code, across eight declared layers, live in [`LoadBearingArchSpec.cs`](https://github.com/andypgray/loadbearing/blob/main/arch/Zphil.LoadBearing.ArchSpec/LoadBearingArchSpec.cs), and every fence from here down to [This page is tested](#this-page-is-tested) is that spec, or this solution under it, on one surface after another. Take the rule that keeps the CLI off stdout — `host` is the layer the CLI project's namespace defines:
+LoadBearing governs itself. Thirty-five rules over this repository's real code, across eight declared layers, live in [`LoadBearingArchSpec.cs`](https://github.com/andypgray/loadbearing/blob/main/arch/Zphil.LoadBearing.ArchSpec/LoadBearingArchSpec.cs), and every fence from here down to [This page is tested](#this-page-is-tested) is that spec, or this solution under it, on one surface after another. Take the rule that keeps the CLI off stdout — `host` is the layer the CLI project defines:
 
 ```csharp
         arch.Rule("cli/no-stdout")
@@ -238,19 +238,17 @@ flowchart LR
         s_Checking["Checking"]
         s_Rendering["Rendering"]
     end
-    subgraph s_Extraction["Extraction"]
-        subgraph s_Zphil_LoadBearing_Roslyn_MsBuild["Quarantine: roslyn/msbuild-bootstrap"]
-            s_MsBuildBootstrap[["MsBuildBootstrap"]]
-        end
-    end
+    s_Extraction["Extraction"]
     s_Microsoft_CodeAnalysis("Microsoft.CodeAnalysis.*")
     s_Microsoft_Build("Microsoft.Build.*")
     s_Adapter["Adapter"]
-    subgraph s_Host["Host"]
-        s_Zphil_LoadBearing_Cli_Mcp_Infrastructure["Zphil.LoadBearing.Cli.Mcp.Infrastructure.*"]
-    end
+    s_Host["Host"]
     s_Pack["Pack"]
+    s_Zphil_LoadBearing_Cli_Mcp_Infrastructure["Zphil.LoadBearing.Cli.Mcp.Infrastructure.*"]
     s_System_Environment("System.Environment")
+    subgraph s_Zphil_LoadBearing_Roslyn_MsBuild["Quarantine: roslyn/msbuild-bootstrap"]
+        s_MsBuildBootstrap[["MsBuildBootstrap"]]
+    end
 
     s_Core --x s_Extraction
     s_Core --x s_Microsoft_CodeAnalysis
@@ -276,7 +274,7 @@ flowchart LR
     end
 ```
 
-Nothing in that drawing is a shape somebody chose for it. A bare `--x` is a reference this spec forbids, the labelled arrows are the verbs that need naming, the dotted one is the single Migrate rule with its existing sites baselined, and the box inside Extraction is the quarantined scope with its sanctioned surface doubled. Model, Checking and Rendering sit inside Core because Core's globs contain theirs. The legend is generated with the rest, one row per construct this particular drawing uses.
+Nothing in that drawing is a shape somebody chose for it. A bare `--x` is a reference this spec forbids, the labelled arrows are the verbs that need naming, the dotted one is the single Migrate rule with its existing sites baselined, and the box holding a doubled node is the quarantined scope with its sanctioned surface. Model, Checking and Rendering sit inside Core because the spec defines each of them as a namespace cone inside the Core layer, so that nesting is declared rather than inferred. The legend is generated with the rest, one row per construct this particular drawing uses.
 
 The line under the fence is the honest part. A diagram can only draw a rule whose subject and targets are *places*, and most of this spec's rules are about shapes, names, attributes and members instead. Those rules are listed by ID rather than quietly dropped, so the picture is never mistaken for the whole law.
 

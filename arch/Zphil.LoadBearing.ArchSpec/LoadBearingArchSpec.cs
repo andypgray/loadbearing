@@ -18,15 +18,16 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///     tests. Each rule carries its own law, <c>Because</c> and <c>Fix</c>, so this comment holds only
 ///     what the code cannot say.
 ///     <para>
-///         Layers: five are assembly-shaped (Core, Extraction, Host, Adapter, Pack), and three more —
-///         Model, Checking, Rendering — cut Core into the pieces <c>layering/model-independent</c> needs
-///         to name. Every layer says what it is for, and a self-spec test holds that complete. Checking
-///         and Rendering carry no anchored rule on purpose: a declared layer with no law of its own still
-///         renders a module-map row — its name, its globs and its purpose — and no card, an honest
-///         negative. The union-subject
-///         rules (<c>naming/async-suffix</c>, <c>mcp/no-blocking-waits</c>,
+///         Layers: five are assembly-shaped (Core, Extraction, Host, Adapter, Pack), each defined as the
+///         project it is, and three more — Model, Checking, Rendering — cut Core into the pieces
+///         <c>layering/model-independent</c> needs to name, each defined as a namespace cone inside it.
+///         Every layer says what it is for, and a self-spec test holds that complete. Checking
+///         and Rendering each carry one anchored rule: <c>layering/no-circular-references</c> ranges over
+///         Model, Checking and Rendering alike, and a family-of-layers rule places its bullet on every
+///         cell's card, so each of the three renders a card as well as its module-map row. The
+///         union-subject rules (<c>naming/async-suffix</c>, <c>mcp/no-blocking-waits</c>,
 ///         <c>model/reified-nodes-immutable</c>, <c>state/no-static-mutable</c> and the exception laws)
-///         place no card either — a union has no single home directory.
+///         place no card — a union has no single home directory.
 ///     </para>
 ///     <para>
 ///         Two rules come from <c>DotNetGuidance</c>, the shared pack, and the rest of it is declined on
@@ -55,12 +56,21 @@ namespace Zphil.LoadBearing.ArchSpec;
 ///         package: the leaf verb exempts external targets, so it cannot say the one thing
 ///         <c>layering/core-no-roslyn</c> exists to say, and a second rule beside that one would state
 ///         the weaker half twice. Its consumer is a modular monolith whose leaf module must stay clear
-///         of its siblings. <c>MustBeRegistered</c> idles because nothing
+///         of its siblings. <c>MustOnlyBeReferencedByItself</c> idles because nothing here is hermetic:
+///         the test project reaches into every layer by design, so an inbound leaf over any of them
+///         would be red for the reason the tests exist. Its consumer is a modular monolith whose modules
+///         are reached only through their own surfaces. <c>MustBeRegistered</c> idles because nothing
 ///         here is registered by convention: the composition root wires a hand-written list of
 ///         infrastructure singletons, so a completeness rule over them could only restate that list at
 ///         itself — a tautology wearing a law's clothes. Its consumer is an estate where a naming
 ///         convention implies registration (every <c>*Handler</c>, say) and a type can carry the name
-///         while missing the wiring. <c>MustHaveExactlyOneCounterpart</c> idles because this suite
+///         while missing the wiring. <c>MustBelongTo</c> idles because the five shipping projects now
+///         <em>are</em> the five layers: every type they declare belongs to one by construction, so a
+///         coverage rule over them could never red, and a law that cannot fail is the vacuous law its
+///         neighbours here decline. A sixth shipping project still surfaces, on the artifact stratum,
+///         under <c>packaging/only-the-four-ship</c>. Its consumer is an estate whose layers are namespace
+///         cones that do not exhaust the projects they sit in, where a type can land outside every one of
+///         them. <c>MustHaveExactlyOneCounterpart</c> idles because this suite
 ///         organizes tests by behavior, not per type: 21 of the 110 public Core types have a
 ///         <c>{Name}Tests</c> class, and a rule demanding one each would grandfather the other 89 as
 ///         debt — recording a convention the tree deliberately does not follow as if it were merely
@@ -196,46 +206,33 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
     /// <inheritdoc />
     public void Define(Arch arch)
     {
-        // The five assembly-shaped layers plus three inside Core, in module-map order. Core's globs are
-        // its namespace inventory rather than a subtree, because Core's root namespace is also this
-        // repo's root namespace — `Zphil.LoadBearing.*` would swallow Roslyn, Cli, Xunit and the pack.
-        // That makes the list brittle by construction, which is why SelfSpecTests pins it against the
-        // project: a new Core namespace that nobody adds here would silently escape core's rules.
-        Layer core = arch.Layer("Core",
-                "Zphil.LoadBearing",
-                "Zphil.LoadBearing.Baselines.*",
-                "Zphil.LoadBearing.Building.*",
-                "Zphil.LoadBearing.Checking.*",
-                "Zphil.LoadBearing.Codebase.*",
-                "Zphil.LoadBearing.Discovery.*",
-                "Zphil.LoadBearing.Fluent.*",
-                "Zphil.LoadBearing.Hosting.*",
-                "Zphil.LoadBearing.Internal.*",
-                "Zphil.LoadBearing.Model.*",
-                "Zphil.LoadBearing.Prose.*",
-                "Zphil.LoadBearing.Rendering.*",
-                "Zphil.LoadBearing.Validation.*")
+        // The five assembly-shaped layers, each defined as the project it is, and three cuts inside Core,
+        // each a namespace cone within it. The unit of architecture here is the assembly, so the build's
+        // own answer to "what is in this project" is the definition — Core in particular cannot be a
+        // subtree, its root namespace being this repo's root namespace, and enumerating its namespaces
+        // instead let a new one escape every rule anchored on `core` until someone remembered to add it.
+        Layer core = arch.Layer("Core", arch.Project("Zphil.LoadBearing"))
             .Purpose("Core is the package a spec is written against: the fluent language, the model a spec " +
                      "compiles to, and the readers of that model that need no compiler.");
-        Layer model = arch.Layer("Model", "Zphil.LoadBearing.Model.*")
+        Layer model = arch.Layer("Model", core.InNamespace("Zphil.LoadBearing.Model.*"))
             .Purpose("Model is the reified spec: the nodes a spec compiles to, and the one thing the checker and " +
                      "the renderers both read.");
-        Layer checking = arch.Layer("Checking", "Zphil.LoadBearing.Checking.*")
+        Layer checking = arch.Layer("Checking", core.InNamespace("Zphil.LoadBearing.Checking.*"))
             .Purpose("Checking evaluates each rule of the model against an extracted codebase: a verdict per rule, " +
                      "its violations, and what the baselines grandfather.");
-        Layer rendering = arch.Layer("Rendering", "Zphil.LoadBearing.Rendering.*")
+        Layer rendering = arch.Layer("Rendering", core.InNamespace("Zphil.LoadBearing.Rendering.*"))
             .Purpose("Rendering turns the model and a check's results into what people and agents read: the " +
                      "managed block and cards, the diagrams, and the reports.");
-        Layer extraction = arch.Layer("Extraction", "Zphil.LoadBearing.Roslyn.*")
+        Layer extraction = arch.Layer("Extraction", arch.Project("Zphil.LoadBearing.Roslyn"))
             .Purpose("Extraction is the Roslyn host: it loads a solution through MSBuild and reads out the codebase " +
                      "model the checker evaluates against.");
-        Layer host = arch.Layer("Host", "Zphil.LoadBearing.Cli.*")
+        Layer host = arch.Layer("Host", arch.Project("Zphil.LoadBearing.Cli"))
             .Purpose("Host is the `loadbearing` command: the CLI verbs, the MCP server, and the spec loading and " +
                      "pipeline behind both.");
-        Layer adapter = arch.Layer("Adapter", "Zphil.LoadBearing.Xunit.*")
+        Layer adapter = arch.Layer("Adapter", arch.Project("Zphil.LoadBearing.Xunit"))
             .Purpose("Adapter runs every rule of a spec as an individually named xUnit test in the consumer's own " +
                      "test project.");
-        Layer pack = arch.Layer("Pack", "Zphil.LoadBearing.Packs.*")
+        Layer pack = arch.Layer("Pack", arch.Project("Zphil.LoadBearing.Packs.DotNet"))
             .Purpose("Pack is the shared rule pack: canonical .NET rules as an ordinary class library that a spec " +
                      "takes one method at a time.");
 
@@ -258,26 +255,23 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
                      "added without touching it.")
             .Fix("Keep the dependency one-way: give Model the data, and let Checking or Rendering read it.");
 
-        arch.Rule("arch/no-ungoverned-types")
-            .Enforce(arch.AnyOf(
-                    arch.Project("Zphil.LoadBearing"),
-                    arch.Project("Zphil.LoadBearing.Roslyn"),
-                    arch.Project("Zphil.LoadBearing.Cli"),
-                    arch.Project("Zphil.LoadBearing.Xunit"),
-                    arch.Project("Zphil.LoadBearing.Packs.DotNet"))
-                .Authored()
-                .Except(arch.Types.Named("Program"))
-                .MustBelongTo(core, extraction, host, adapter, pack))
-            .Because("A type outside every declared layer is governed by nothing: no rule sweeps it, no card " +
-                     "covers it, and check stays green while it accretes. The subject names the five projects " +
-                     "rather than a namespace glob because a glob reaches only the namespaces someone " +
-                     "predicted, and the failure this rule exists to catch is a type arriving under a root " +
-                     "nobody did. The five assembly-shaped layers are the whole cover — Model, Checking and " +
-                     "Rendering are cuts inside Core, not additions beside it. Two exemptions, both principled: " +
-                     "generated types nobody can move, and Program, which top-level statements synthesize into " +
-                     "the global namespace no glob can name.")
-            .Fix("Put the type in a namespace one of the five layers covers, or add its namespace to a layer " +
-                 "in this spec and say in review what the layer now means.");
+        arch.Rule("layering/no-circular-references")
+            .Enforce(arch.Each(model, checking, rendering).MustNotHaveCircularReferences())
+            .Because("Model, Checking and Rendering are three cuts inside one assembly with one intended direction: " +
+                     "a model and two readers of it. A circle among them means a reader has become something the " +
+                     "other reader depends on, and the next render target or checker change could no longer land " +
+                     "without touching both.")
+            .Fix("Move what a reader borrows from another reader down to where both can reach it: Model for " +
+                 "shared data, a helper namespace for a helper. A reader depends on the model, never on the other reader.");
+
+        arch.Rule("layering/leaves-independent")
+            .Enforce(arch.Each(host, adapter, pack).MustNotReferenceEachOther())
+            .Because("Host, Adapter and Pack are the three leaves of the project graph: each is a different way " +
+                     "to consume Core, and none is a dependency of another. A reference between two leaves " +
+                     "would pull one consumer's closure — the CLI's MSBuild and MCP machinery, the adapter's " +
+                     "xunit, the pack's canonical rules — into a project that ships without it.")
+            .Fix("Move the shared piece down into Core, or into Extraction if it needs Roslyn; a leaf takes " +
+                 "what it needs from below, never from a sibling.");
 
         arch.Rule("cli/no-stdout")
             .Enforce(host

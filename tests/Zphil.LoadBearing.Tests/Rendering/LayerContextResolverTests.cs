@@ -57,6 +57,36 @@ public class LayerContextResolverTests
             .Because("Neither the web layer nor the domain touches legacy.");
     });
 
+    // Two layers under one family rule and nothing else: the rule anchors on each cell, and each card
+    // lands at its own cell's directory rather than at the subject's head.
+    private static readonly IArchitectureSpec FamilySubjectSpec = new InlineSpec(arch =>
+    {
+        Layer web = arch.Layer("Web", "MyApp.Web.*");
+        Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
+        arch.Rule("layering/leaves-independent")
+            .Enforce(arch.Each(web, billing).MustNotReferenceEachOther())
+            .Because("Neither leaf may grow a dependency on the other.");
+    });
+
+    // The same family narrowed by an adjective — a refinement keeps the noun head, family or not.
+    private static readonly IArchitectureSpec RefinedFamilySubjectSpec = new InlineSpec(arch =>
+    {
+        Layer web = arch.Layer("Web", "MyApp.Web.*");
+        Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
+        arch.Rule("layering/leaves-independent")
+            .Enforce(arch.Each(web, billing).Except(arch.Types.Named("Shared")).MustNotReferenceEachOther())
+            .Because("Neither leaf may grow a dependency on the other.");
+    });
+
+    // The project form of the same law: it names no layer, so it anchors no card at all.
+    private static readonly IArchitectureSpec ProjectFamilySubjectSpec = new InlineSpec(arch =>
+    {
+        arch.Layer("Web", "MyApp.Web.*");
+        arch.Rule("layering/projects-independent")
+            .Enforce(arch.Each(arch.Projects.Matching("MyApp.*")).MustNotReferenceEachOther())
+            .Because("Each project is its own deployable unit.");
+    });
+
     // A Billing layer with one anchored rule — used to place against a codebase that has no billing types.
     private static readonly IArchitectureSpec BillingLayerSpec = new InlineSpec(arch =>
     {
@@ -193,6 +223,53 @@ public class LayerContextResolverTests
 
         placement.DirectoryPath.ShouldBeNull();
         placement.SkipReason.ShouldBe("layer 'Billing' matched no types; no scoped context emitted");
+    }
+
+    [Fact]
+    public void Resolve_FamilyOfLayersSubject_AnchorsEveryCellAtItsOwnDirectory()
+    {
+        CodebaseModel codebase = CompilationFactory.Extract("MyApp",
+            ("src/MyApp.Web/HomeController.cs", "namespace MyApp.Web; public class HomeController {}"),
+            ("src/MyApp.Legacy.Billing/BillingCalculator.cs", "namespace MyApp.Legacy.Billing; public class BillingCalculator {}"));
+
+        // One rule, two cards: the sentence names every cell, so it reads correctly on each — and the
+        // directory is the CELL's, never the subject head's, or both cards would land in one place.
+        IReadOnlyList<LayerPlacement> placements = LayerContextResolver.Resolve(
+            ArchModelBuilder.Build(FamilySubjectSpec), codebase);
+
+        placements.Select(placement => (placement.LayerName, placement.DirectoryPath))
+            .ShouldBe([("Web", "src/MyApp.Web"), ("Billing", "src/MyApp.Legacy.Billing")]);
+        placements.ShouldAllBe(placement => placement.Rules.Count == 1);
+    }
+
+    [Fact]
+    public void Resolve_RefinedFamilySubject_StillAnchorsEveryCell()
+    {
+        CodebaseModel codebase = CompilationFactory.Extract("MyApp",
+            ("src/MyApp.Web/HomeController.cs", "namespace MyApp.Web; public class HomeController {}"),
+            ("src/MyApp.Legacy.Billing/BillingCalculator.cs", "namespace MyApp.Legacy.Billing; public class BillingCalculator {}"));
+
+        // An Except on the family produces a RefinedSelection over the same noun, exactly as it does over
+        // a bare layer, so anchoring survives it — and each card still ranges over the whole cell.
+        LayerContextResolver.Resolve(ArchModelBuilder.Build(RefinedFamilySubjectSpec), codebase)
+            .Select(placement => placement.LayerName)
+            .ShouldBe(["Web", "Billing"]);
+    }
+
+    [Fact]
+    public void Resolve_FamilyOfProjectsSubject_AnchorsNothing()
+    {
+        CodebaseModel codebase = CompilationFactory.Extract("MyApp.Web",
+            ("src/MyApp.Web/HomeController.cs", "namespace MyApp.Web; public class HomeController {}"));
+
+        // The project form names no layer, so there is no card to place — a bare project noun earns none
+        // either, and a family of them is the same answer.
+        ArchitectureModel model = ArchModelBuilder.Build(ProjectFamilySubjectSpec);
+
+        LayerContextResolver.Resolve(model, codebase)
+            .ShouldBeEmpty();
+        LayerContextResolver.HasAnchoredLayers(model)
+            .ShouldBeFalse();
     }
 
     [Fact]

@@ -50,7 +50,7 @@ public sealed class ProseQuotedOutputTests
     [
         (QuotingReadme, "Checked 9 rules: 8 passed, 1 failed, 0 skipped (2 violations, 0 warnings)"),
         (InterchangeReadme, "Checked 12 rules: 12 passed, 0 failed, 0 skipped (0 violations, 0 warnings)"),
-        (OperationsReadme, "Checked 10 rules: 9 passed, 0 failed, 1 skipped (0 violations, 0 warnings)")
+        (OperationsReadme, "Checked 8 rules: 7 passed, 0 failed, 1 skipped (0 violations, 0 warnings)")
     ];
 
     /// <summary>

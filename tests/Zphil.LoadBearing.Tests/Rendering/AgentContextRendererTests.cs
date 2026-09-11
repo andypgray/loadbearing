@@ -45,14 +45,6 @@ public class AgentContextRendererTests
         return ArchModelBuilder.Build(new ArchSpec());
     }
 
-    // The one rule a cautioned scope reifies to, whatever its ID: a caution mints a single child, so the
-    // model has nothing else to pick from and the rows below need not restate the scope ID twice.
-    private static ArchRule CautionTripwire(Action<Arch> define)
-    {
-        return Checker.Model(define)
-            .Rules.Single();
-    }
-
     [Fact]
     public void RootBlock_CanonicalSample_MatchesGolden()
     {
@@ -222,7 +214,7 @@ public class AgentContextRendererTests
     [Fact]
     public void CautionCard_CautionedScope_MatchesGolden()
     {
-        ArchRule tripwire = CautionTripwire(arch =>
+        ArchRule tripwire = Checker.Tripwire(arch =>
             arch.Scope("shared/utilities")
                 .Caution(arch.Namespace("MyApp.Shared.*"))
                 .Dragons("Argument order is load-bearing: every caller passes them positionally.")
@@ -245,7 +237,7 @@ public class AgentContextRendererTests
     [Fact]
     public void CautionCard_DragonsDocOnly_RendersBacktickedPathBulletAndNoDragonsParagraph()
     {
-        ArchRule tripwire = CautionTripwire(arch =>
+        ArchRule tripwire = Checker.Tripwire(arch =>
             arch.Scope("shared/utilities")
                 .Caution(arch.Namespace("MyApp.Shared.*"))
                 .DragonsDoc("arch/utilities-dragons.md")
@@ -266,7 +258,7 @@ public class AgentContextRendererTests
     {
         // The lede carries the scoped selection because a caution has no law sentence to carry it, and it
         // reads it through the very fragment every other reference position uses.
-        ArchRule tripwire = CautionTripwire(arch =>
+        ArchRule tripwire = Checker.Tripwire(arch =>
             arch.Scope("resilience/retry")
                 .Caution(arch.Types.Named("RetryPolicy"))
                 .Dragons("The back-off table is tuned against production, not first principles.")
@@ -281,7 +273,7 @@ public class AgentContextRendererTests
     {
         // A bare layer handle keeps the collective voice ("the Model layer") rather than falling to the
         // types voice, exactly as it does in any other reference position.
-        ArchRule tripwire = CautionTripwire(arch =>
+        ArchRule tripwire = Checker.Tripwire(arch =>
             arch.Scope("model/legacy")
                 .Caution(arch.Layer("Model", "MyApp.Model.*"))
                 .Dragons("The entities are generated; the partial halves are hand-written.")

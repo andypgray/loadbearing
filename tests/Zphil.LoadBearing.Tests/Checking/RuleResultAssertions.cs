@@ -72,6 +72,27 @@ internal static class RuleResultAssertions
     }
 
     /// <summary>
+    ///     Asserts the rule passed carrying exactly one warning of <paramref name="kind" />, saying
+    ///     <paramref name="message" /> about <paramref name="file" /> — the shape a scope tripwire that
+    ///     fired reports in, with the path carried structurally as well as in the prose.
+    /// </summary>
+    internal static RuleResult ShouldHaveWarnedOnce(
+        this RuleResult result, CheckWarningKind kind, string message, string file)
+    {
+        string report = Describe(result);
+        result.Status.ShouldBe(RuleStatus.Passed, report);
+        result.Violations.ShouldBeEmpty(report);
+        CheckWarning warning = result.Warnings.ShouldHaveSingleItem(report);
+
+        warning.ShouldSatisfyAllConditions(
+            () => warning.Kind.ShouldBe(kind, report),
+            () => warning.Message.ShouldBe(message, report),
+            () => warning.File.ShouldBe(file, report));
+
+        return result;
+    }
+
+    /// <summary>
     ///     Asserts the run reached no verdict for the rule and said why: <see cref="RuleStatus.Skipped" />
     ///     carrying <paramref name="reason" />, with nothing red to show for it.
     /// </summary>
@@ -214,6 +235,34 @@ internal static class RuleResultAssertions
         result.Status.ShouldBe(RuleStatus.Failed, report);
         Rendered(result, kind)
             .ShouldBe(edges, ignoreOrder: true, customMessage: report);
+
+        return result;
+    }
+
+    /// <summary>
+    ///     Asserts the rule failed on exactly the edge violations of <paramref name="kind" /> that
+    ///     <paramref name="edges" /> names, each paired with the detail that violation carries — the shape
+    ///     the circular-references verb reports in, a reference violation carrying the circle its pair lies
+    ///     on (GRAMMAR §5.3). Exhaustive for the kind, in any order, as
+    ///     <see cref="ShouldHaveFailedWithEdges" /> is.
+    /// </summary>
+    /// <remarks>
+    ///     Edge and detail are asserted together rather than in two rows, because the claim is that this
+    ///     pair lies on that circle: an edge set with the wrong circle beside it is a different finding, and
+    ///     splitting the two would let a red name only half of it.
+    /// </remarks>
+    internal static RuleResult ShouldHaveFailedWithDetailedEdges(
+        this RuleResult result, ViolationKind kind, (string Edge, string Detail)[] edges)
+    {
+        string report = Describe(result);
+        RequireExpectation(edges.Select(edge => edge.Edge).ToArray(), report);
+        result.Status.ShouldBe(RuleStatus.Failed, report);
+
+        IReadOnlyList<(string Edge, string Detail)> rendered = result.Violations
+            .Where(violation => violation.Kind == kind)
+            .Select(violation => (Edge(violation) ?? NothingPopulated, violation.Detail ?? NothingPopulated))
+            .ToList();
+        rendered.ShouldBe(edges, ignoreOrder: true, customMessage: report);
 
         return result;
     }

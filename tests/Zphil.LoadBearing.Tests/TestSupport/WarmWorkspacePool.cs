@@ -1,6 +1,6 @@
 using Zphil.LoadBearing.Cli;
 using Zphil.LoadBearing.Cli.Pipeline;
-using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Roslyn;
 
 namespace Zphil.LoadBearing.Tests.TestSupport;

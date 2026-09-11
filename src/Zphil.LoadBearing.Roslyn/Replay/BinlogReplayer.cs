@@ -1,6 +1,6 @@
 using Basic.CompilerLog.Util;
 using Microsoft.CodeAnalysis;
-using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Roslyn.Diagnostics;
 using Zphil.LoadBearing.Roslyn.Solutions;
 

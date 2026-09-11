@@ -15,8 +15,9 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     remaining pairs, and how many matched entries came in under their recorded count or record none at
 ///     all. Each of those three extinguishes itself, so a rule whose pairs are one site apiece and whose
 ///     counts all hold reads exactly as it did before the measure existed. A scope tripwire reads
-///     <c>skip</c> (diff-aware), whichever posture minted it — a caution has no other line, so without
-///     this its rule would fall to the Enforce arm and read <c>pass</c> for a rule the run never ran.
+///     <c>skip</c> (diff-aware), whichever posture minted it: the role is tested ahead of the posture
+///     dispatch, so a caution — whose tripwire is its only child — never falls to the Enforce arm and
+///     reads <c>pass</c> for a rule the run never ran.
 ///     Only Migrate surfaces
 ///     the promotion suggestion when the baseline has burned to zero — Quarantine→Migrate is a human decision.
 ///     A rule a solution filter left no subject for reads <c>skip</c> with its reason, whatever its posture:
@@ -33,18 +34,22 @@ internal static class StatusFormatter
 
     private static string RuleLine(RuleResult result)
     {
+        // A tripwire keeps its own line whatever its status and whichever posture minted it: it says what a
+        // diff-aware skip is and what to run to get a verdict, which is the same fact under both.
+        if (IsTripwire(result)) return TripwireLine(result);
+
         // Ahead of the posture dispatch, because posture is what would mislead: a narrowing-skipped Migrate
         // rule falls to RatchetLine and reads "pass … 0 new, 2 fixed awaiting acceptance" — a pass and a
-        // burndown for a rule the run never measured. The tripwire is Skipped for its own reason and keeps
-        // its own line, which says what a diff-aware skip is and what to run to get a verdict.
-        if (result.Status == RuleStatus.Skipped && !IsTripwire(result))
+        // burndown for a rule the run never measured.
+        if (result.Status == RuleStatus.Skipped)
             return $"skip {result.Rule.Id} — {result.SkipReason}";
 
         return result.Rule.Posture switch
         {
             Posture.Migrate => RatchetLine(result, "migrate"),
-            Posture.Quarantine => QuarantineLine(result),
-            Posture.Caution => TripwireLine(result),
+            // Containment ratchets like Migrate but never suggests promotion; it is a quarantine's only
+            // non-tripwire child, and a caution has none.
+            Posture.Quarantine => RatchetLine(result, "quarantine"),
             _ => EnforceLine(result)
         };
     }
@@ -52,14 +57,6 @@ internal static class StatusFormatter
     private static bool IsTripwire(RuleResult result)
     {
         return result.Rule.Scope is { Role: ScopeRole.Tripwire };
-    }
-
-    private static string QuarantineLine(RuleResult result)
-    {
-        // Containment ratchets like Migrate (but never suggests promotion); the tripwire is diff-aware skip.
-        return result.Rule.Scope!.Role == ScopeRole.Containment
-            ? RatchetLine(result, "quarantine")
-            : TripwireLine(result);
     }
 
     // The one tripwire line both scope postures print. A caution's only rule is its tripwire, so the

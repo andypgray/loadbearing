@@ -48,19 +48,17 @@ flowchart LR
         s_Checking["Checking"]
         s_Rendering["Rendering"]
     end
-    subgraph s_Extraction["Extraction"]
-        subgraph s_Zphil_LoadBearing_Roslyn_MsBuild["Quarantine: roslyn/msbuild-bootstrap"]
-            s_MsBuildBootstrap[["MsBuildBootstrap"]]
-        end
-    end
+    s_Extraction["Extraction"]
     s_Microsoft_CodeAnalysis("Microsoft.CodeAnalysis.*")
     s_Microsoft_Build("Microsoft.Build.*")
     s_Adapter["Adapter"]
-    subgraph s_Host["Host"]
-        s_Zphil_LoadBearing_Cli_Mcp_Infrastructure["Zphil.LoadBearing.Cli.Mcp.Infrastructure.*"]
-    end
+    s_Host["Host"]
     s_Pack["Pack"]
+    s_Zphil_LoadBearing_Cli_Mcp_Infrastructure["Zphil.LoadBearing.Cli.Mcp.Infrastructure.*"]
     s_System_Environment("System.Environment")
+    subgraph s_Zphil_LoadBearing_Roslyn_MsBuild["Quarantine: roslyn/msbuild-bootstrap"]
+        s_MsBuildBootstrap[["MsBuildBootstrap"]]
+    end
 
     s_Core --x s_Extraction
     s_Core --x s_Microsoft_CodeAnalysis
@@ -86,7 +84,7 @@ flowchart LR
     end
 ```
 
-Not drawn in full: `arch/no-ungoverned-types`, `cli/no-stdout`, `di/no-captive-dependencies`, `di/no-service-locator`, `di/no-buildserviceprovider`, `mcp/tools-accept-cancellation`, `mcp/tool-types-attributed`, `mcp/tool-types-in-cli`, `roslyn/no-msbuildlocator-query`, `mcp/no-blocking-waits`, `mcp/no-path-assembly-loads`, `naming/async-suffix`, `mcp/warm-state-constructed-once`, `xunit/throws-setup-errors-only`, `exceptions/no-swallowed-broad-catches`, `exceptions/no-bare-bcl-throws`, `state/no-static-mutable`, `naming/interfaces`, `model/constraint-nodes`, `model/reified-nodes-immutable`, `api/core-front-door`, `api/extraction-front-door`, `api/host-front-door`, `packaging/core-netstandard-only`, `packaging/core-carries-nothing`, `packaging/shipping-locks-restore`, `packaging/only-the-four-ship`, `roslyn/msbuild-bootstrap/tripwire` (Quarantine), `model/prose-fragments/tripwire` (Caution). Expand any of them with `loadbearing explain <rule-id>`.
+Not drawn in full: `layering/no-circular-references`, `layering/leaves-independent`, `cli/no-stdout`, `di/no-captive-dependencies`, `di/no-service-locator`, `di/no-buildserviceprovider`, `mcp/tools-accept-cancellation`, `mcp/tool-types-attributed`, `mcp/tool-types-in-cli`, `roslyn/no-msbuildlocator-query`, `mcp/no-blocking-waits`, `mcp/no-path-assembly-loads`, `naming/async-suffix`, `mcp/warm-state-constructed-once`, `xunit/throws-setup-errors-only`, `exceptions/no-swallowed-broad-catches`, `exceptions/no-bare-bcl-throws`, `state/no-static-mutable`, `naming/interfaces`, `model/constraint-nodes`, `model/reified-nodes-immutable`, `api/core-front-door`, `api/extraction-front-door`, `api/host-front-door`, `packaging/core-netstandard-only`, `packaging/core-carries-nothing`, `packaging/shipping-locks-restore`, `packaging/only-the-four-ship`, `roslyn/msbuild-bootstrap/tripwire` (Quarantine), `model/prose-fragments/tripwire` (Caution). Expand any of them with `loadbearing explain <rule-id>`.
 <!-- loadbearing:end -->
 
 Nobody drew either of those, and nobody can let them go stale:

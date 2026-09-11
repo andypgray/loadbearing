@@ -2,7 +2,7 @@ using System.Runtime.CompilerServices;
 using Microsoft.Build.Construction;
 using Microsoft.Build.Definition;
 using Microsoft.Build.Evaluation;
-using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Roslyn.Caching;
 using Zphil.LoadBearing.Roslyn.Extraction;
 

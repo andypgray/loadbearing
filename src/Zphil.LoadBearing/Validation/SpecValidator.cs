@@ -15,7 +15,7 @@ namespace Zphil.LoadBearing.Validation;
 ///     registrations, keyed to the rule or scope the author wrote. Every rule/scope/member-attributed
 ///     error carries the offending anchor's spec-source location (GRAMMAR §8) so all-errors-at-once
 ///     lands each one at a <c>file:line</c> jump target; spec-wide errors (duplicate layer name, layer
-///     globs, layer purposes) stay location-free by design.
+///     globs, layer definitions, layer purposes) stay location-free by design.
 /// </remarks>
 internal static class SpecValidator
 {
@@ -48,13 +48,22 @@ internal static class SpecValidator
             if (!seen.Add(layer.Name))
                 errors.Add(new SpecValidationError(Code.DuplicateLayerName, null, $"Duplicate layer name '{layer.Name}'."));
 
-            // A layer's globs are validated here — their authoritative, use-independent home — so a bad
-            // glob is caught whether or not the layer is ever used as a subject (§8 items 15–16). Like the
-            // duplicate-name error above, these are spec-wide (null ID, named by layer in the message) and
-            // location-free: a layer name is a unique, trivially greppable string.
+            // A layer's definition is validated here — its authoritative, use-independent home — so a bad
+            // one is caught whether or not the layer is ever used as a subject (§8 items 10, 15–16, 19).
+            // Like the duplicate-name error above, these are spec-wide (null ID, named by layer in the
+            // message) and location-free: a layer name is a unique, trivially greppable string. A selection
+            // definition takes every walk a rule's selections take, in the order a rule takes them.
             var subject = $"layer '{layer.Name}'";
-            foreach (string glob in layer.Globs)
-                CheckPattern(glob, PatternKind.NamespacePattern, null, null, errors, subject);
+            if (layer.Definition is { } definition)
+            {
+                CheckSelectionOperands([definition], null, arch, null, errors, subject);
+                CheckFamilies(FamilyPositions(definition, FamilyPosition.LayerDefinition), null, null, errors, subject);
+            }
+            else
+            {
+                foreach (string glob in layer.Globs)
+                    CheckPattern(glob, PatternKind.NamespacePattern, null, null, errors, subject);
+            }
 
             // A purpose is prose like any other (§8 items 5–6) and is checked where the layer is declared, on the
             // same spec-wide terms as its globs: null ID, no location, named by layer.
@@ -144,6 +153,9 @@ internal static class SpecValidator
         CheckHierarchyAnchors(rule, errors);
         CheckPatterns(RulePatterns(rule), rule.Id, rule.Location, errors);
         CheckLifetimes(RuleSelections(rule), rule.Id, rule.Location, errors);
+        CheckFamilies(RuleFamilyPositions(rule), rule.Id, rule.Location, errors);
+        CheckEachOtherSubject(rule, errors);
+        CheckCircularReferencesSubject(rule, errors);
     }
 
     private static void ValidateScope(ScopeRegistration scope, Arch arch, List<SpecValidationError> errors)
@@ -185,9 +197,8 @@ internal static class SpecValidator
         foreach ((string label, string? value) in ScopeProse(scope))
             CheckProse(value, label, scope.Id, scope.Location, errors);
 
-        CheckForeign(ScopeSelections(scope), scope.Id, arch, scope.Location, errors);
-        CheckPatterns(ScopePatterns(scope), scope.Id, scope.Location, errors);
-        CheckLifetimes(ScopeSelections(scope), scope.Id, scope.Location, errors);
+        CheckSelectionOperands(ScopeOperands(scope), scope.Id, arch, scope.Location, errors);
+        CheckFamilies(ScopeFamilyPositions(scope), scope.Id, scope.Location, errors);
     }
 
     private static void CheckBecause(List<string> becauses, string id, SpecSourceLocation? location, List<SpecValidationError> errors)
@@ -215,10 +226,24 @@ internal static class SpecValidator
         else if (value!.IndexOf('\n') >= 0 || value.IndexOf('\r') >= 0) errors.Add(new SpecValidationError(Code.MultiLineProse, id, $"Multi-line {label} on {SubjectOf(id, subject)}; prose fields are single-line.", location));
     }
 
-    private static void CheckPatterns(
-        IEnumerable<(string Value, PatternKind Kind)> patterns, string id, SpecSourceLocation? location, List<SpecValidationError> errors)
+    // The walks every selection-bearing anchor takes — a layer's definition and a scope's operands alike —
+    // in the order a rule's selections take them, so a bad selection reports the same first error wherever
+    // it sits.
+    private static void CheckSelectionOperands(
+        IEnumerable<Selection> operands, string? id, Arch arch, SpecSourceLocation? location,
+        List<SpecValidationError> errors, string? subject = null)
     {
-        foreach ((string value, PatternKind kind) in patterns) CheckPattern(value, kind, id, location, errors);
+        List<Selection> roots = operands.ToList();
+        CheckForeign(roots.SelectMany(SelectionWalk.ExpandSelection), id, arch, location, errors, subject);
+        CheckPatterns(roots.SelectMany(SelectionPatterns), id, location, errors, subject);
+        CheckLifetimes(roots.SelectMany(SelectionWalk.ExpandSelection), id, location, errors, subject);
+    }
+
+    private static void CheckPatterns(
+        IEnumerable<(string Value, PatternKind Kind)> patterns, string? id, SpecSourceLocation? location,
+        List<SpecValidationError> errors, string? subject = null)
+    {
+        foreach ((string value, PatternKind kind) in patterns) CheckPattern(value, kind, id, location, errors, subject);
     }
 
     // GRAMMAR §8 items 15–16. A blank glob or affix is BlankPattern (the shared catalog-wide code, one
@@ -264,6 +289,128 @@ internal static class SpecValidator
         return subject ?? $"'{id}'";
     }
 
+    // GRAMMAR §8 item 27: a family may stand only as a rule subject. One code and one sentence shape for
+    // every position, with the position word varying — what the author has to move is the family, and where
+    // it stands is the whole of what they need told.
+    private static void CheckFamilies(
+        IEnumerable<(Selection Selection, string Position)> candidates, string? id, SpecSourceLocation? location,
+        List<SpecValidationError> errors, string? subject = null)
+    {
+        foreach ((Selection selection, string position) in candidates)
+        {
+            if (selection is UnionSelection || selection.Noun is not EachNoun) continue;
+
+            errors.Add(new SpecValidationError(Code.FamilyMisplaced, id,
+                $"A family (`arch.Each`) used as {position} by {SubjectOf(id, subject)}; "
+                + "a family may stand only as a rule subject.", location));
+        }
+    }
+
+    // GRAMMAR §8 item 28: the cross-cell ban's targets are the subject's own cells, so a subject with no
+    // cells names nothing to forbid. The message names the verb the author meant, because over a plain
+    // selection there is one and it is not a rewrite of the rule.
+    private static void CheckEachOtherSubject(RuleRegistration rule, List<SpecValidationError> errors)
+    {
+        if (rule.Constraint is not MustNotReferenceEachOtherConstraint constraint) return;
+
+        Selection subject = constraint.Subject!;
+        if (subject is not UnionSelection && subject.Noun is EachNoun) return;
+
+        errors.Add(new SpecValidationError(Code.EachOtherWithoutFamily, rule.Id,
+            $"`MustNotReferenceEachOther` on '{rule.Id}' needs a family subject (`arch.Each`); "
+            + "over a plain selection write `MustNotReference`.", rule.Location));
+    }
+
+    // GRAMMAR §8 item 29: the cycle gate needs a family of LAYERS. A plain selection has no cells to be the
+    // nodes of a cell graph; a family of projects has cells the build already forbids a circle among, so the
+    // law would hold by construction and the rule could never red. Two wordings, because the two shapes are
+    // wrong for different reasons and each has its own answer.
+    private static void CheckCircularReferencesSubject(RuleRegistration rule, List<SpecValidationError> errors)
+    {
+        if (rule.Constraint is not MustNotHaveCircularReferencesConstraint constraint) return;
+
+        Selection subject = constraint.Subject!;
+        if (subject is UnionSelection || subject.Noun is not EachNoun family)
+        {
+            errors.Add(new SpecValidationError(Code.CircularReferencesNeedLayerFamily, rule.Id,
+                $"`MustNotHaveCircularReferences` on '{rule.Id}' needs a family of layers (`arch.Each`); "
+                + "over a plain selection there are no layers to reference each other.", rule.Location));
+            return;
+        }
+
+        if (family.Layers is not null) return;
+
+        errors.Add(new SpecValidationError(Code.CircularReferencesNeedLayerFamily, rule.Id,
+            $"`MustNotHaveCircularReferences` on '{rule.Id}' needs a family of layers; projects cannot have "
+            + "circular references, so over a family of projects the law holds by construction. Write "
+            + "`MustNotReferenceEachOther` or an ordering rule.", rule.Location));
+    }
+
+    // Every position a rule's selections stand in, item 27's way: the subject itself is the one legal one,
+    // so only what it NESTS is walked, while each operand is walked from its own root. A member constraint's
+    // Subject is the type selection its projection was taken from, which is a subject too — a family as the
+    // source of a member projection is legal.
+    private static IEnumerable<(Selection Selection, string Position)> RuleFamilyPositions(RuleRegistration rule)
+    {
+        if (rule.Constraint is not { } constraint) yield break;
+
+        if (constraint.Subject is { } subject)
+            foreach ((Selection, string) nested in NestedFamilyPositions(subject))
+                yield return nested;
+
+        foreach (Selection operand in constraint.Operands)
+        foreach ((Selection, string) position in FamilyPositions(operand, FamilyPosition.Operand))
+            yield return position;
+    }
+
+    // The scope's twin: the quarantined interior and each sanctioned-surface operand, each named by the
+    // position a reader would go looking for it in.
+    private static IEnumerable<(Selection Selection, string Position)> ScopeFamilyPositions(ScopeRegistration scope)
+    {
+        // Non-null past ValidateScope's dangling-anchor return, as ScopeOperands relies on too.
+        foreach ((Selection, string) position in FamilyPositions(scope.Scoped!, FamilyPosition.ScopedSelection))
+            yield return position;
+
+        foreach (Selection facade in scope.Boundary)
+        foreach ((Selection, string) position in FamilyPositions(facade, FamilyPosition.Boundary))
+            yield return position;
+    }
+
+    // One root and everything it nests, each paired with the position word item 27 names it by.
+    private static IEnumerable<(Selection Selection, string Position)> FamilyPositions(Selection root, string position)
+    {
+        yield return (root, position);
+
+        foreach ((Selection, string) nested in NestedFamilyPositions(root)) yield return nested;
+    }
+
+    // What a selection nests, and nothing else: its union parts and its Except payloads, each of which
+    // consumes a set and so refuses a family. A family's own cells are Layers by construction, so there is
+    // no cell arm — the type system already refused a nested family.
+    private static IEnumerable<(Selection Selection, string Position)> NestedFamilyPositions(Selection root)
+    {
+        if (root is UnionSelection union)
+            foreach (Selection part in union.Parts)
+            foreach ((Selection, string) nested in FamilyPositions(part, FamilyPosition.UnionOperand))
+                yield return nested;
+
+        foreach (SelectionAdjective adjective in root.Adjectives)
+            if (adjective is ExceptAdjective except)
+                foreach ((Selection, string) nested in FamilyPositions(except.Payload, FamilyPosition.ExceptPayload))
+                    yield return nested;
+    }
+
+    /// <summary>The position words item 27's one sentence varies on (GRAMMAR §8).</summary>
+    private static class FamilyPosition
+    {
+        internal const string Operand = "an operand";
+        internal const string ExceptPayload = "an Except payload";
+        internal const string UnionOperand = "a union operand";
+        internal const string LayerDefinition = "a layer definition";
+        internal const string ScopedSelection = "a scoped selection";
+        internal const string Boundary = "a boundary";
+    }
+
     // The foreign-Arch walk the three strata share (GRAMMAR §8 items 4, 13, 22): the first candidate some
     // other Arch minted is reported and the walk stops, because a spec assembled from two instances is one
     // mistake however many of its parts carry it. Each stratum supplies the noun its sentence opens with,
@@ -272,14 +419,14 @@ internal static class SpecValidator
     // was reported, which is what lets a caller skip the per-item checks a foreign owner makes meaningless.
     private static bool ReportFirstForeign(
         IEnumerable<(Arch Owner, SpecSourceLocation? Location)> candidates, Arch arch, Code code, string noun,
-        string id, List<SpecValidationError> errors)
+        string? id, List<SpecValidationError> errors, string? subject = null)
     {
         foreach ((Arch owner, SpecSourceLocation? location) in candidates)
         {
             if (ReferenceEquals(owner, arch)) continue;
 
             errors.Add(new SpecValidationError(code, id,
-                $"{noun} used by '{id}' was minted on a different Arch instance; it is not registered with this model.",
+                $"{noun} used by {SubjectOf(id, subject)} was minted on a different Arch instance; it is not registered with this model.",
                 location));
             return true;
         }
@@ -288,12 +435,13 @@ internal static class SpecValidator
     }
 
     private static void CheckForeign(
-        IEnumerable<Selection> selections, string id, Arch arch, SpecSourceLocation? location, List<SpecValidationError> errors)
+        IEnumerable<Selection> selections, string? id, Arch arch, SpecSourceLocation? location,
+        List<SpecValidationError> errors, string? subject = null)
     {
         IEnumerable<(Arch Owner, SpecSourceLocation? Location)> candidates =
             selections.Select(selection => (selection.Owner, Location: location));
 
-        ReportFirstForeign(candidates, arch, Code.ForeignSelection, "A selection", id, errors);
+        ReportFirstForeign(candidates, arch, Code.ForeignSelection, "A selection", id, errors, subject);
     }
 
     // GRAMMAR §8 item 22: the project-stratum sibling of CheckForeign. A project selection carries its own
@@ -511,14 +659,15 @@ internal static class SpecValidator
     // UnionSelection has no single noun). Reported all-at-once, and the build throws before membership
     // resolution ever sees the bad value.
     private static void CheckLifetimes(
-        IEnumerable<Selection> selections, string id, SpecSourceLocation? location, List<SpecValidationError> errors)
+        IEnumerable<Selection> selections, string? id, SpecSourceLocation? location,
+        List<SpecValidationError> errors, string? subject = null)
     {
         foreach (Selection selection in selections)
             if (selection is not UnionSelection && selection.Noun is RegisteredNoun { Lifetime: { } lifetime }
                                                 && !Enum.IsDefined(typeof(Lifetime), lifetime))
                 errors.Add(new SpecValidationError(Code.UndefinedLifetime, id,
                     $"'(Lifetime){(int)lifetime}' is not a defined Lifetime — " +
-                    $"use Lifetime.Singleton, Lifetime.Scoped, or Lifetime.Transient (used by '{id}').",
+                    $"use Lifetime.Singleton, Lifetime.Scoped, or Lifetime.Transient (used by {SubjectOf(id, subject)}).",
                     location));
     }
 
@@ -637,9 +786,10 @@ internal static class SpecValidator
 
         foreach (string dragonsDoc in scope.DragonsDocs) yield return ("DragonsDoc", dragonsDoc);
 
-        if (scope.Scoped != null)
-            foreach ((string, string?) prose in SelectionProse(scope.Scoped))
-                yield return prose;
+        // Non-null past ValidateScope's dangling-anchor return: the posture verbs set the selection with the
+        // posture.
+        foreach ((string, string?) prose in SelectionProse(scope.Scoped!))
+            yield return prose;
     }
 
     private static IEnumerable<(string Label, string? Value)> ConstraintProse(Constraint constraint)
@@ -699,15 +849,6 @@ internal static class SpecValidator
         return rule.Constraint == null ? Enumerable.Empty<Selection>() : SelectionWalk.ConstraintSelections(rule.Constraint);
     }
 
-    // A scope's selections are the scoped interior and every operand of its sanctioned surface: the
-    // boundary is spec-authored selection like any other, so the foreign-Arch, lifetime and pattern walks
-    // must reach it. The desugared containment rule expands the same selections, but a scope whose spec is
-    // invalid never reaches desugaring, so the error has to be found here.
-    private static IEnumerable<Selection> ScopeSelections(ScopeRegistration scope)
-    {
-        return ScopeOperands(scope).SelectMany(SelectionWalk.ExpandSelection);
-    }
-
     // The glob/affix walk (GRAMMAR §8 items 15–16), parallel to the prose and selection walks: every
     // glob and affix a rule carries, each tagged with the PatternKind that names it in the error and says
     // whether the full structural check applies (namespace globs) or only the blank check (every other
@@ -720,16 +861,15 @@ internal static class SpecValidator
             : ConstraintPatterns(rule.Constraint);
     }
 
-    private static IEnumerable<(string Value, PatternKind Kind)> ScopePatterns(ScopeRegistration scope)
-    {
-        return ScopeOperands(scope).SelectMany(SelectionPatterns);
-    }
-
+    // A scope's selections are the scoped interior and every operand of its sanctioned surface: the
+    // boundary is spec-authored selection like any other, so the foreign-Arch, lifetime and pattern walks
+    // must reach it. The desugared containment rule expands the same selections, but a scope whose spec is
+    // invalid never reaches desugaring, so the error has to be found here.
     private static IEnumerable<Selection> ScopeOperands(ScopeRegistration scope)
     {
-        if (scope.Scoped == null) yield break;
-
-        yield return scope.Scoped;
+        // Non-null past ValidateScope's dangling-anchor return: the posture verbs set the selection with the
+        // posture.
+        yield return scope.Scoped!;
 
         foreach (Selection facade in scope.Boundary) yield return facade;
     }

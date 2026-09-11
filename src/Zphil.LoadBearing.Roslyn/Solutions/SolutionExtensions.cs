@@ -1,6 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
-using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Internal;
 
 namespace Zphil.LoadBearing.Roslyn.Solutions;
 

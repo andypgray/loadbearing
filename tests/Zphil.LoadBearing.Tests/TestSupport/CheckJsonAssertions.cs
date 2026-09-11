@@ -187,6 +187,35 @@ internal static class CheckJsonAssertions
     }
 
     /// <summary>
+    ///     Asserts every one of <paramref name="ruleId" />'s violations carries <paramref name="detail" />
+    ///     — the circle the circular-references verb names, which the JSON channel alone reads (GRAMMAR
+    ///     §5.3). Says nothing about the edges themselves, so a row can state the detail beside a separate
+    ///     claim about which pairs are red.
+    /// </summary>
+    /// <remarks>
+    ///     Reds when the rule reported nothing: an empty violation array would satisfy "every one of them"
+    ///     vacuously, and a rule that stopped reporting is exactly what this verb has to catch.
+    /// </remarks>
+    internal static string ShouldHaveDetailOnEveryViolation(this string checkJson, string ruleId, string detail)
+    {
+        JsonElement red = RuleOrFail(checkJson, ruleId);
+        string report = Describe(red);
+
+        List<JsonElement> violations = red.GetProperty("violations")
+            .EnumerateArray()
+            .ToList();
+        violations.ShouldNotBeEmpty(report);
+
+        Action[] checks = violations
+            .Select<JsonElement, Action>(violation => () => Slot(violation, "detail")
+                .ShouldBe(detail, report))
+            .ToArray();
+        red.ShouldSatisfyAllConditions(checks);
+
+        return checkJson;
+    }
+
+    /// <summary>
     ///     Asserts <paramref name="ruleId" /> is green in <paramref name="checkJson" /> on
     ///     <paramref name="count" /> grandfathered violations — captured, not fixed.
     /// </summary>

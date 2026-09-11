@@ -85,8 +85,8 @@ genuinely cannot be made to load, and then treat every conclusion below as provi
   equals its `types` is wholly generator output: never make it a layer glob and never anchor a
   rule on it.** A compiled view tier collects hundreds of such types under one namespace nobody
   typed, and naming it would aim your law at code no one can fix. Where a project's `generated`
-  is a large share of its `types`, prefer namespace subjects over `arch.Project(...)`, or narrow
-  the project noun with `.Authored()`.
+  is a large share of its `types`, narrow the project noun with `.Authored()` — the layer or the
+  rule keeps the project it names and stops aiming at code no one typed.
 - `projectEdges[]` — **observed** project→project references (distinct type pairs), and only
   references the code declares: a project reaching a type it compiles itself is not an edge,
   however extraction attributed that type (see `multiplyDeclaredTypes[]` below). Compare
@@ -165,7 +165,8 @@ are holding names every project you can scope to.
 From the survey, write down **hypotheses, not conclusions**:
 
 - Candidate layers: coherent namespace subtrees or project groups (Domain-shaped, Web-shaped,
-  Infrastructure-shaped). Keep the globs disjoint — overlapping layers double-count evidence.
+  Infrastructure-shaped). Either can be a layer — a layer is defined by namespace globs or by a
+  selection, so a project is one. Keep them disjoint: overlapping layers double-count evidence.
 - Candidate direction rules: which layer should never reference which (the `projectEdges`
   matrix tells you which of those are already true and which are aspirational).
 - Candidate conventions: naming patterns the inventory suggests (interfaces, handlers,
@@ -344,14 +345,22 @@ evidence in step 4; postures come in step 5. **Author the already-true direction
 layer pair the survey's edge matrix shows clean becomes an Enforce candidate — the cheapest
 law you will ever get. A derive that only writes rules about problems under-produces law.
 
+Define each layer by whatever honestly says where it is. A namespace cone where the namespaces are
+disciplined; `arch.Project("MyApp.Web")` where the unit of architecture is the assembly, or where the
+survey's `multiplyDeclaredTypes[]` or a shared `RootNamespace` says the namespaces do not separate
+the projects; a refinement — `core.InNamespace("MyApp.Core.Model.*")` — where one cone nests inside
+another and a glob would swallow it. A layer names exactly what its definition names and checks
+identically to it, so the choice costs nothing at the checker and buys the row, the card and the
+collective voice.
+
 Give each layer a `.Purpose(prose)`: one sentence on what the layer is for, lifted from the step 0
 prose that already says it (the ADR, the wiki page, the `AGENTS.md` paragraph). It renders into the
 layer's module-map row and its card, so the sentence that rotted in a document now sits beside the
-globs it describes and re-renders with them.
+definition it describes and re-renders with it.
 
 ```csharp
 Layer domain = arch.Layer("Domain", "MyApp.Domain.*").Purpose("Domain holds the order and customer model.");
-Layer web    = arch.Layer("Web",    "MyApp.Web.*").Purpose("Web is the HTTP surface: controllers and the views they serve.");
+Layer web    = arch.Layer("Web",    arch.Project("MyApp.Web")).Purpose("Web is the HTTP surface: controllers and the views they serve.");
 
 arch.Rule("layering/domain-independent")
     .Enforce(domain.MustNotReference(web))
@@ -395,10 +404,25 @@ arch.Rule("data-access/no-inline-sql")
   internals, or framework defaults are not seen, so an empty-subject failure here means the
   registrations live outside the recognized calls — drop the rule rather than guessing.
 - Anchor a rule on the `Layer` handle wherever one exists (`tools.MustHaveSuffix("Tools")`,
-  not `arch.Types.InNamespace("MyApp.Tools.*").MustHaveSuffix("Tools")`). The two check
-  identically, but render's per-directory local-rules card is keyed on the layer-anchored
-  subject — the glob-spelled twin emits no card in that layer's directory, so agents editing
-  there never see the rule locally.
+  not `arch.Types.InNamespace("MyApp.Tools.*").MustHaveSuffix("Tools")`, and `web.MustNot…`
+  rather than a bare `arch.Project("MyApp.Web").MustNot…` where a Web layer names that
+  project). The two check identically, but render's per-directory local-rules card is keyed on
+  the layer-anchored subject — the anonymous twin emits no card in that layer's directory, so
+  agents editing there never see the rule locally, and it earns no module-map row and no
+  purpose either.
+- Family candidates: where the estate has a family of like units — plugins, modules, bounded
+  contexts, one project or one layer each — the law that every unit keeps to itself is one rule
+  over the family, not one per unit. `arch.Each(arch.Projects.Matching("MyApp.Plugin.*"))
+  .MustNotReferenceEachOther()` says no plugin reaches another;
+  `arch.Each(dispatch, tracking, invoicing).Except(<each module's Contracts cone>)
+  .MustOnlyBeReferencedByItself()` says each module's internals are reached only from its own
+  module; `arch.Each(a, b, c).MustNotHaveCircularReferences()` says the units may reference each
+  other but never in a circle — the law for peers whose order nobody has stated, and the first
+  law to write on an estate before its order is known (layers only: MSBuild already forbids a
+  circle among projects). On a family, "itself" and "their own" mean the cell — the whole layer
+  or project the type sits in, as declared — so the `MustOnly*` verbs read the same way per
+  cell, and the survey's edge matrix over the family's projects is the evidence. One rule, one
+  ID, one baseline; write one rule per cell only where each cell needs its own `Because` or `Fix`.
 - Dragon-zone candidates are the one exception to "all as Enforce": a scope has no Enforce
   form, so draft them as `arch.Scope(id).Quarantine(...)` directly (step 5 shows the full shape
   of both scope postures). The scope's containment violations arrive in step 4 alongside every
@@ -605,13 +629,19 @@ curation (with why) so it is on the record.
 A spec is one class implementing `IArchitectureSpec` with one method `Define(Arch arch)`, and
 three statement forms: definitions, rules, scopes.
 
-**Nouns** — `arch.Types` (all solution-declared types) · `arch.Layer(name, glob, ...)` (a definition; its optional `.Purpose(prose)` trailer is one sentence on what the layer is for, rendered into the layer's module-map row and its card) ·
+**Nouns** — `arch.Types` (all solution-declared types) · `arch.Layer(name, glob, ...)` or `arch.Layer(name, selection)` (a definition — namespace globs, or any selection: `arch.Project("MyApp.Web")` for an assembly-shaped layer, `core.InNamespace("MyApp.Core.Model.*")` for a cone inside another layer. The layer names exactly what its definition names. Its optional `.Purpose(prose)` trailer is one sentence on what the layer is for, rendered into the layer's module-map row and its card) ·
 `arch.Namespace(glob)` · `arch.Project(name)` · `arch.Type(typeof(X))` (or the sugar
 `arch.Type<X>()`) · `arch.AnyOf(a, b, ...)` (the union of any selections — the way to say "these
 four projects" in one subject; `arch.AnyOf(typeof(X), typeof(Y), ...)` is the multi-type sugar.
 Adjectives apply to the union, not through it: `AnyOf(a, b).Except(c)` is (a ∪ b) − c. Every
 operand must match at least one type in subject position, so a typo'd operand fails loudly
-rather than hiding behind its siblings) · `arch.Registered(Lifetime.Singleton)` (types named in a source-visible
+rather than hiding behind its siblings) · `arch.Each(layer, layer, ...)` /
+`arch.Each(arch.Projects.Matching(glob))` (a family — one rule over a partition into cells, each
+cell a declared layer or a project. A family may stand only as a rule subject; adjectives on it
+narrow every cell; and the `MustOnly*` reference verbs and the two leaf verbs below read "itself"
+and "their own" as the cell the type sits in — the whole layer or project, as declared — so
+`arch.Each(a, b, c).MustOnlyReference(core)` lets each cell reach itself and Core, never a
+sibling) · `arch.Registered(Lifetime.Singleton)` (types named in a source-visible
 container registration at that lifetime — service and implementation alike; `arch.Registered()`
 = any lifetime) · `arch.Member(typeof(X), nameof(X.M))` (a declared member of `X`, the
 `MustNotUse` target form; matching is by declaring type + member name, so one ban covers every
@@ -648,8 +678,14 @@ string always names the **definition**, so it reads like the open-generic `typeo
 **Constraint verbs** (selection → complete sentence) — `MustNotReference` /
 `MustOnlyReference` / `MustNotBeReferencedBy` / `MustOnlyBeReferencedBy` (each takes
 selections or `typeof()`s, one-or-more) · `MustOnlyReferenceItself()` (nullary — a leaf of the
-reference graph, whose whole allow-set is the subject) · `MustNotUse(arch.Member(...), ...)` — or, when every
-target is a **static** member, the lambdas bare: `MustNotUse(() => DateTime.Now,
+reference graph, whose whole allow-set is the subject) · `MustOnlyBeReferencedByItself()` (nullary
+— the inbound leaf: nothing outside the subject may reach it; on a family, nothing outside each
+cell may reach that cell's members, which is the modular-monolith law in one line) ·
+`MustNotReferenceEachOther()` (nullary, family subjects only — no cell reaches another; over a
+plain selection write `MustNotReference`) · `MustNotHaveCircularReferences()` (nullary, families
+of layers only — the cells may reference each other but never in a circle; over projects it is
+refused, because MSBuild already forbids the circle) · `MustNotUse(arch.Member(...), ...)` — or,
+when every target is a **static** member, the lambdas bare: `MustNotUse(() => DateTime.Now,
 () => DateTime.UtcNow)` — (bans member accesses — `DateTime.Now`, `.Result`,
 `ConfigurationManager.AppSettings`; *use* = a
 source-level member access, and `nameof` operands are not uses) ·
@@ -812,7 +848,9 @@ range over solution-declared types; targets also reach external (BCL/NuGet) type
 packages are exempt, and the rendered sentence says so) and allows the subject implicitly, after
 any `Except` it spells — list what a layer may reach BEYOND itself, and reach for
 `MustOnlyReferenceItself()` where that list is empty. `MustOnlyBeReferencedBy` reads its subject
-the same way. `MustOnlyThrow` is stricter
+the same way. On a family (`arch.Each`) both read the subject per cell — the whole layer or
+project a type sits in, as declared — so a cell's own `Except`-ed types still count as its own,
+and `MustOnlyBeReferencedByItself()` is the leaf where the source list is empty. `MustOnlyThrow` is stricter
 still: external thrown types ARE constrained (no type must throw a BCL exception), so its
 sentence carries no exemption; `MustNotThrow` is its ban twin, and a spec may carry either or
 both. All five exception verbs match their operands exactly — banning `Exception` never flags a

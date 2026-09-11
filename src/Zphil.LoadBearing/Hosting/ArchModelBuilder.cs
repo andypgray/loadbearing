@@ -77,6 +77,7 @@ public static class ArchModelBuilder
     {
         LayerNoun noun = registration.Noun;
         string? purpose = registration.Purposes.FirstOrDefault();
-        return new LayerDefinition(noun.Name, noun.Globs, SentenceRenderer.LayerDefinition(noun, purpose), purpose);
+        return new LayerDefinition(
+            noun.Name, noun.Globs, SentenceRenderer.LayerDefinition(noun, purpose), purpose, noun.Definition);
     }
 }

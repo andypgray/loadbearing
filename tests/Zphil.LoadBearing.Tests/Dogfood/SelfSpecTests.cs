@@ -8,6 +8,7 @@ using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.SpecLoading;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Hosting;
+using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.Diagnostics;
@@ -75,14 +76,9 @@ public sealed class SelfSpecTests
     });
 
     /// <summary>
-    ///     This repository's own spec, built once for the four gates that render or read it. The model is
-    ///     immutable and each of them only reads it, so one instance answers all four.
+    ///     This repository's own spec, built once for the gates that render or read it. The model is
+    ///     immutable and each of them only reads it, so one instance answers them all.
     /// </summary>
-    /// <remarks>
-    ///     <see cref="CoreLayer_MatchesTheCoreProject" /> deliberately builds its own: it reaches back
-    ///     through a constraint's subject to the builder that made it and names a second selection from
-    ///     there, which is a question about one instance rather than about the spec.
-    /// </remarks>
     private static readonly ArchitectureModel SelfModel = ArchModelBuilder.Build(new LoadBearingArchSpec());
 
     /// <summary>
@@ -390,43 +386,6 @@ public sealed class SelfSpecTests
             name = name.Substring("Project".Length);
 
         return name;
-    }
-
-    /// <summary>
-    ///     The Core layer's completeness pin. Core is declared as an explicit list of namespace globs,
-    ///     because its root namespace is this repository's root namespace and a <c>Zphil.LoadBearing.*</c>
-    ///     subtree would swallow every other project. That list is a hand-maintained duplicate of a fact
-    ///     the build already knows — project membership — and a new Core namespace nobody adds to it would
-    ///     escape every rule anchored on <c>core</c>, silently and with every rule still green. So the two
-    ///     type sets are asserted equal: a <c>Project</c> subject means membership, a <c>Layer</c> subject
-    ///     means namespace match, and here they must name the same types.
-    /// </summary>
-    [Fact]
-    public async Task CoreLayer_MatchesTheCoreProject()
-    {
-        CodebaseModel codebase = await WholeCodebase.Value;
-
-        // The layer selection is taken from the built model rather than re-declared, so this pins the globs
-        // the spec actually ships. layering/core-no-roslyn's subject is the bare Core layer.
-        ArchitectureModel model = ArchModelBuilder.Build(new LoadBearingArchSpec());
-        Selection coreLayer = model.Rule("layering/core-no-roslyn")
-            .Constraint!.Subject!;
-        Selection coreProject = coreLayer.Owner.Project("Zphil.LoadBearing");
-
-        var evaluator = new SelectionEvaluator(codebase);
-        IReadOnlyList<string> inLayer = Names(evaluator.Evaluate(coreLayer, SelectionPosition.Subject));
-        IReadOnlyList<string> inProject = Names(evaluator.Evaluate(coreProject, SelectionPosition.Subject));
-
-        // Asserted as two set differences rather than one list equality, because the whole Core type list
-        // is ~190 names and a positional diff of it says nothing. Each direction names only the strays.
-        inProject.Except(inLayer)
-            .ShouldBeEmpty(
-                "these Core types are in no Core-layer glob, so every rule anchored on `core` silently skips " +
-                "them — add their namespace to the Core layer in LoadBearingArchSpec.");
-        inLayer.Except(inProject)
-            .ShouldBeEmpty(
-                "these types match a Core-layer glob but are not in the Core project, so the layer now claims " +
-                "code it does not own — narrow the glob in LoadBearingArchSpec.");
     }
 
     /// <summary>

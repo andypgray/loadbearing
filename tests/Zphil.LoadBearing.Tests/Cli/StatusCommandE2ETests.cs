@@ -33,7 +33,7 @@ public sealed class StatusCommandE2ETests
         result.Out.ShouldNotContain("domain/retry-budget/tripwire (caution)");
         result.Out.ShouldContain(
             "FAIL layering/services-behind-contracts (migrate) — 1 grandfathered remaining, 1 new, 0 fixed awaiting acceptance");
-        result.Out.ShouldContain("Checked 29 rules: 2 passed, 25 failed, 2 skipped.");
+        result.Out.ShouldContain("Checked 31 rules: 2 passed, 27 failed, 2 skipped.");
         result.Out.ShouldContain("Burndown: 2 grandfathered remaining (3 sites), 0 fixed awaiting acceptance.");
     }
 

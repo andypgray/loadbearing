@@ -44,6 +44,17 @@ internal sealed class LawPlace
     internal LawPlace? Parent { get; set; }
 
     /// <summary>
+    ///     The places this one contains by construction rather than by namespace containment — the operands
+    ///     of a layer defined as a union of places, empty for everything else.
+    /// </summary>
+    /// <remarks>
+    ///     Carried here rather than resolved at classification because a child has to be the
+    ///     <em>registered</em> instance of its place to be drawn inside anything;
+    ///     <see cref="LawPlaces" /> is where that identity lives.
+    /// </remarks>
+    internal IReadOnlyList<LawPlace> StructuralChildren { get; set; } = [];
+
+    /// <summary>
     ///     The displayed label: a quarantined scope announces itself, and everything else keeps the name
     ///     it was classified under — the layer name, the glob, the project, or the type.
     /// </summary>

@@ -9,9 +9,10 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 /// <summary>
 ///     <see cref="LawPlaceClassifier" /> facts, one per arm of the triage: the drawable verbs, the
 ///     place-shaped nouns, the three selections that are not places, the position asymmetry a single type
-///     has, the adjective rule, and the identity collapse a single-glob layer earns. Models are built
-///     from inline specs and read back through the reified nodes — no workspace, no extraction, because
-///     the law is a property of the spec alone.
+///     has, the adjective rule, the identity collapses a single-glob and a project-defined layer earn, and
+///     what a layer's definition says about where it is drawn. Models are built from inline specs and read
+///     back through the reified nodes — no workspace, no extraction, because the law is a property of the
+///     spec alone.
 /// </summary>
 public sealed class LawPlaceClassifierTests
 {
@@ -29,6 +30,70 @@ public sealed class LawPlaceClassifierTests
         // Act + Assert
         LawPlaceClassifier.IsDrawableVerb(model.Rules.Single().Constraint)
             .ShouldBeTrue();
+    }
+
+    [Fact]
+    public void IsDrawableVerb_TheInboundLeafForm_IsDrawableForTheSameReasonTheOutboundOneIs()
+    {
+        // Arrange — a hermetic set is a node of the graph whether or not an arrow reaches it, so the
+        // inbound leaf classifies like its outbound twin: it registers its subject's place and draws
+        // nothing.
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Rule("r/hermetic")
+                .Enforce(arch.Namespace("A.*").MustOnlyBeReferencedByItself())
+                .Because("x"));
+
+        // Act
+        LawPlaceClassifier.DrawableVerb verb = LawPlaceClassifier.Classify(model.Rules.Single().Constraint)
+            .ShouldNotBeNull();
+
+        // Assert
+        verb.Inbound.ShouldBeTrue();
+        verb.Only.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void IsDrawableVerb_TheCrossCellBan_IsNotDrawable()
+    {
+        // Arrange — the far end is a different place for every cell, so one arrow could not say the law.
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Rule("r/leaves")
+                .Enforce(arch.Each(arch.Layer("A", "A.*"), arch.Layer("B", "B.*")).MustNotReferenceEachOther())
+                .Because("x"));
+
+        // Act + Assert
+        LawPlaceClassifier.IsDrawableVerb(model.Rules.Single().Constraint)
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public void IsDrawableVerb_TheCircularReferencesVerb_IsNotDrawable()
+    {
+        // Arrange — the law forbids a property of a path, not an edge, so no arrow can say "no circle".
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Rule("r/no-circles")
+                .Enforce(arch.Each(arch.Layer("A", "A.*"), arch.Layer("B", "B.*")).MustNotHaveCircularReferences())
+                .Because("x"));
+
+        // Act + Assert
+        LawPlaceClassifier.IsDrawableVerb(model.Rules.Single().Constraint)
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public void SubjectPlace_AFamily_IsNotAPlace()
+    {
+        // Arrange — a family is several places at once, so it is none: its rules join the compact list
+        // under the fence, the totality rule that keeps a law visible when the drawing cannot hold it.
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Rule("r/leaves")
+                .Enforce(arch.Each(arch.Layer("A", "A.*"), arch.Layer("B", "B.*"))
+                    .MustNotReference(arch.Namespace("C.*")))
+                .Because("x"));
+
+        // Act + Assert
+        LawPlaceClassifier.SubjectPlace(model.Rules.Single().Constraint!.Subject, model.Layers)
+            .ShouldBeNull();
     }
 
     [Fact]
@@ -261,6 +326,107 @@ public sealed class LawPlaceClassifierTests
 
         // Act + Assert
         LawPlaceClassifier.SubjectPlace(Subject(model), model.Layers)
+            .ShouldBeNull();
+    }
+
+    [Fact]
+    public void SubjectPlace_AProjectDefinedLayerAndItsProject_CollapseToOnePlace()
+    {
+        // Arrange — one rule names the layer, the next names the project that defines it.
+        ArchitectureModel model = Checker.Model(arch =>
+        {
+            Layer core = arch.Layer("Core", arch.Project("MyApp.Core"));
+            arch.Rule("r/one")
+                .Enforce(core.MustNotReference(arch.Namespace("B.*")))
+                .Because("x");
+            arch.Rule("r/two")
+                .Enforce(arch.Project("MyApp.Core").MustNotReference(arch.Namespace("C.*")))
+                .Because("x");
+        });
+
+        // Act
+        LawPlace? viaLayer = LawPlaceClassifier.SubjectPlace(Subject(model), model.Layers);
+        LawPlace? viaProject = LawPlaceClassifier.SubjectPlace(Subject(model, 1), model.Layers);
+
+        // Assert — the glob collapse's project twin: same key, so they dedupe to one node, and the layer's
+        // name is what it is called.
+        viaLayer.ShouldNotBeNull();
+        viaProject.ShouldNotBeNull();
+        viaProject.Key.ShouldBe(viaLayer.Key);
+        viaProject.Key.ShouldBe("project:MyApp.Core");
+        viaProject.Label.ShouldBe("Core");
+        viaProject.IsDeclaredLayer.ShouldBeTrue();
+        viaProject.Globs.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void SubjectPlace_ARefinementDefinedLayer_IsItsOwnPlaceInsideTheLayerItRefines()
+    {
+        // Arrange — the inner layer's definition says where it sits, which is the only thing that can say
+        // so: nesting elsewhere is glob implication, and a project place has no globs to imply anything.
+        ArchitectureModel model = Checker.Model(arch =>
+        {
+            Layer core = arch.Layer("Core", arch.Project("MyApp.Core"));
+            Layer model2 = arch.Layer("Model", core.InNamespace("MyApp.Core.Model.*"));
+            arch.Rule("r/one")
+                .Enforce(model2.MustNotReference(arch.Namespace("B.*")))
+                .Because("x");
+        });
+
+        // Act
+        LawPlace? place = LawPlaceClassifier.SubjectPlace(Subject(model), model.Layers);
+
+        // Assert
+        place.ShouldNotBeNull();
+        place.Key.ShouldBe("layer:Model");
+        place.Label.ShouldBe("Model");
+        place.Parent.ShouldNotBeNull()
+            .Key.ShouldBe("project:MyApp.Core");
+    }
+
+    [Fact]
+    public void SubjectPlace_AUnionDefinedLayer_ParentsEachOperandsPlace()
+    {
+        // Arrange — a union of places holds no region of its own; the box is what its operands sit in.
+        ArchitectureModel model = Checker.Model(arch =>
+        {
+            Layer shipping = arch.Layer("Shipping", arch.AnyOf(arch.Project("MyApp.Core"), arch.Namespace("MyApp.Web.*")));
+            arch.Rule("r/one")
+                .Enforce(shipping.MustNotReference(arch.Namespace("B.*")))
+                .Because("x");
+        });
+
+        // Act
+        LawPlace? place = LawPlaceClassifier.SubjectPlace(Subject(model), model.Layers);
+
+        // Assert
+        place.ShouldNotBeNull();
+        place.Key.ShouldBe("layer:Shipping");
+        place.StructuralChildren.Select(child => child.Key)
+            .ShouldBe(["project:MyApp.Core", "MyApp.Web.*"]);
+    }
+
+    [Fact]
+    public void SubjectPlace_ALayerDefinedAsSomethingUnplaceable_IsNoPlace()
+    {
+        // Arrange — a registration is a lifetime rather than a location, and a union carrying an operand
+        // the classifier declines is a box missing part of itself. Neither is a place, so the rules
+        // anchored on them join the compact list under the fence.
+        ArchitectureModel model = Checker.Model(arch =>
+        {
+            arch.Rule("r/registered")
+                .Enforce(arch.Layer("Wiring", arch.Registered(Lifetime.Singleton)).MustNotReference(arch.Namespace("B.*")))
+                .Because("x");
+            arch.Rule("r/partial")
+                .Enforce(arch.Layer("Mixed", arch.AnyOf(arch.Project("MyApp.Core"), arch.Types))
+                    .MustNotReference(arch.Namespace("B.*")))
+                .Because("x");
+        });
+
+        // Act + Assert
+        LawPlaceClassifier.SubjectPlace(Subject(model), model.Layers)
+            .ShouldBeNull();
+        LawPlaceClassifier.SubjectPlace(Subject(model, 1), model.Layers)
             .ShouldBeNull();
     }
 

@@ -39,6 +39,18 @@ public sealed class TripwireDiffE2ETests
         "green under the unfiltered-catch rule, and it is the fixture's one sanctioned broad handler. " +
         "Keep the filter; add cases beside it, never inside it.";
 
+    // The one touched Domain file every caution row runs against; the three channels differ only in the
+    // flags they add, which is the claim those rows are making.
+    private static async Task<CliResult> CautionRunAsync(params string[] extraArgs)
+    {
+        using var repo = new TempGitRepo();
+        File.AppendAllText(repo.PathOf("MyApp.Domain", "RetryPolicy.cs"), CautionTouch);
+
+        string[] args =
+            ["check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD", .. extraArgs];
+        return await CliRunner.InvokeAsync(args);
+    }
+
     [Fact]
     public async Task CheckDiffBase_UntrackedFileInQuarantinedScope_WarnsAndExitsZero()
     {
@@ -90,11 +102,7 @@ public sealed class TripwireDiffE2ETests
         // containment-driven and this spec's containment holds, so exit 0 here is not "the warning did not
         // gate" but "there was never anything else to gate on" — which is what makes a caution's whole
         // verdict a warning, and this the only spec in the suite that can prove it.
-        using var repo = new TempGitRepo();
-        File.AppendAllText(repo.PathOf("MyApp.Domain", "RetryPolicy.cs"), CautionTouch);
-
-        CliResult result = await CliRunner.InvokeAsync(
-            "check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD");
+        CliResult result = await CautionRunAsync();
 
         result.ShouldSucceed("warn domain/retry-budget/tripwire");
         // A different question from the quarantine's wording: not whether the task belongs here at all, only
@@ -109,11 +117,7 @@ public sealed class TripwireDiffE2ETests
     [Fact]
     public async Task CheckDiffBaseJson_TouchedFileInCautionedScope_CarriesTheKindAndTheSameMessage()
     {
-        using var repo = new TempGitRepo();
-        File.AppendAllText(repo.PathOf("MyApp.Domain", "RetryPolicy.cs"), CautionTouch);
-
-        CliResult result = await CliRunner.InvokeAsync(
-            "check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD", "--json");
+        CliResult result = await CautionRunAsync("--json");
 
         // The machine channel names the posture in the warning's own kind rather than leaving a reader to
         // parse the prose for it — an additive enum value within schemaVersion 3, beside the quarantine's.
@@ -151,11 +155,8 @@ public sealed class TripwireDiffE2ETests
         // document, whole: the parse below rejects trailing content, so a leaked report line cannot hide
         // behind it. That purity is the whole contract, because the wrapper passes stdout through verbatim
         // and Claude Code parses it.
-        result.Exit.ShouldBe(0);
-        using JsonDocument document = JsonDocument.Parse(result.Out);
-        string context = document.RootElement.GetProperty("hookSpecificOutput")
-            .GetProperty("additionalContext")
-            .GetString()!;
+        result.ShouldSucceed();
+        string context = result.ShouldHaveHookAdditionalContext();
         context.ShouldContain("warn legacy/billing/tripwire");
         context.ShouldContain(
             "Changed file 'MyApp.Legacy.Billing/LegacyNote.cs' is inside quarantined scope 'legacy/billing'");
@@ -169,18 +170,10 @@ public sealed class TripwireDiffE2ETests
         // The caution's third channel, and the one it was built for: a rule that only ever warns has only
         // exit 0 to travel on, and an every-edit agent hook is exactly the reader the dragons are addressed
         // to. Same two lines as the human run, inside the document the wrapper hands to Claude Code.
-        using var repo = new TempGitRepo();
-        File.AppendAllText(repo.PathOf("MyApp.Domain", "RetryPolicy.cs"), CautionTouch);
+        CliResult result = await CautionRunAsync("--hook-json");
 
-        CliResult result = await CliRunner.InvokeAsync(
-            "check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD",
-            "--hook-json");
-
-        result.Exit.ShouldBe(0);
-        using JsonDocument document = JsonDocument.Parse(result.Out);
-        string context = document.RootElement.GetProperty("hookSpecificOutput")
-            .GetProperty("additionalContext")
-            .GetString()!;
+        result.ShouldSucceed();
+        string context = result.ShouldHaveHookAdditionalContext();
         context.ShouldContain("warn domain/retry-budget/tripwire");
         context.ShouldContain(CautionWarning);
         context.ShouldContain(CautionDragons);

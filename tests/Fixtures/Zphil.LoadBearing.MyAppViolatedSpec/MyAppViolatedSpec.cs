@@ -20,12 +20,32 @@ public sealed class MyAppViolatedSpec : IArchitectureSpec
     {
         Layer domain = arch.Layer("Domain", "MyApp.Domain.*");
         Layer web = arch.Layer("Web", "MyApp.Web.*");
+        Layer reporting = arch.Layer("Reporting", web.WithPrefix("Report"));
+        Layer invoicing = arch.Layer("Invoicing", web.WithPrefix("Invoice"));
 
         // Fails: MyApp.Domain.OrderService references HomeController and WebTextExtensions.
         arch.Rule("layering/domain-independent")
             .Enforce(domain.MustNotReference(web))
             .Because("Domain is UI-agnostic; transaction boundaries live in services.")
             .Fix("Define an abstraction in Domain and implement it in Web.");
+
+        // Fails (family, project form): one rule over a partition, where a spec without it would need one
+        // rule per project pair. The cells are the three MyApp projects, and an edge whose far end lands in
+        // any other cell is a violation — so the Domain→Web and Web→Legacy.Billing edges red under one ID,
+        // one sentence and one baseline key. The wire renderers see the noun for the first time here.
+        arch.Rule("layering/projects-independent")
+            .Enforce(arch.Each(arch.Projects.Matching("MyApp.*")).MustNotReferenceEachOther())
+            .Because("Each MyApp project is its own deployable unit; a reference from one into another couples their release cadences.")
+            .Fix("Move the shared type into a project both may reference, or reach the other project through an abstraction it owns.");
+
+        // Fails (family, circular references): two cuts inside Web that reference each other in a circle —
+        // ReportEndpoint → InvoiceService one way, InvoiceCreatedHandler → ReportEndpoint the other — so both
+        // arrows' pairs red under one ID, each carrying the JSON-only detail naming the circle. The cross-cell
+        // ban cannot say this law: the cuts MAY reference each other, just not in a circle.
+        arch.Rule("layering/web-cuts-not-circular")
+            .Enforce(arch.Each(reporting, invoicing).MustNotHaveCircularReferences())
+            .Because("Reporting and invoicing are two cuts of the web layer with no intended order between them; a circle means neither can be extracted without dragging the other along.")
+            .Fix("Move what one cut borrows from the other into a type both may reach, or pick a direction and state it as an ordering rule.");
 
         // Passes: Billing never reaches up into the web layer.
         arch.Rule("layering/billing-independent")

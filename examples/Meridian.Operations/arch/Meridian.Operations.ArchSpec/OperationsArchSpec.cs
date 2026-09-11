@@ -29,21 +29,18 @@ public sealed class OperationsArchSpec : IArchitectureSpec
             .Purpose("Host is the composition root: it wires the modules through their Contracts surfaces and " +
                      "serves the HTTP endpoints.");
 
-        arch.Rule("modules/dispatch/internals")
-            .Enforce(dispatch.Except(arch.Namespace("Meridian.Operations.Dispatch.Contracts.*"))
-                         .MustOnlyBeReferencedBy(dispatch))
-            .Because("Every other module integrates with dispatch through its Contracts surface, so the board, the roster, and the haulage-leg types behind it stay swappable; a reference into them from outside turns a private implementation detail into a contract dispatch can no longer change without breaking a caller.")
-            .Fix("Depend on `IDispatchBoard` or another `Dispatch.Contracts` type instead of reaching into the module's internals.");
+        arch.Rule("modules/internals")
+            .Enforce(arch.Each(dispatch, tracking, invoicing)
+                         .Except(arch.Namespace("Meridian.Operations.Dispatch.Contracts.*"),
+                                 arch.Namespace("Meridian.Operations.Tracking.Contracts.*"),
+                                 arch.Namespace("Meridian.Operations.Invoicing.Contracts.*"))
+                         .MustOnlyBeReferencedByItself())
+            .Because("Every module is reached only through its Contracts surface, so the dispatch board and roster, the milestone store and log, and the invoice assembler and reconciler all stay swappable; a reference into any of them from another module turns a private implementation detail into a contract its owner can no longer revise without breaking a caller.")
+            .Fix("Depend on the module's `Contracts` type — `IDispatchBoard`, `ITrackingLog`, `IInvoiceRun` — instead of reaching into its internals.");
 
         arch.Rule("modules/dispatch/outbound")
             .Enforce(dispatch.MustOnlyReference(arch.Namespace("Meridian.Operations.Tracking.Contracts.*")))
             .Because("The module dependency graph is kept explicit and acyclic: dispatch consumes tracking's milestone contracts to gate a haulage leg and reaches nothing else, so the only arrow out of dispatch is the one drawn here and the monolith can still be split along its module lines.");
-
-        arch.Rule("modules/tracking/internals")
-            .Enforce(tracking.Except(arch.Namespace("Meridian.Operations.Tracking.Contracts.*"))
-                         .MustOnlyBeReferencedBy(tracking))
-            .Because("Downstream modules read tracking only through its Contracts surface, so the milestone store and the log stay swappable; a reference into them from outside would lock an internal into a contract the source-of-truth module can no longer revise.")
-            .Fix("Depend on `ITrackingLog` or another `Tracking.Contracts` type instead of the internal store or log.");
 
         arch.Rule("modules/tracking/outbound")
             .Enforce(tracking.MustOnlyReferenceItself())
@@ -53,12 +50,6 @@ public sealed class OperationsArchSpec : IArchitectureSpec
             .Enforce(tracking.WithSuffix("Event").Must(t => t.IsRecord, description: "be declared as records"))
             .Because("The `*Event` values are what tracking projects across the module boundary and, later, onto a bus; declaring them as records makes them immutable and compared by value, so an event cannot be mutated after it is published or matched by reference identity.")
             .Fix("Declare the `*Event` type as a `record`.");
-
-        arch.Rule("modules/invoicing/internals")
-            .Enforce(invoicing.Except(arch.Namespace("Meridian.Operations.Invoicing.Contracts.*"))
-                         .MustOnlyBeReferencedBy(invoicing))
-            .Because("Invoicing is reached only through its Contracts surface, so the assembler, the reconciler, and the invoice-line types stay internal; a reference into them from another module would turn billing's private assembly steps into a contract it can no longer revise.")
-            .Fix("Depend on `IInvoiceRun` or another `Invoicing.Contracts` type instead of the internal assembler or reconciler.");
 
         // demurrage is listed here as the whole layer, not just its Contracts/facade surface: the
         // reconciler's grandfathered reach into FreeTimeCalendar is owned by the demurrage/engine

@@ -102,13 +102,7 @@ internal sealed class SelectionEvaluator
             return Unite(union, parts);
         }
 
-        IEnumerable<TypeNode> current = ByNoun(selection.Noun, position);
-        foreach (SelectionAdjective adjective in selection.Adjectives) current = ApplyAdjective(current, adjective);
-
-        // The constructor is the point: adjectives can yield the same node twice, and naming HashSet here
-        // says the deduplication is deliberate where a spread would leave it to the return type.
-        // ReSharper disable once UseCollectionExpression
-        return new HashSet<TypeNode>(current);
+        return Narrow(selection, ByNoun(selection.Noun, position));
     }
 
     /// <summary>
@@ -135,6 +129,25 @@ internal sealed class SelectionEvaluator
         return new HashSet<TypeNode>(unioned);
     }
 
+    /// <summary>
+    ///     A selection's own adjectives applied to a candidate set already resolved in the same position —
+    ///     the tail of <see cref="Evaluate" /> without its noun resolution.
+    /// </summary>
+    /// <remarks>
+    ///     Exposed for the same reason as <see cref="Unite" />: a caller that already holds what the
+    ///     selection's noun resolves to can finish the selection without resolving it a second time.
+    /// </remarks>
+    internal HashSet<TypeNode> Narrow(Selection selection, IEnumerable<TypeNode> candidates)
+    {
+        IEnumerable<TypeNode> current = candidates;
+        foreach (SelectionAdjective adjective in selection.Adjectives) current = ApplyAdjective(current, adjective);
+
+        // The constructor is the point: adjectives can yield the same node twice, and naming HashSet here
+        // says the deduplication is deliberate where a spread would leave it to the return type.
+        // ReSharper disable once UseCollectionExpression
+        return new HashSet<TypeNode>(current);
+    }
+
     // Instance (not static) because the RegisteredNoun arm reads model-side registration facts
     // (CodebaseModel.ServiceRegistrations) — membership is many-to-many and never denormalized onto a
     // TypeNode (GRAMMAR §4.7). The other nouns select purely off the position-correct universe. Never an
@@ -149,6 +162,12 @@ internal sealed class SelectionEvaluator
                 // arch.Types is solution-declared by definition (§5.1), so in subject position the universe
                 // already IS the answer; only the target universe (which holds externals) needs the filter.
                 return subject ? _solutionDeclared : Scanned(noun, position, () => universe.Where(t => !t.IsExternal));
+            case LayerNoun { Definition: { } definition }:
+                // A layer is transparent to its definition: it names what the definition names, in the
+                // caller's position, and the layer's own adjectives are applied by Evaluate afterwards.
+                // Unmemoized on purpose — the definition's own noun scan is memoized one level down, and a
+                // definition may carry a Where predicate, which every other adjective re-runs per call.
+                return Evaluate(definition, position);
             case LayerNoun layer:
                 return Scanned(noun, position, () =>
                 {
@@ -162,10 +181,13 @@ internal sealed class SelectionEvaluator
                     return universe.Where(t => pattern.Matches(t.Namespace));
                 });
             case ProjectNoun project:
-                // The ordinal declarer index, then the position filter — the same nodes in the same
-                // order the universe scan yielded, because a lookup grouping keeps Types order.
-                IEnumerable<TypeNode> declaring = ByProjectName[project.Name];
-                return subject ? declaring.Where(t => !t.IsExternal) : declaring;
+                return ProjectMembers(project.Name, subject);
+            case EachNoun family:
+                // A family is the union of its cells to every reader but the three that read the
+                // partition (GRAMMAR §5.1). Unmemoized on purpose, for the reason the definition-layer arm
+                // above is: a layer cell may carry a Where predicate through its definition, and a project
+                // family's cells are decided by a project selection that may carry one directly.
+                return FamilyMembers(family, subject, position);
             case TypeNoun typeNoun:
                 // The scan is a lookup wearing a Where: every node carrying the name, position-filtered.
                 // Usually that is one — one source file compiled into several projects is conflated at merge,
@@ -191,6 +213,58 @@ internal sealed class SelectionEvaluator
                 // would vacuously pass every shape verb over an empty subject). ArchChecker contains it per-rule.
                 throw new InvalidOperationException($"Unhandled selection noun '{noun.GetType().Name}'.");
         }
+    }
+
+    /// <summary>
+    ///     The cells of a family subject, as selections, in the order the family declares or resolves
+    ///     them (GRAMMAR §5.1) — the layers themselves, or one bare project noun per project the family's
+    ///     project selection names.
+    /// </summary>
+    /// <remarks>
+    ///     The one place cells are minted, so the three readers of the partition — the self-allowance, the
+    ///     leaf verbs and the emptiness gate — all range over the same list, resolved once per rule. A
+    ///     project cell is minted as the selection <c>arch.Project(name)</c> would be, stamped with the
+    ///     family's own owner, which is what makes <see cref="SelectionAdmission.Collect" /> stage its
+    ///     project head and §4.1 attribution judge each instance at its declarer.
+    /// </remarks>
+    internal IReadOnlyList<Selection> Cells(Selection family)
+    {
+        var noun = (EachNoun)family.Noun;
+        if (noun.Layers is { } layers) return layers;
+
+        IReadOnlyList<ProjectNode> projects = ProjectSelectionEvaluator.Resolve(noun.Projects!, _model.Projects);
+        return projects
+            .Select(project => (Selection)new RefinedSelection(
+                family.Owner, new ProjectNoun(project.Name), Array.Empty<SelectionAdjective>()))
+            .ToList();
+    }
+
+    // A family's membership: the union of its cells, each resolved in the caller's position. The layer
+    // form evaluates the cell selection (so a definition-defined cell stays transparent to its
+    // definition); the project form takes the project noun's own path per named project, which is what
+    // makes a family of projects name exactly what a union of project nouns would.
+    private IEnumerable<TypeNode> FamilyMembers(EachNoun family, bool subject, SelectionPosition position)
+    {
+        var members = new HashSet<TypeNode>();
+        if (family.Layers is { } layers)
+        {
+            foreach (Layer cell in layers) members.UnionWith(Evaluate(cell, position));
+
+            return members;
+        }
+
+        foreach (ProjectNode project in ProjectSelectionEvaluator.Resolve(family.Projects!, _model.Projects))
+            members.UnionWith(ProjectMembers(project.Name, subject));
+
+        return members;
+    }
+
+    // The ordinal declarer index, then the position filter — the same nodes in the same order the
+    // universe scan yielded, because a lookup grouping keeps Types order.
+    private IEnumerable<TypeNode> ProjectMembers(string name, bool subject)
+    {
+        IEnumerable<TypeNode> declaring = ByProjectName[name];
+        return subject ? declaring.Where(t => !t.IsExternal) : declaring;
     }
 
     // The scanning nouns' memo, keyed on (noun, position): every one of them walks the whole position-

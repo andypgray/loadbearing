@@ -8,10 +8,12 @@ namespace Zphil.LoadBearing.Rendering;
 ///     one node that accumulates all four rules' facts.
 /// </summary>
 /// <remarks>
-///     Nesting is namespace containment and nothing else: a place is drawn inside the most specific other
-///     place whose glob set strictly covers its own. When two candidate parents are incomparable —
-///     neither covers the other — there is no "most specific" answer, and the node stays flat rather than
-///     picking one and implying a hierarchy the spec never declared.
+///     Nesting is namespace containment for everything the spec does not state outright: a place is drawn
+///     inside the most specific other place whose glob set strictly covers its own. When two candidate
+///     parents are incomparable — neither covers the other — there is no "most specific" answer, and the
+///     node stays flat rather than picking one and implying a hierarchy the spec never declared. A layer
+///     whose definition refines or unions other places arrives already nested, because its containment is
+///     declared rather than inferred, and a project place has no globs to infer anything from.
 /// </remarks>
 internal sealed class LawPlaces(IReadOnlyList<LayerDefinition> layers)
 {
@@ -104,12 +106,27 @@ internal sealed class LawPlaces(IReadOnlyList<LayerDefinition> layers)
 
     private LawPlace? Register(LawPlace? place)
     {
-        if (place is null) return null;
+        return place is null ? null : Registered(place);
+    }
 
+    // Registration proper, and the one place structural containment is resolved to registered instances: a
+    // place is drawn inside another only if the two nodes on the page are the ones the rules registered.
+    private LawPlace Registered(LawPlace place)
+    {
         if (_byKey.TryGetValue(place.Key, out LawPlace existing)) return existing;
+
+        // A structural parent is drawn whether or not a rule names it — a layer defined as a refinement of
+        // another says where it sits, and the box has to be on the page for the child to sit inside it.
+        // Registering it first also puts a container ahead of its content in registration order.
+        if (place.Parent is { } parent) place.Parent = Registered(parent);
 
         _byKey.Add(place.Key, place);
         _ordered.Add(place);
+
+        // A structural child keeps a parent it already has, so a place two definitions claim is drawn once,
+        // inside the first box that claimed it — the same first-wins rule registration itself follows.
+        foreach (LawPlace child in place.StructuralChildren) Registered(child).Parent ??= place;
+
         return place;
     }
 }

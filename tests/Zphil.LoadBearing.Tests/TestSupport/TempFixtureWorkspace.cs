@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 using Xunit;
-using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Internal;
 
 namespace Zphil.LoadBearing.Tests.TestSupport;
 

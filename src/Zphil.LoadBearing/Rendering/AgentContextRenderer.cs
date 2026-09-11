@@ -196,21 +196,12 @@ public static class AgentContextRenderer
             $"- {ProseFormat.Backtick(containmentRule.Id)} — {containmentRule.Sentence} {containmentRule.Because}"
         };
         if (quarantine.Surface.Count > 0) bullets.Add($"- Sanctioned surface: {SurfaceList(quarantine.Surface)}.");
-        // The linked long-form doc is a backticked solution-relative path (the spec stays the index),
-        // not a rebased markdown link.
-        if (quarantine.DragonsDoc is { } dragonsDoc) bullets.Add($"- Dragons doc: {ProseFormat.Backtick(dragonsDoc)}.");
-        bullets.Add($"- Expand: {ProseFormat.Backtick($"loadbearing explain {containmentRule.Id}")}.");
 
-        var sections = new List<string>
-        {
+        return ScopeCardBody(
             $"## Quarantined scope {ProseFormat.Backtick(scopeId)}",
             $"This directory holds the quarantined {ProseFormat.Backtick(scopeId)} scope. " +
-            "Here be dragons — do not spread references into it."
-        };
-        if (quarantine.Dragons is { } dragons) sections.Add($"Dragons: {dragons}");
-        sections.Add(string.Join("\n", bullets));
-
-        return string.Join("\n\n", sections);
+            "Here be dragons — do not spread references into it.",
+            bullets, quarantine, containmentRule.Id);
     }
 
     /// <summary>
@@ -231,7 +222,7 @@ public static class AgentContextRenderer
     {
         Guard.NotNull(tripwireRule, nameof(tripwireRule));
         if (tripwireRule.Posture != Posture.Caution
-            || tripwireRule.Scope is not { Role: ScopeRole.Tripwire, Scoped: { } scoped } caution)
+            || tripwireRule.Scope is not { Role: ScopeRole.Tripwire } caution)
             throw new ArgumentException("CautionCard requires a Caution tripwire rule.", nameof(tripwireRule));
 
         string scopeId = caution.ScopeId;
@@ -241,19 +232,27 @@ public static class AgentContextRenderer
             $"- {ProseFormat.Backtick(tripwireRule.Id)} — a change set touching this scope is flagged by " +
             $"{ProseFormat.Backtick("check --diff-base <ref>")}. {tripwireRule.Because}"
         };
-        // The linked long-form doc is a backticked solution-relative path (the spec stays the index),
-        // not a rebased markdown link.
-        if (caution.DragonsDoc is { } dragonsDoc) bullets.Add($"- Dragons doc: {ProseFormat.Backtick(dragonsDoc)}.");
-        bullets.Add($"- Expand: {ProseFormat.Backtick($"loadbearing explain {tripwireRule.Id}")}.");
 
-        var sections = new List<string>
-        {
+        return ScopeCardBody(
             $"## Cautioned scope {ProseFormat.Backtick(scopeId)}",
             $"This directory holds the cautioned {ProseFormat.Backtick(scopeId)} scope: " +
-            $"{SentenceRenderer.Reference(scoped)}. Here be dragons — the weirdness below is load-bearing; " +
-            "read it before you edit, and do not tidy it away."
-        };
-        if (caution.Dragons is { } dragons) sections.Add($"Dragons: {dragons}");
+            $"{SentenceRenderer.Reference(caution.Scoped)}. Here be dragons — the weirdness below is load-bearing; " +
+            "read it before you edit, and do not tidy it away.",
+            bullets, caution, tripwireRule.Id);
+    }
+
+    // The body both scope cards share, so they agree on shape by construction rather than by copy: the
+    // posture's heading and lede, its own opening bullets, then the parts every scope card carries.
+    private static string ScopeCardBody(
+        string heading, string lede, List<string> bullets, ScopeData scope, string ruleId)
+    {
+        // The linked long-form doc is a backticked solution-relative path (the spec stays the index),
+        // not a rebased markdown link.
+        if (scope.DragonsDoc is { } dragonsDoc) bullets.Add($"- Dragons doc: {ProseFormat.Backtick(dragonsDoc)}.");
+        bullets.Add($"- Expand: {ProseFormat.Backtick($"loadbearing explain {ruleId}")}.");
+
+        var sections = new List<string> { heading, lede };
+        if (scope.Dragons is { } dragons) sections.Add($"Dragons: {dragons}");
         sections.Add(string.Join("\n", bullets));
 
         return string.Join("\n\n", sections);

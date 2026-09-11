@@ -54,6 +54,56 @@ public sealed class CheckCommandE2ETests
     }
 
     [Fact]
+    public async Task Check_ViolatedSpec_ReportsTheFamilyRuleAsOneLawOverEveryCrossProjectEdge()
+    {
+        CliResult result = await ViolatedHuman.Value;
+
+        // One rule over a three-cell partition, where a spec without the noun would need one rule per
+        // project pair: the sentence names the family, and the edges are every reference that leaves a
+        // cell for another — in both directions the solution's references actually run.
+        result.ShouldReportViolations(
+            "FAIL layering/projects-independent — Each of the projects matching `MyApp.*` must not reference the others.");
+        result.Out.ShouldContain(
+            "MyApp.Domain/OrderService.cs:9 — MyApp.Domain.OrderService references MyApp.Web.HomeController");
+        result.Out.ShouldContain(
+            "MyApp.Web/InvoiceController.cs:10 — MyApp.Web.InvoiceController references MyApp.Legacy.Billing.RoundingMode");
+        // The facade path is sanctioned by the quarantine and still crosses a project boundary, so this
+        // rule reds on it — two laws over one edge, asking different questions (GRAMMAR §4.3).
+        result.Out.ShouldContain(
+            "MyApp.Web/HomeController.cs:17 — MyApp.Web.HomeController references MyApp.Legacy.Billing.IBillingFacade");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpec_ReportsTheCircleAsOneLawOverBothArrowsOfIt()
+    {
+        CliResult result = await ViolatedHuman.Value;
+
+        // Two cuts of the web layer that reference each other: the cells MAY point at one another, so the
+        // cross-cell ban could not say this law — only the circle is forbidden, and both its arrows are red
+        // under one ID because the verb knows a circle exists and not which way it should have run.
+        result.ShouldReportViolations(
+            "FAIL layering/web-cuts-not-circular — Each of the Reporting and Invoicing layers must not have circular references with the others.");
+        result.Out.ShouldContain(
+            "MyApp.Web/InvoiceCreatedHandler.cs:10 — MyApp.Web.InvoiceCreatedHandler references MyApp.Web.ReportEndpoint");
+        result.Out.ShouldContain(
+            "MyApp.Web/ReportEndpoint.cs:23 — MyApp.Web.ReportEndpoint references MyApp.Web.InvoiceService");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpecJson_CarriesTheCircleAsADetailOnEveryPairThatLiesOnIt()
+    {
+        CliResult json = await ViolatedJson.Value;
+
+        // The verb's one addition to the wire document: the circle rides as a per-violation detail, which
+        // the JSON channel alone reads — the human report, the baseline and SARIF see an ordinary reference
+        // pair, which is what keeps the ratchet untouched by this verb (GRAMMAR §5.3).
+        json.Out.ShouldHaveFailedWith("layering/web-cuts-not-circular", "target",
+            ["MyApp.Web.InvoiceService", "MyApp.Web.ReportEndpoint"]);
+        json.Out.ShouldHaveDetailOnEveryViolation(
+            "layering/web-cuts-not-circular", "circular references among the Reporting and Invoicing layers");
+    }
+
+    [Fact]
     public async Task Check_ViolatedSpec_RatchetsMigrateRuleWithGrandfatheredInvoiceAndRedHome()
     {
         CliResult result = await ViolatedHuman.Value;
@@ -95,8 +145,12 @@ public sealed class CheckCommandE2ETests
         result.Out.ShouldContain("fix: use `IBillingFacade`");
         result.Out.ShouldContain(
             "hint: no baseline captured for this rule; run 'loadbearing baseline --init' to grandfather existing violations");
-        // The facade path (HomeController → IBillingFacade) is the sanctioned surface — green, never listed.
-        result.Out.ShouldNotContain("MyApp.Web.HomeController references MyApp.Legacy.Billing.IBillingFacade");
+        // The facade path (HomeController → IBillingFacade) is the sanctioned surface, so it is absent from
+        // THIS rule's violations — read off the document rather than off the whole report, because
+        // layering/projects-independent reds on the very same edge asking a different question (GRAMMAR §4.3).
+        CliResult json = await ViolatedJson.Value;
+        json.Out.ShouldHaveFailedWith("legacy/billing/containment", "target",
+            ["MyApp.Legacy.Billing.BillingCalculator", "MyApp.Legacy.Billing.RoundingMode"]);
         // The tripwire skips without a --diff-base.
         result.Out.ShouldContain("skip legacy/billing/tripwire");
         result.Out.ShouldContain(
@@ -119,7 +173,7 @@ public sealed class CheckCommandE2ETests
         // grandfather, so the report gains one skip line and no red anywhere.
         result.Out.ShouldNotContain("domain/retry-budget/containment");
         result.Out.ShouldNotContain("FAIL domain/retry-budget");
-        result.Out.ShouldContain("Checked 29 rules: 2 passed, 25 failed, 2 skipped (44 violations, 1 warnings).");
+        result.Out.ShouldContain("Checked 31 rules: 2 passed, 27 failed, 2 skipped (51 violations, 1 warnings).");
     }
 
     [Fact]
@@ -232,6 +286,22 @@ public sealed class CheckCommandE2ETests
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.CleanSpecDll);
 
         result.ShouldSucceed();
+    }
+
+    [Fact]
+    public async Task Check_LayerSpec_JudgesEachLayerAsWhateverDefinesIt()
+    {
+        // The three definition forms in one run: Web is its project and reds on the two controllers that
+        // reach billing, the Reporting refinement narrows Web to the Report* types and holds, and the
+        // glob-defined Billing layer — and the quarantine over it — read exactly as they always have.
+        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.LayerSpecDll);
+
+        result.ShouldReportViolations(
+            "FAIL layering/web-not-billing — The Web layer must not reference types in `MyApp.Legacy.Billing.*`.",
+            "MyApp.Web/InvoiceController.cs:9 — MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator",
+            "pass layering/reporting-not-billing — The Reporting layer must not reference types in `MyApp.Legacy.Billing.*`.",
+            "pass legacy/billing/containment — Types in the Billing layer, except `IBillingFacade` or `BillingFacade`, "
+            + "must be referenced only by the Billing layer, `IBillingFacade` or `BillingFacade`.");
     }
 
     [Fact]
@@ -517,14 +587,14 @@ public sealed class CheckCommandE2ETests
     [Fact]
     public async Task Check_RulesSelectingOnePassingRule_StampsTheFilterAndExitsZero()
     {
-        // Act — one green rule picked out of a spec with twenty-five red ones.
+        // Act — one green rule picked out of a spec with twenty-seven red ones.
         CliResult result = await CliRunner.InvokeAsync(
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--rules", "layering/billing-independent");
 
         // Assert — exit 0, because the rules that were not selected were not run. That is the whole hazard the
         // stamp exists for: a green subset of a red spec looks exactly like a green solution without it.
         result.ShouldSucceed(
-            "Checking 1 of 29 rules matching 'layering/billing-independent'; the verdict below covers only those, "
+            "Checking 1 of 31 rules matching 'layering/billing-independent'; the verdict below covers only those, "
             + "so a clean result here is not a clean solution.");
         result.Out.ShouldNotContain("layering/domain-independent");
     }
@@ -538,7 +608,7 @@ public sealed class CheckCommandE2ETests
 
         // Assert — the exit contract is untouched: narrowing changes what runs, never what a violation means.
         result.ShouldReportViolations(
-            "Checking 5 of 29 rules matching 'exceptions/*'; the verdict below covers only those, so a clean "
+            "Checking 5 of 31 rules matching 'exceptions/*'; the verdict below covers only those, so a clean "
             + "result here is not a clean solution.",
             "FAIL exceptions/no-general-catch",
             "FAIL exceptions/no-bare-bcl-throw");

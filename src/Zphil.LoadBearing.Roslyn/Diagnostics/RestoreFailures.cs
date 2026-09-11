@@ -2,7 +2,7 @@ using System.Security;
 using System.Text;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
-using Zphil.LoadBearing.Rendering;
+using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Roslyn.Solutions;
 
 namespace Zphil.LoadBearing.Roslyn.Diagnostics;

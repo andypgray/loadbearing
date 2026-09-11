@@ -82,6 +82,25 @@ public class SpecValidationTests
     // states the wrong kind of law.
     [InlineData(typeof(BlankCounterpartTemplateSpec), Code.BlankPattern, "area/rule")]
     [InlineData(typeof(PlaceholderFreeCounterpartTemplateSpec), Code.CounterpartTemplateWithoutPlaceholder, "area/rule")]
+    // The family (GRAMMAR §5.1, §8 items 27–28). A family may stand only as a rule subject, so every
+    // other position is item 27 under one code — the message names which, and the arms below walk each
+    // path that reaches it. Its cells and its own adjectives ride the walks a union's operands do, so a
+    // foreign cell, a blank glob on the family and the project stratum inside a project family need no
+    // new codes at all.
+    [InlineData(typeof(FamilyAsOperandSpec), Code.FamilyMisplaced, "area/rule")]
+    [InlineData(typeof(FamilyAsExceptPayloadSpec), Code.FamilyMisplaced, "area/rule")]
+    [InlineData(typeof(FamilyAsUnionOperandSpec), Code.FamilyMisplaced, "area/rule")]
+    [InlineData(typeof(FamilyAsMembershipSpec), Code.FamilyMisplaced, "area/rule")]
+    [InlineData(typeof(FamilyAsCounterpartAmongSpec), Code.FamilyMisplaced, "area/rule")]
+    [InlineData(typeof(FamilyAsScopedSelectionSpec), Code.FamilyMisplaced, "legacy/modules")]
+    [InlineData(typeof(FamilyAsBoundarySpec), Code.FamilyMisplaced, "legacy/modules")]
+    [InlineData(typeof(EachOtherWithoutFamilySpec), Code.EachOtherWithoutFamily, "area/rule")]
+    [InlineData(typeof(CircularReferencesOnPlainSubjectSpec), Code.CircularReferencesNeedLayerFamily, "area/rule")]
+    [InlineData(typeof(CircularReferencesOnProjectFamilySpec), Code.CircularReferencesNeedLayerFamily, "area/rule")]
+    [InlineData(typeof(ForeignFamilyCellSpec), Code.ForeignSelection, "area/rule")]
+    [InlineData(typeof(BlankFamilyGlobSpec), Code.BlankPattern, "area/rule")]
+    [InlineData(typeof(BlankProjectFamilyGlobSpec), Code.BlankProjectPattern, "area/rule")]
+    [InlineData(typeof(ForeignProjectFamilySpec), Code.ForeignProjectSelection, "area/rule")]
     public void Validate_FailingSpec_ReportsItsCodeAndRuleId(Type specType, Code code, string ruleId)
     {
         var spec = (IArchitectureSpec)Activator.CreateInstance(specType)!;
@@ -224,6 +243,95 @@ public class SpecValidationTests
             .RuleId.ShouldBeNull();
         ex.ShouldHaveError(Code.DuplicateLayerName)
             .Message.ShouldBe("Duplicate layer name 'Dup'.");
+    }
+
+    [Theory]
+    [InlineData(typeof(FamilyAsOperandSpec), "an operand")]
+    [InlineData(typeof(FamilyAsExceptPayloadSpec), "an Except payload")]
+    [InlineData(typeof(FamilyAsUnionOperandSpec), "a union operand")]
+    [InlineData(typeof(FamilyAsMembershipSpec), "an operand")]
+    [InlineData(typeof(FamilyAsCounterpartAmongSpec), "an operand")]
+    public void FamilyMisplaced_OnARule_NamesThePositionItStandsIn(Type specType, string position)
+    {
+        // One sentence for every position, varying on the position alone: what an author has to move is
+        // the family, and where it stands is the whole of what they need told (GRAMMAR §8 item 27).
+        var spec = (IArchitectureSpec)Activator.CreateInstance(specType)!;
+
+        SpecValidationException ex = BuildExpectingFailure(spec);
+
+        ex.ShouldHaveError(Code.FamilyMisplaced, "area/rule")
+            .Message.ShouldEndWith(
+                $"A family (`arch.Each`) used as {position} by 'area/rule'; a family may stand only as a rule subject.");
+    }
+
+    [Theory]
+    [InlineData(typeof(FamilyAsScopedSelectionSpec), "a scoped selection")]
+    [InlineData(typeof(FamilyAsBoundarySpec), "a boundary")]
+    public void FamilyMisplaced_OnAScope_NamesThePositionItStandsIn(Type specType, string position)
+    {
+        var spec = (IArchitectureSpec)Activator.CreateInstance(specType)!;
+
+        SpecValidationException ex = BuildExpectingFailure(spec);
+
+        ex.ShouldHaveError(Code.FamilyMisplaced, "legacy/modules")
+            .Message.ShouldEndWith(
+                $"A family (`arch.Each`) used as {position} by 'legacy/modules'; "
+                + "a family may stand only as a rule subject.");
+    }
+
+    [Fact]
+    public void FamilyMisplaced_AsALayerDefinition_IsReportedSpecWideNamingTheLayer()
+    {
+        // A definition is use-independent, so its error is the layer's: null ID, no location, named by
+        // layer — the same terms every other layer error reports on.
+        SpecValidationException ex = BuildExpectingFailure(new FamilyAsLayerDefinitionSpec());
+
+        SpecValidationError error = ex.ShouldHaveError(Code.FamilyMisplaced);
+        error.RuleId.ShouldBeNull();
+        error.Message.ShouldBe(
+            "A family (`arch.Each`) used as a layer definition by layer 'Modules'; "
+            + "a family may stand only as a rule subject.");
+    }
+
+    [Fact]
+    public void EachOtherWithoutFamily_OnAPlainSubject_NamesTheVerbTheAuthorMeant()
+    {
+        // The cross-cell ban's targets are the subject's own cells, so a cell-free subject names nothing
+        // to forbid — and the plain-selection verb has a name (GRAMMAR §8 item 28).
+        SpecValidationException ex = BuildExpectingFailure(new EachOtherWithoutFamilySpec());
+
+        ex.ShouldHaveError(Code.EachOtherWithoutFamily, "area/rule")
+            .Message.ShouldEndWith(
+                "`MustNotReferenceEachOther` on 'area/rule' needs a family subject (`arch.Each`); "
+                + "over a plain selection write `MustNotReference`.");
+    }
+
+    [Fact]
+    public void CircularReferencesNeedLayerFamily_OnAPlainSubject_SaysThereAreNoLayers()
+    {
+        // The cycle gate's nodes are the subject's own cells, so a cell-free subject has no graph at all
+        // (GRAMMAR §8 item 29).
+        SpecValidationException ex = BuildExpectingFailure(new CircularReferencesOnPlainSubjectSpec());
+
+        ex.ShouldHaveError(Code.CircularReferencesNeedLayerFamily, "area/rule")
+            .Message.ShouldEndWith(
+                "`MustNotHaveCircularReferences` on 'area/rule' needs a family of layers (`arch.Each`); "
+                + "over a plain selection there are no layers to reference each other.");
+    }
+
+    [Fact]
+    public void CircularReferencesNeedLayerFamily_OnAProjectFamily_NamesTheVerbsTheAuthorMeant()
+    {
+        // The build forbids circular project references, so over a family of projects the law holds by
+        // construction — a rule that cannot red is a false promise, and the two verbs that can say
+        // something are named (GRAMMAR §8 item 29).
+        SpecValidationException ex = BuildExpectingFailure(new CircularReferencesOnProjectFamilySpec());
+
+        ex.ShouldHaveError(Code.CircularReferencesNeedLayerFamily, "area/rule")
+            .Message.ShouldEndWith(
+                "`MustNotHaveCircularReferences` on 'area/rule' needs a family of layers; projects cannot "
+                + "have circular references, so over a family of projects the law holds by construction. "
+                + "Write `MustNotReferenceEachOther` or an ordering rule.");
     }
 
     [Fact]
@@ -445,6 +553,58 @@ public class SpecValidationTests
 
         ex.ShouldHaveError(Code.UnanchoredSubtreePattern)
             .RuleId.ShouldBeNull();
+        ex.ShouldHaveError(Code.UnanchoredSubtreePattern)
+            .Message
+            .ShouldBe("The namespace pattern 'MyApp.*.Svc.*' on layer 'Bad' has a trailing `.*` subtree " +
+                      "operator but its literal prefix contains a `*`, which never matches; anchor the subtree on a literal prefix.");
+    }
+
+    [Fact]
+    public void ForeignSelection_InALayerDefinition_IsReportedSpecWide()
+    {
+        // A definition is validated where the layer is declared, on the layer-glob terms: spec-wide, null
+        // rule ID, named by layer, and found whether or not any rule ever names the layer (§8 item 10).
+        SpecValidationException ex = BuildExpectingFailure(new ForeignLayerDefinitionSpec());
+
+        ex.ShouldHaveError(Code.ForeignSelection)
+            .RuleId.ShouldBeNull();
+        ex.ShouldHaveError(Code.ForeignSelection)
+            .Message.ShouldBe(
+                "A selection used by layer 'Foreign' was minted on a different Arch instance; it is not registered with this model.");
+    }
+
+    [Fact]
+    public void BlankPattern_BlankProjectNameInALayerDefinition_IsReportedSpecWide()
+    {
+        // The definition takes the same blank-operand walk a rule's selections take (§8 item 15), under the
+        // noun the type-side walk names it by.
+        SpecValidationException ex = BuildExpectingFailure(new BlankProjectNameLayerDefinitionSpec());
+
+        ex.ShouldHaveError(Code.BlankPattern)
+            .RuleId.ShouldBeNull();
+        ex.ShouldHaveError(Code.BlankPattern)
+            .Message.ShouldBe("Blank project name on layer 'Bad'.");
+    }
+
+    [Fact]
+    public void UndefinedLifetime_InALayerDefinition_IsReportedSpecWide()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new UndefinedLifetimeLayerDefinitionSpec());
+
+        ex.ShouldHaveError(Code.UndefinedLifetime)
+            .RuleId.ShouldBeNull();
+        ex.ShouldHaveError(Code.UndefinedLifetime)
+            .Message.ShouldBe("'(Lifetime)7' is not a defined Lifetime — " +
+                              "use Lifetime.Singleton, Lifetime.Scoped, or Lifetime.Transient (used by layer 'Wiring').");
+    }
+
+    [Fact]
+    public void UnanchoredSubtreePattern_InALayerDefinitionsExceptPayload_IsReportedSpecWide()
+    {
+        // The walk reaches a definition's nesting, not just its head: an Except payload is where a
+        // definition hides a second selection.
+        SpecValidationException ex = BuildExpectingFailure(new DeadSubtreeLayerDefinitionSpec());
+
         ex.ShouldHaveError(Code.UnanchoredSubtreePattern)
             .Message
             .ShouldBe("The namespace pattern 'MyApp.*.Svc.*' on layer 'Bad' has a trailing `.*` subtree " +

@@ -104,7 +104,8 @@ internal sealed class ConstraintEvaluator
         // member-subject paths alike. The gate hands back the admission it folded the operands into, so
         // the union subject is neither evaluated a second time nor attributed a second time. The bang is the
         // project dispatch above: every constraint that reaches here carries a type selection.
-        (IReadOnlyList<Violation> emptyOperands, SelectionAdmission? resolved) = ResolveSubject(constraint.Subject!);
+        (IReadOnlyList<Violation> emptyOperands, SelectionAdmission? resolved, FamilySubject? family) =
+            ResolveSubject(constraint.Subject!);
         if (resolved is not { } admission) return (emptyOperands, NoWarnings, default);
 
         // A member-subject constraint (GRAMMAR §4.6) ranges over declared members, so it dispatches before
@@ -115,7 +116,8 @@ internal sealed class ConstraintEvaluator
         HashSet<TypeNode> subjects = admission.Members;
         if (subjects.Count == 0) return ([Violation.EmptySubject(EmptySubjectMessage)], NoWarnings, default);
 
-        (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings) = Dispatch(constraint, subjects, admission);
+        (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings) =
+            Dispatch(constraint, subjects, admission, family);
         return (violations, warnings, CoverageOf(subjects));
     }
 
@@ -145,7 +147,7 @@ internal sealed class ConstraintEvaluator
     // per-declarer instances the rule owns, at whichever end it sits (§4.1). The shape verbs and the member
     // path take the set, because a rule with no edge has nothing to attribute.
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) Dispatch(
-        Constraint constraint, HashSet<TypeNode> subjects, SelectionAdmission admission)
+        Constraint constraint, HashSet<TypeNode> subjects, SelectionAdmission admission, FamilySubject? family)
     {
         switch (constraint)
         {
@@ -156,9 +158,15 @@ internal sealed class ConstraintEvaluator
             case MustOnlyReferenceConstraint or MustOnlyReferenceItselfConstraint:
                 // The leaf verb rides the allow-list's own arm with the empty operand list it was built to
                 // carry: an empty admission, which the implicit self-allowance folds back to the subject alone.
-                return OnlyReference(admission, constraint.Operands);
-            case MustOnlyBeReferencedByConstraint c:
-                return OnlyBeReferencedBy(admission, c.Sources);
+                return OnlyReference(admission, constraint.Operands, family);
+            case MustOnlyBeReferencedByConstraint or MustOnlyBeReferencedByItselfConstraint:
+                // The inbound pair, likewise: the leaf's empty operand list resolves to the subject alone,
+                // and MustOnlyBeReferencedBy's Sources IS the inherited operand list.
+                return OnlyBeReferencedBy(admission, constraint.Operands, family);
+            case MustNotReferenceEachOtherConstraint:
+                return EachOther(family);
+            case MustNotHaveCircularReferencesConstraint:
+                return CircularReferences(family);
             case MustNotUseConstraint c:
                 return ForbiddenMemberUse(subjects, c.Members);
             case MustNotConstructConstraint c:
@@ -503,50 +511,249 @@ internal sealed class ConstraintEvaluator
             subjectAtSource: true, requireSites: false, warnInert: true);
     }
 
+    /// <summary>
+    ///     The outbound allow-list and its leaf form (GRAMMAR §4.1, §5.3): every reference out of the
+    ///     subject whose target the allow-set does not name is a violation.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The refined subject is allowed implicitly, as one more allow entry (GRAMMAR §4.1) — folded
+    ///         into the resolved admission here rather than into the Targets list, so Operands, the
+    ///         sentence and the diagram never see an entry no author wrote. External targets are exempt
+    ///         (the complement universe is solution-declared). <c>MustOnly*</c> never warns — an empty
+    ///         allow-set is loud by itself, and the leaf verb's empty operand list resolves to
+    ///         subject-only rather than to nothing. Attribution survives by flipping the polarity
+    ///         <see cref="SelectionAdmission.CountsEdge" /> asks with: an edge is a violation when SOME
+    ///         instance the subject owns lands outside the allow-set. So an intra-copy edge is allowed by
+    ///         an entry naming the compiling project — the subject counts as one, at the projects it names
+    ///         the node at — or by an entry that is not a project at all, and never by an entry naming some
+    ///         other declarer of the same source file.
+    ///     </para>
+    ///     <para>
+    ///         Over a family subject "self" is the cell rather than the whole subject (GRAMMAR §5.1), so
+    ///         the walk runs once per cell: the subject is that cell intersected with the family's
+    ///         membership, and the allow-set is the operands plus the same cell <em>as declared</em> — the
+    ///         whole layer or project, which is what lets a module's excluded <c>Contracts</c> cone still
+    ///         count as its own.
+    ///     </para>
+    /// </remarks>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyReference(
-        SelectionAdmission subject, IReadOnlyList<Selection> allowedTargets)
+        SelectionAdmission subject, IReadOnlyList<Selection> allowedTargets, FamilySubject? family)
     {
-        SelectionAdmission allowed = ResolveOperands(allowedTargets).IncludingSelf(subject);
-        var violations = new List<Violation>();
+        SelectionAdmission operands = ResolveOperands(allowedTargets);
+        if (family is null) return (Outbound(subject, operands.IncludingSelf(subject), wantHit: false), NoWarnings);
 
-        // The refined subject is allowed implicitly, as one more allow entry (GRAMMAR §4.1) — folded into
-        // the resolved admission here rather than into the Targets list, so Operands, the sentence and the
-        // diagram never see an entry no author wrote. External targets are exempt (the complement universe
-        // is solution-declared). MustOnly* never warns — an empty allow-set is loud by itself, and the
-        // leaf verb's empty operand list resolves to subject-only rather than to nothing.
-        // Attribution survives by flipping the polarity CountsEdge asks with: an edge is a violation when
-        // SOME instance the subject owns lands outside the allow-set. So an intra-copy edge is allowed by
-        // an entry naming the compiling project — the subject counts as one, at the projects it names the
-        // node at — or by an entry that is not a project at all, and never by an entry naming some other
-        // declarer of the same source file.
+        IReadOnlyList<SelectionAdmission> declared = DeclaredCells(family);
+        var violations = new List<Violation>();
+        for (var cell = 0; cell < declared.Count; cell++)
+            violations.AddRange(
+                Outbound(family.Subjects[cell], operands.IncludingSelf(declared[cell]), wantHit: false));
+
+        return (Deduplicated(violations), NoWarnings);
+    }
+
+    /// <summary>
+    ///     The inbound allow-list and its leaf form: any reference into the subject from outside the
+    ///     allow-set is a violation (the containment verb, GRAMMAR §7), the refined subject being one of
+    ///     the allowed sources implicitly (§4.1, as for the outbound verb).
+    /// </summary>
+    /// <remarks>
+    ///     Edge sources are always solution-declared, so no external caveat is needed. The subject sits at
+    ///     the edge's TARGET end, so it bounds ownership there while the allow-set decides the source — one
+    ///     test rather than two, because "some instance the subject owns comes from an unallowed project"
+    ///     is a claim about one declarer and cannot be split across independent filters (§4.1). The family
+    ///     path is the outbound one read from the other end: per cell, allowed = the operands plus that
+    ///     cell as declared.
+    /// </remarks>
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyBeReferencedBy(
+        SelectionAdmission subject, IReadOnlyList<Selection> allowedSources, FamilySubject? family)
+    {
+        SelectionAdmission operands = ResolveOperands(allowedSources);
+        if (family is null) return (Inbound(subject, operands.IncludingSelf(subject)), NoWarnings);
+
+        IReadOnlyList<SelectionAdmission> declared = DeclaredCells(family);
+        var violations = new List<Violation>();
+        for (var cell = 0; cell < declared.Count; cell++)
+            violations.AddRange(Inbound(family.Subjects[cell], operands.IncludingSelf(declared[cell])));
+
+        return (Deduplicated(violations), NoWarnings);
+    }
+
+    /// <summary>
+    ///     The cross-cell ban (GRAMMAR §5.1, §5.3): per cell, an owned outbound instance whose far end
+    ///     lies in any <em>other</em> cell, as declared, is a violation. Symmetric, so one outbound walk
+    ///     states the whole law, and a one-cell family passes vacuously.
+    /// </summary>
+    /// <remarks>
+    ///     The polarity is the allow-list's flipped — <c>wantHit: true</c> over the merged other cells —
+    ///     which is what keeps one edge test behind every verb at either end (§4.1). A family subject is
+    ///     required by spec-build item 28, so the null arm fails closed rather than describing a shape a
+    ///     built model can carry.
+    /// </remarks>
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) EachOther(FamilySubject? family)
+    {
+        if (family is null)
+            throw new RuleEvaluationException(
+                "`MustNotReferenceEachOther` needs a family subject (`arch.Each`); this subject declares no cells.");
+
+        IReadOnlyList<SelectionAdmission> declared = DeclaredCells(family);
+        var violations = new List<Violation>();
+        for (var cell = 0; cell < declared.Count; cell++)
+            violations.AddRange(
+                Outbound(family.Subjects[cell], SelectionAdmission.AllBut(declared, cell), wantHit: true));
+
+        return (Deduplicated(violations), NoWarnings);
+    }
+
+    /// <summary>
+    ///     The cycle gate (GRAMMAR §5.1, §5.3): an arrow runs from cell to cell wherever some owned
+    ///     reference crosses between them, the strongly connected components are taken over those arrows,
+    ///     and every type pair on an arrow whose two cells share a component is a violation. A one-cell
+    ///     family and any acyclic cell graph pass; an arrow into a component from outside it is green,
+    ///     because it lies on no circle.
+    /// </summary>
+    /// <remarks>
+    ///     A violation's identity is the type pair, never the cycle. That is what keeps the baseline, the
+    ///     ratchet, the human report and SARIF untouched by this verb: a baseline keyed on circles would
+    ///     churn by dozens of entries the moment one new arrow closed another circle, and enumerating the
+    ///     circles of a component is exponential in its size where the arrows are linear. The consequence
+    ///     is that the intended direction is blamed beside the stray back-reference — both arrows of a
+    ///     two-cell circle red — by design: this verb says only that a circle exists, and the author who
+    ///     knows which way the cells should point writes an ordering rule instead. The circle's cell names
+    ///     ride on <see cref="Violation.Detail" />, which the JSON channel alone reads.
+    ///     <para>
+    ///         A family of layers is required by spec-build item 29, so both throws below fail closed
+    ///         rather than describing a shape a built model can carry — the projects arm doubly so, since
+    ///         the build forbids circular project references and the law could never red.
+    ///     </para>
+    /// </remarks>
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) CircularReferences(FamilySubject? family)
+    {
+        if (family is null)
+            throw new RuleEvaluationException(
+                "`MustNotHaveCircularReferences` needs a family of layers (`arch.Each`); this subject declares no cells.");
+
+        if (family.Cells.Any(cell => cell is UnionSelection || cell.Noun is not LayerNoun))
+            throw new RuleEvaluationException(
+                "`MustNotHaveCircularReferences` needs a family of layers (`arch.Each`); this subject's cells are projects, which cannot have circular references.");
+
+        IReadOnlyList<SelectionAdmission> declared = DeclaredCells(family);
+        int cellCount = declared.Count;
+
+        // The cell graph, materialized as the type pairs realizing each arrow: arrows[i, j] is what a
+        // reference from cell i into cell j is made of, and its emptiness is the absence of the arrow.
+        var arrows = new List<ReferenceEdge>[cellCount, cellCount];
+        for (var source = 0; source < cellCount; source++)
+        for (var target = 0; target < cellCount; target++)
+            arrows[source, target] = source == target
+                ? new List<ReferenceEdge>()
+                : OutboundEdges(family.Subjects[source], declared[target], wantHit: true);
+
+        int[] components = CellComponents.Of(cellCount, (source, target) => arrows[source, target].Count > 0);
+        Dictionary<int, string> circles = CircleDetails(family, components);
+
+        var violations = new List<Violation>();
+        for (var source = 0; source < cellCount; source++)
+        for (var target = 0; target < cellCount; target++)
+        {
+            List<ReferenceEdge> arrow = arrows[source, target];
+            if (arrow.Count == 0 || components[source] != components[target]) continue;
+
+            string detail = circles[components[source]];
+            foreach (ReferenceEdge edge in arrow)
+                violations.Add(Violation.Reference(edge.Source, edge.Target, edge.Sites, detail));
+        }
+
+        return (Deduplicated(violations), NoWarnings);
+    }
+
+    // One detail sentence per component that holds a circle, naming its cells in family DECLARATION order —
+    // the order the rule's own sentence names them in, so the finding and the law read alike. A component of
+    // one cell holds no circle and mints nothing, which is why the caller skips an empty arrow before
+    // reaching in here: a cell IS in its own component, and arrows[i, i] is empty by construction.
+    private static Dictionary<int, string> CircleDetails(FamilySubject family, int[] components)
+    {
+        var names = new Dictionary<int, List<string>>();
+        for (var cell = 0; cell < components.Length; cell++)
+        {
+            int component = components[cell];
+            if (!names.TryGetValue(component, out List<string>? members))
+            {
+                members = new List<string>();
+                names[component] = members;
+            }
+
+            var layer = (LayerNoun)family.Cells[cell].Noun;
+            members.Add(layer.Name);
+        }
+
+        return names
+            .Where(component => component.Value.Count > 1)
+            .ToDictionary(
+                component => component.Key,
+                component => $"circular references among the {ProseFormat.JoinReferencesAnd(component.Value)} layers");
+    }
+
+    // The outbound reference walk the allow-list, the leaf and the cross-cell ban share, parameterized by
+    // the polarity each asks with. External targets are exempt either way: the complement universe is
+    // solution-declared, and a cell never holds an external type to be an "other" of.
+    private List<Violation> Outbound(SelectionAdmission subject, SelectionAdmission operand, bool wantHit)
+    {
+        return OutboundEdges(subject, operand, wantHit)
+            .Select(edge => Violation.Reference(edge.Source, edge.Target, edge.Sites))
+            .ToList();
+    }
+
+    // The walk itself, kept apart from the mint because the cycle gate needs the EDGES of an arrow before
+    // it knows whether that arrow lies on a circle — and only then whether they are violations at all.
+    private List<ReferenceEdge> OutboundEdges(SelectionAdmission subject, SelectionAdmission operand, bool wantHit)
+    {
+        var edges = new List<ReferenceEdge>();
         foreach (ReferenceEdge edge in Keyed(subject.Members, _edgesBySource.Lookup))
             if (!edge.Target.IsExternal
                 && SelectionAdmission.CountsEdge(
-                    subject, allowed, edge.Source, edge.Target, subjectAtSource: true, wantHit: false))
-                violations.Add(Violation.Reference(edge.Source, edge.Target, edge.Sites));
+                    subject, operand, edge.Source, edge.Target, subjectAtSource: true, wantHit))
+                edges.Add(edge);
 
-        return (violations, NoWarnings);
+        return edges;
     }
 
-    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyBeReferencedBy(
-        SelectionAdmission subject, IReadOnlyList<Selection> allowedSources)
+    // The inbound twin, keyed on the edge's target so the subject bounds ownership where it sits.
+    private List<Violation> Inbound(SelectionAdmission subject, SelectionAdmission allowed)
     {
-        SelectionAdmission allowed = ResolveOperands(allowedSources).IncludingSelf(subject);
         var violations = new List<Violation>();
-
-        // Any inbound reference from outside the allow-set is a violation (the containment verb, §7), the
-        // refined subject being one of the allowed sources implicitly (GRAMMAR §4.1, as for the outbound
-        // verb). Edge sources are always solution-declared, so no external caveat is needed. The subject
-        // sits at the edge's TARGET end, so it bounds ownership there while the allow-set decides the
-        // source — one test rather than two, because "some instance the subject owns comes from an
-        // unallowed project" is a claim about one declarer and cannot be split across independent
-        // filters (§4.1).
         foreach (ReferenceEdge edge in Keyed(subject.Members, _edgesByTarget.Lookup))
             if (SelectionAdmission.CountsEdge(
                     subject, allowed, edge.Source, edge.Target, subjectAtSource: false, wantHit: false))
                 violations.Add(Violation.Reference(edge.Source, edge.Target, edge.Sites));
 
-        return (violations, NoWarnings);
+        return violations;
+    }
+
+    // A family's cells collected in TARGET position — each cell as declared, which is what "self" means on
+    // a family (GRAMMAR §5.1). Resolved here rather than in ResolveSubject so a family rule whose verb
+    // never reads the partition pays nothing for it.
+    private IReadOnlyList<SelectionAdmission> DeclaredCells(FamilySubject family)
+    {
+        return family.Cells
+            .Select(cell => SelectionAdmission.Collect(_selections, cell, SelectionPosition.Target))
+            .ToList();
+    }
+
+    // One violation per (source, target) pair however many cells minted it (GRAMMAR §4.3): a project
+    // family's cells overlap wherever one source file compiles into two of them, so the same edge can be
+    // judged twice while the baseline still keys on the pair.
+    private static IReadOnlyList<Violation> Deduplicated(List<Violation> violations)
+    {
+        if (violations.Count < 2) return violations;
+
+        var seen = new HashSet<(TypeNode Source, TypeNode Target)>();
+        var unique = new List<Violation>(violations.Count);
+        foreach (Violation violation in violations)
+            if (seen.Add((violation.Source!, violation.Target!)))
+                unique.Add(violation);
+
+        return unique;
     }
 
     // The throw verb (GRAMMAR §4.8, §5.3): a STRICT allow-list — every throw edge from a subject whose thrown
@@ -581,14 +788,18 @@ internal sealed class ConstraintEvaluator
     // must never have the union's own adjectives applied. Target position keeps the softer per-rule
     // inert-target warning instead. A non-union subject has no operands and resolves straight through; a
     // union's operands ARE the union, so collecting them here is what keeps it from being resolved twice.
-    private (IReadOnlyList<Violation> Empty, SelectionAdmission? Subject) ResolveSubject(Selection subject)
+    private (IReadOnlyList<Violation> Empty, SelectionAdmission? Subject, FamilySubject? Family) ResolveSubject(
+        Selection subject)
     {
-        if (subject is not UnionSelection union)
-        {
-            SelectionAdmission whole = SelectionAdmission.Collect(_selections, subject, SelectionPosition.Subject);
-            return (Array.Empty<Violation>(), whole);
-        }
+        if (subject is UnionSelection union) return ResolveUnionSubject(union);
+        if (subject.Noun is EachNoun) return ResolveFamilySubject(subject);
 
+        SelectionAdmission whole = SelectionAdmission.Collect(_selections, subject, SelectionPosition.Subject);
+        return (Array.Empty<Violation>(), whole, null);
+    }
+
+    private (IReadOnlyList<Violation>, SelectionAdmission?, FamilySubject?) ResolveUnionSubject(UnionSelection union)
+    {
         var operands = new List<SelectionAdmission>(union.Parts.Count);
         var violations = new List<Violation>();
         foreach (Selection operand in union.Parts)
@@ -599,9 +810,92 @@ internal sealed class ConstraintEvaluator
                 violations.Add(Violation.EmptySubject(EmptyOperandMessage(SentenceRenderer.Reference(operand))));
         }
 
-        if (violations.Count > 0) return (violations, null);
+        if (violations.Count > 0) return (violations, null, null);
 
-        return (Array.Empty<Violation>(), SelectionAdmission.United(_selections, union, operands));
+        return (Array.Empty<Violation>(), SelectionAdmission.United(_selections, union, operands), null);
+    }
+
+    // A family subject, resolved once for the whole rule (GRAMMAR §5.1): its cells, their memberships, and
+    // the partition discipline. The cells are collected in subject position exactly as a union's operands
+    // are, so a cell matching nothing fails the rule in its own right with the cell named — the same §9
+    // loudness, for the same reason. Overlap is fail-closed rather than silently double-judged: a type in
+    // two cells has two selves and the rule cannot say which it meant.
+    private (IReadOnlyList<Violation>, SelectionAdmission?, FamilySubject?) ResolveFamilySubject(Selection subject)
+    {
+        IReadOnlyList<Selection> cells = _selections.Cells(subject);
+        RequireDistinctLayerCells(cells);
+
+        var collected = new List<SelectionAdmission>(cells.Count);
+        var violations = new List<Violation>();
+        foreach (Selection cell in cells)
+        {
+            SelectionAdmission matched = SelectionAdmission.Collect(_selections, cell, SelectionPosition.Subject);
+            collected.Add(matched);
+            if (matched.Count == 0)
+                violations.Add(Violation.EmptySubject(EmptyOperandMessage(SentenceRenderer.Reference(cell))));
+        }
+
+        if (violations.Count > 0) return (violations, null, null);
+
+        SelectionAdmission whole = SelectionAdmission.Family(_selections, subject, collected);
+        RequireDisjointLayerCells(cells, collected, whole.Members);
+
+        List<SelectionAdmission> perCell = collected.Select(cell => cell.Restricted(whole.Members)).ToList();
+        return (Array.Empty<Violation>(), whole, new FamilySubject(cells, perCell));
+    }
+
+    // The degenerate overlap, caught on the names alone before any type is resolved: a layer listed twice
+    // is one cell wearing two, which no membership answer could untangle. A project family cannot reach
+    // this — its cells come from a resolved project list, which holds each project once.
+    private static void RequireDistinctLayerCells(IReadOnlyList<Selection> cells)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (Selection cell in cells)
+            if (cell.Noun is LayerNoun layer && !seen.Add(layer.Name))
+                throw new RuleEvaluationException($"The {layer.Name} layer is listed twice in the family.");
+    }
+
+    // Partition discipline over the cells as declared (GRAMMAR §5.1): a subject type in two layer cells has
+    // two selves, so the rule fails closed naming the type and both cells. A project family needs no check
+    // — a multiply-declared type sits in every declarer's cell and is judged per instance (§4.1). The
+    // report is ordinal by type then by cell pair so one overlapping type always names the same one.
+    private static void RequireDisjointLayerCells(
+        IReadOnlyList<Selection> cells, IReadOnlyList<SelectionAdmission> declared, HashSet<TypeNode> members)
+    {
+        if (cells.Count < 2 || cells[0].Noun is not LayerNoun) return;
+
+        var owner = new Dictionary<TypeNode, int>();
+        List<(string Type, string First, string Second)>? overlaps = null;
+        for (var cell = 0; cell < declared.Count; cell++)
+            foreach (TypeNode node in declared[cell].Members)
+            {
+                if (!members.Contains(node)) continue;
+                if (!owner.TryGetValue(node, out int first))
+                {
+                    owner[node] = cell;
+                    continue;
+                }
+
+                overlaps ??= [];
+                overlaps.Add((node.FullName, LayerNameOf(cells[first]), LayerNameOf(cells[cell])));
+            }
+
+        if (overlaps is null) return;
+
+        (string type, string firstCell, string secondCell) = overlaps
+            .OrderBy(overlap => overlap.Type, StringComparer.Ordinal)
+            .ThenBy(overlap => overlap.First, StringComparer.Ordinal)
+            .ThenBy(overlap => overlap.Second, StringComparer.Ordinal)
+            .First();
+
+        throw new RuleEvaluationException(
+            $"Type `{type}` sits in both the {firstCell} and {secondCell} cells of the family; "
+            + "a family's cells must not overlap.");
+    }
+
+    private static string LayerNameOf(Selection cell)
+    {
+        return ((LayerNoun)cell.Noun).Name;
     }
 
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) Shape(HashSet<TypeNode> subjects, Func<TypeNode, bool> holds)
@@ -913,5 +1207,19 @@ internal sealed class ConstraintEvaluator
         }
 
         internal ILookup<TypeNode, TEdge> Lookup => _lookup ??= _edges.ToLookup(_key);
+    }
+
+    // A family subject resolved once per rule (GRAMMAR §5.1): the cells themselves, and the subject each
+    // cell's law ranges over — that cell intersected with the family's own membership, so an Except on the
+    // family narrows what every cell governs. Held rather than recomputed because four verbs read it and
+    // a project family resolves its cells against the project list to find them. The cells as DECLARED are
+    // not held here: only the verbs that read the cells as declared need them, and they resolve them themselves.
+    private sealed class FamilySubject(IReadOnlyList<Selection> cells, IReadOnlyList<SelectionAdmission> subjects)
+    {
+        /// <summary>The cells, in declaration order for a layer family and project order for a project one.</summary>
+        internal IReadOnlyList<Selection> Cells { get; } = cells;
+
+        /// <summary>Each cell intersected with the family's membership, positionally aligned with <see cref="Cells" />.</summary>
+        internal IReadOnlyList<SelectionAdmission> Subjects { get; } = subjects;
     }
 }

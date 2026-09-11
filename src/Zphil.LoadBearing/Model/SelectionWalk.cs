@@ -39,9 +39,32 @@ internal static class SelectionWalk
     /// </summary>
     internal static IEnumerable<ProjectSelection> ConstraintProjectSelections(Constraint constraint)
     {
-        if (constraint is not ProjectConstraint project) yield break;
+        if (constraint is ProjectConstraint project)
+        {
+            foreach (ProjectSelection selection in ExpandProjectSelection(project.ProjectSubject)) yield return selection;
 
-        foreach (ProjectSelection selection in ExpandProjectSelection(project.ProjectSubject)) yield return selection;
+            yield break;
+        }
+
+        // The one project selection a TYPE-subject constraint can carry: the project form of a family
+        // (GRAMMAR §5.1), whose cells the artifact stratum names. It rides this walk so the project-side
+        // checks — the foreign-Arch walk and the blank name/glob check (§8 items 22–23) — reach it
+        // without a walk of their own. A reader here is therefore not entitled to assume a project
+        // constraint; each one reads the anchor it was given rather than the constraint.
+        if (FamilyProjects(constraint.Subject) is { } projects)
+            foreach (ProjectSelection selection in ExpandProjectSelection(projects))
+                yield return selection;
+    }
+
+    /// <summary>
+    ///     The project selection inside a family-of-projects subject, or null for every other selection —
+    ///     the one place the type stratum reaches the artifact stratum (GRAMMAR §5.1).
+    /// </summary>
+    internal static ProjectSelection? FamilyProjects(Selection? selection)
+    {
+        if (selection is null or UnionSelection) return null;
+
+        return (selection.Noun as EachNoun)?.Projects;
     }
 
     /// <summary>The project selection itself, then the payloads of its own <c>Except</c> adjectives.</summary>
@@ -60,16 +83,26 @@ internal static class SelectionWalk
                     yield return nested;
     }
 
-    /// <summary>The selection itself, then its union parts, then the payloads of its own <c>Except</c> adjectives.</summary>
+    /// <summary>
+    ///     The selection itself, then its union parts or its family's layer cells, then the payloads of
+    ///     its own <c>Except</c> adjectives.
+    /// </summary>
     internal static IEnumerable<Selection> ExpandSelection(Selection selection)
     {
         yield return selection;
 
         // As in SelectionProse: the operands, then this selection's own Except payloads — a union carries
-        // adjectives of its own, so AnyOf(a, b).Except(bad) must reach the payload walk.
+        // adjectives of its own, so AnyOf(a, b).Except(bad) must reach the payload walk. A family's layer
+        // cells are walked on the same terms and for the same reason, so the foreign-Arch, lifetime and
+        // blank walks reach a cell minted on another Arch (GRAMMAR §5.1, §8). The arms are exclusive
+        // because reading .Noun on a union throws by design.
         if (selection is UnionSelection union)
             foreach (Selection member in union.Parts)
             foreach (Selection nested in ExpandSelection(member))
+                yield return nested;
+        else if (selection.Noun is EachNoun { Layers: { } cells })
+            foreach (Layer cell in cells)
+            foreach (Selection nested in ExpandSelection(cell))
                 yield return nested;
 
         foreach (SelectionAdjective adjective in selection.Adjectives)

@@ -17,7 +17,7 @@ public sealed class ScopeData
         string? dragons,
         string? dragonsDoc,
         string scopeId,
-        Selection? scoped)
+        Selection scoped)
     {
         Role = role;
         Boundary = boundary;
@@ -39,7 +39,7 @@ public sealed class ScopeData
     ///     maps changed files to the scoped types through it. Not public — placement and diff-matching are
     ///     Core concerns.
     /// </summary>
-    internal Selection? Scoped { get; }
+    internal Selection Scoped { get; }
 
     /// <summary>
     ///     The sanctioned surface as the spec named it (empty for a hermetic quarantine or a tripwire).

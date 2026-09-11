@@ -303,7 +303,7 @@ public static class ArchChecker
 
         string scopeId = rule.Scope!.ScopeId;
         CheckWarningKind kind = caution ? CheckWarningKind.CautionedScopeTouched : CheckWarningKind.QuarantinedScopeTouched;
-        HashSet<TypeNode> scoped = selections.Evaluate(rule.Scope.Scoped!, SelectionPosition.Subject);
+        HashSet<TypeNode> scoped = selections.Evaluate(rule.Scope.Scoped, SelectionPosition.Subject);
 
         List<CheckWarning> touched = scoped
             .Where(type => !type.IsExternal)

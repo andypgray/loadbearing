@@ -37,9 +37,9 @@ public static class ScopedContextResolver
 
         foreach (ArchRule rule in model.Rules)
         {
-            if (rule.Scope is not { Scoped: { } scoped } scope || !IsCardBearing(rule, scope)) continue;
+            if (rule.Scope is not { } scope || !IsCardBearing(rule, scope)) continue;
 
-            string? directory = DirectoryPlacement.ResolveDirectory(evaluator, scoped);
+            string? directory = DirectoryPlacement.ResolveDirectory(evaluator, scope.Scoped);
 
             placements.Add(directory is null
                 ? new ScopePlacement(scope.ScopeId, rule, null,

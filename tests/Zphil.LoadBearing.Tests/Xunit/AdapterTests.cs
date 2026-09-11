@@ -45,7 +45,8 @@ public sealed class AdapterTests
             [
                 "layering/core-no-roslyn",
                 "layering/model-independent",
-                "arch/no-ungoverned-types",
+                "layering/no-circular-references",
+                "layering/leaves-independent",
                 "cli/no-stdout",
                 "di/no-captive-dependencies",
                 "di/no-service-locator",

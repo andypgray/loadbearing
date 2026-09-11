@@ -6,6 +6,7 @@
 This directory holds the `Model` layer. Model is the reified spec: the nodes a spec compiles to, and the one thing the checker and the renderers both read. Its architecture rules:
 
 - `layering/model-independent` — The Model layer must not reference the Checking layer or the Rendering layer. The Model is the one reified thing this product is built around: a spec compiles to it, and checking and rendering are two independent readers of it. A reference the other way would make the model know about a consumer, and the next render target could no longer be added without touching it.
+- `layering/no-circular-references` — Each of the Model, Checking and Rendering layers must not have circular references with the others. Model, Checking and Rendering are three cuts inside one assembly with one intended direction: a model and two readers of it. A circle among them means a reader has become something the other reader depends on, and the next render target or checker change could no longer land without touching both.
 - Expand any rule above with `loadbearing explain <rule-id>`.
 
 ## Cautioned scope `model/prose-fragments`

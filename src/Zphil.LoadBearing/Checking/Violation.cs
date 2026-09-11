@@ -64,7 +64,12 @@ public sealed class Violation
     /// <summary>The reference or declaration sites carrying the violation; empty for EmptySubject/RuleError.</summary>
     public IReadOnlyList<SourceLocation> Sites { get; }
 
-    /// <summary>Free text for EmptySubject/RuleError; null otherwise.</summary>
+    /// <summary>
+    ///     Free text for EmptySubject/RuleError; on a Reference violation minted by the
+    ///     circular-references verb, the circle the pair lies on ("circular references among the A and B
+    ///     layers"), which the JSON channel alone reads — never the human report and never SARIF; null
+    ///     otherwise.
+    /// </summary>
     public string? Detail { get; private set; }
 
     /// <summary>
@@ -133,6 +138,19 @@ public sealed class Violation
     internal static Violation Reference(TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites)
     {
         return Edge(ViolationKind.Reference, source, target, sites);
+    }
+
+    /// <summary>
+    ///     A reference violation carrying the circle its pair lies on — what
+    ///     <c>MustNotHaveCircularReferences</c> mints (GRAMMAR §5.3). Identical to
+    ///     <see cref="Reference(TypeNode, TypeNode, IReadOnlyList{SourceLocation})" /> in kind, identity and
+    ///     order key, so the baseline, the human report and SARIF are untouched; <see cref="Detail" /> is
+    ///     the JSON channel's addition alone.
+    /// </summary>
+    internal static Violation Reference(
+        TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites, string detail)
+    {
+        return new Violation(ViolationKind.Reference, sites) { Source = source, Target = target, Detail = detail };
     }
 
     internal static Violation Construction(TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites)

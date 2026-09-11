@@ -5,6 +5,7 @@
 
 This directory holds the `Adapter` layer. Adapter runs every rule of a spec as an individually named xUnit test in the consumer's own test project. Its architecture rules:
 
+- `layering/leaves-independent` — Each of the Host, Adapter and Pack layers must not reference the others. Host, Adapter and Pack are the three leaves of the project graph: each is a different way to consume Core, and none is a dependency of another. A reference between two leaves would pull one consumer's closure — the CLI's MSBuild and MCP machinery, the adapter's xunit, the pack's canonical rules — into a project that ships without it.
 - `xunit/leaf-adapter` — The Adapter layer must not be referenced by the Core layer, the Extraction layer, the Host layer or the Pack layer. The adapter rides xunit.v3; a product reference would ship a test framework to every consumer of the referencing package.
 - `xunit/throws-setup-errors-only` — The Adapter layer must throw only `FileNotFoundException` or `InvalidOperationException`. The adapter runs inside consumers' test processes; its own failures must surface as the two documented setup errors, not as arbitrary exception noise beside the rule results.
 - Expand any rule above with `loadbearing explain <rule-id>`.

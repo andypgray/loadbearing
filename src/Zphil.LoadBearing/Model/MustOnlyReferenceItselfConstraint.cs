@@ -1,3 +1,5 @@
+using Zphil.LoadBearing.Prose;
+
 namespace Zphil.LoadBearing.Model;
 
 /// <summary>
@@ -14,8 +16,17 @@ namespace Zphil.LoadBearing.Model;
 ///     an arrow at nothing. The parenthetical is the same honesty pin
 ///     <see cref="MustOnlyReferenceConstraint" /> carries and states the same complement universe: the
 ///     verb constrains solution-declared targets, so a leaf may still take a NuGet dependency.
+///     <para>
+///         The self phrase is <see cref="SentenceRenderer.SelfReference" />'s and agrees with the subject's
+///         voice (GRAMMAR §6): over a family subject (§5.1) the allow-set is each cell as declared, so the
+///         types voice says "their own layer"; a plain subject says "themselves" in the types voice, the
+///         number its "types" head takes, and "itself" only in the collective voice, where it is one layer.
+///     </para>
 /// </remarks>
 internal sealed class MustOnlyReferenceItselfConstraint(Selection subject) : Constraint(subject)
 {
-    internal override string VerbPhrase => "must reference only itself (external packages are not constrained by this rule)";
+    private const string ExternalCaveat = " (external packages are not constrained by this rule)";
+
+    internal override string VerbPhrase =>
+        $"must reference only {SentenceRenderer.SelfReference(Subject!)}{ExternalCaveat}";
 }
