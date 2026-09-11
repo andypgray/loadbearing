@@ -122,9 +122,10 @@ public class LayerDefinitionTests
     [Fact]
     public void ATypesDefinitionNarrowedToOneNamespace_CarriesThatRegion()
     {
-        // The region rule's second shape, and the one the drawing's own place rules mirror: `arch.Types`
-        // narrowed by exactly one InNamespace names a namespace region, so Globs carries it and a rule
-        // naming that glob collapses onto the layer. Two of them are an intersection and name no region.
+        // The region rule's second shape: `arch.Types` narrowed by exactly one InNamespace names a
+        // namespace region, so Globs carries it and a rule naming that glob collapses onto the layer. Two
+        // of them are an intersection and name no region. The drawing has a third shape of its own — see
+        // ARefinementDefinition_CarriesNoRegion for why this one must not grow to match it.
         LayerDefinition web = Checker.Model(arch => arch.Layer("Web", arch.Types.InNamespace("MyApp.Web.*")))
             .Layers.Single();
 
@@ -134,6 +135,25 @@ public class LayerDefinitionTests
         Checker.Model(arch => arch.Layer("Both", arch.Types.InNamespace("MyApp.*").InNamespace("MyApp.Web.*")))
             .Layers.Single()
             .Globs.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ARefinementDefinition_CarriesNoRegion()
+    {
+        // The drawing draws a place-shaped noun narrowed by one InNamespace as that region inside its
+        // head, which looks like the same predicate as the one above and must not be folded into it. A
+        // named layer keeps its own place and the parent its definition declares; filling Globs here would
+        // route it down the classifier's glob arm instead, cost it that parent, and flatten the box it was
+        // drawn inside — the Core box on this repository's own fence is the one that would go.
+        LayerDefinition model = Checker.Model(arch =>
+            {
+                Layer core = arch.Layer("Core", arch.Project("MyApp.Core"));
+                arch.Layer("Model", core.InNamespace("MyApp.Core.Model.*"));
+            })
+            .Layers.Last();
+
+        model.Name.ShouldBe("Model");
+        model.Globs.ShouldBeEmpty();
     }
 
     [Fact]

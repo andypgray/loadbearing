@@ -28,21 +28,40 @@ internal static class BaselineComposer
     }
 
     /// <summary>
-    ///     The same file as a <em>legacy</em> baseline: schemaVersion 1 and a digest computed in v1's own
-    ///     frozen grammar. Composed and then downgraded rather than hand-written, because an uncounted
-    ///     entry's JSON is byte-identical under both versions — only the envelope differs — so this mints
-    ///     exactly what a write from before the measure existed left on disk.
+    ///     The same file as a <em>legacy</em> baseline: schemaVersion 1, one whole-file digest computed in
+    ///     v1's own frozen grammar, and no per-entry seal. Composed and then downgraded rather than
+    ///     hand-written, so this mints exactly what a write from before either measure existed left on
+    ///     disk: what comes off is what the composer put on, seal fragment by seal fragment, and what goes
+    ///     in its place is one envelope line the product computes.
     /// </summary>
+    /// <exception cref="ArgumentException">
+    ///     An entry carries a <see cref="BaselineEntry.SiteCount" />. A legacy file has no measure, so
+    ///     downgrading a counted entry would mint a file no write ever produced — and one the reader
+    ///     refuses as malformed rather than reading as legacy.
+    /// </exception>
     internal static string ComposeLegacy(params (string RuleId, BaselineEntry[] Entries)[] sections)
     {
         IReadOnlyDictionary<string, IReadOnlyCollection<BaselineEntry>> input = Rules(sections);
-        return BaselineFormat.ComposeFile(input)
-            .Replace(
-                $"\"schemaVersion\": {BaselineFormat.SchemaVersion}",
-                $"\"schemaVersion\": {BaselineFormat.LegacySchemaVersion}")
-            .Replace(
-                BaselineFormat.ComputeDigest(input),
-                BaselineFormat.ComputeDigest(input, BaselineFormat.LegacySchemaVersion));
+        bool anyCounted = sections
+            .SelectMany(section => section.Entries)
+            .Any(entry => entry.SiteCount is not null);
+        if (anyCounted)
+            throw new ArgumentException(
+                "A legacy baseline carries no site count — compose the entries without one.", nameof(sections));
+
+        string composed = BaselineFormat.ComposeFile(input);
+        foreach ((string ruleId, BaselineEntry[] entries) in sections)
+        foreach (BaselineEntry entry in entries)
+        {
+            string seal = BaselineFormat.ComputeSeal(ruleId, entry);
+            composed = composed.Replace($", \"seal\": \"{seal}\"", string.Empty);
+        }
+
+        string legacyDigest = BaselineFormat.LegacyDigest(input);
+        return composed.Replace(
+            $"  \"schemaVersion\": {BaselineFormat.SchemaVersion},\n",
+            $"  \"schemaVersion\": {BaselineFormat.LegacySchemaVersion},\n"
+            + $"  \"digest\": \"{legacyDigest}\",\n");
     }
 
     /// <summary>The legacy composed file for one rule's <paramref name="entries" /> — one section.</summary>
@@ -53,8 +72,9 @@ internal static class BaselineComposer
 
     /// <summary>
     ///     The composer's input for <paramref name="sections" /> — one ordinal-keyed rule section each, in
-    ///     order: the shape <see cref="BaselineFormat.ComposeFile" /> and the digest verbs take, for the rows
-    ///     that call the format directly rather than through <see cref="Compose(ValueTuple{string, BaselineEntry[]}[])" />.
+    ///     order: the shape <see cref="BaselineFormat.ComposeFile" /> and the seal and digest verbs take, for
+    ///     the rows that call the format directly rather than through
+    ///     <see cref="Compose(ValueTuple{string, BaselineEntry[]}[])" />.
     /// </summary>
     internal static IReadOnlyDictionary<string, IReadOnlyCollection<BaselineEntry>> Rules(
         params (string RuleId, BaselineEntry[] Entries)[] sections)

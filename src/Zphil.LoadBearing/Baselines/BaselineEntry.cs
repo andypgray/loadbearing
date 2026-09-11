@@ -67,8 +67,8 @@ public sealed class BaselineEntry : IEquatable<BaselineEntry>
     ///     <c>loadbearing baseline --accept-reductions</c> lowers the recorded count to what is left. An
     ///     entry with no count grandfathers its pair however many sites it grows to, which is what keeps a
     ///     partly cleaned-up file passing. Only an entry keyed by a pair carries a count: a subject
-    ///     entry's sites are declarations. Excluded from the entry's identity and folded into the file's
-    ///     digest, so an edited count is refused rather than quietly widening the allowance.
+    ///     entry's sites are declarations. Excluded from the entry's identity and folded into the entry's
+    ///     seal, so an edited count is refused rather than quietly widening the allowance.
     /// </summary>
     public int? SiteCount { get; }
 
@@ -118,8 +118,8 @@ public sealed class BaselineEntry : IEquatable<BaselineEntry>
     ///         (Target ?? ""))
     ///     </c>
     ///     , ordinal. Single-sourced here because the on-disk file, a parsed section's
-    ///     <see cref="RuleBaseline.Entries" /> and the integrity digest are all computed over it: a drift
-    ///     between any two of them would change a stored file's digest without changing an entry.
+    ///     <see cref="RuleBaseline.Entries" /> and a legacy file's whole-file digest are all computed over
+    ///     it: a drift between any two of them would change a stored digest without changing an entry.
     /// </summary>
     internal static IReadOnlyList<BaselineEntry> InCanonicalOrder(IEnumerable<BaselineEntry> entries)
     {

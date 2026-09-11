@@ -8,7 +8,8 @@ namespace Zphil.LoadBearing.Rendering;
 ///     Renders a <see cref="CheckReport" /> as the plain text <c>loadbearing check</c> prints: one block
 ///     per rule in model order, headed by a status word (<c>pass</c>, <c>warn</c>, <c>FAIL</c> or
 ///     <c>skip</c>, with no colour codes), the rule ID and the rule's sentence. A failed rule adds its
-///     reason, its citation and fix where it has them, and a line per violation site as
+///     reason, its citation, its fix where it has one and the run reached a verdict about the code, and a
+///     line per violation site as
 ///     <c>path:line</c>, the path relative to the solution directory with forward slashes and the lines
 ///     ordered by path and then by line. The report ends with a one-line summary of how many rules were
 ///     checked, passed, failed and skipped.
@@ -21,7 +22,8 @@ namespace Zphil.LoadBearing.Rendering;
 ///     <c>subject:</c> line, and a tripwire that fired prints its warnings followed by the scope's
 ///     dragons prose. Where the rule itself is what went wrong — a subject that matched nothing, or a
 ///     target so a forbidden-set rule can never fire — a <c>hint:</c> line under the diagnosis says what
-///     to change.
+///     to change, and the rule's own <c>fix:</c> is withheld: it advises correcting a violation, and a rule
+///     that never ran has none to correct.
 /// </remarks>
 public static class HumanReportRenderer
 {
@@ -76,7 +78,11 @@ public static class HumanReportRenderer
         {
             output.WriteLine($"  because: {result.Rule.Because}");
             if (result.Rule.Citation is { } citation) output.WriteLine($"  citation: {citation}");
-            if (result.Rule.Fix is { } fix) output.WriteLine($"  fix: {fix}");
+            // The reason and the page it rests on are facts about the rule and stay whatever happened; the fix
+            // is advice for correcting a violation of it, so on a rule that reached no verdict about the code
+            // it is advice for a situation that did not arise — sitting directly above the authoring hint
+            // that says what actually went wrong.
+            if (result.Rule.Fix is { } fix && ReachedAVerdictAboutTheCode(result)) output.WriteLine($"  fix: {fix}");
         }
 
         RenderSubjectLine(output, result);
@@ -139,12 +145,25 @@ public static class HumanReportRenderer
                 "  hint: no baseline captured for this rule; run 'loadbearing baseline --init' to grandfather existing violations");
     }
 
-    // Whether --init would grandfather anything. An empty-subject violation has no baseline identity, so a
-    // rule failing only on those cannot be baselined at all and the hint above would be an instruction that
-    // silently does nothing — beside the authoring hint that says what actually went wrong.
+    // Whether --init would grandfather anything — asked of the identity itself rather than of the kinds that
+    // happen to lack one, because that is the fact: a violation with no baseline identity cannot be recorded,
+    // so the hint above would be an instruction that silently does nothing, beside the authoring hint that
+    // says what actually went wrong. An empty subject and a rule error are both identity-less (GRAMMAR §4.3),
+    // and keying on the identity is what covers the second without anyone having to remember it.
     private static bool HoldsBaselinableViolations(RuleResult result)
     {
-        return result.Violations.Any(violation => violation.Kind != ViolationKind.EmptySubject);
+        return result.Violations.Any(violation => violation.BaselineIdentity() is not null);
+    }
+
+    // Whether the rule reached any verdict about the CODE, as against about itself. EmptySubject and
+    // RuleError are the two kinds that are about the rule — the repo's own phrase for them, on
+    // ViolationJson.Hint — so a rule failing only on those was never measured against anything. It is
+    // deliberately a second predicate beside HoldsBaselinableViolations rather than a shared bool: the two
+    // coincide today and ask different questions, and a kind that gained an identity without becoming a
+    // finding about the code (or the reverse) would have to move exactly one of them.
+    private static bool ReachedAVerdictAboutTheCode(RuleResult result)
+    {
+        return result.Violations.Any(violation => violation.Kind is not (ViolationKind.EmptySubject or ViolationKind.RuleError));
     }
 
     // Why a red site sits on a pair the baseline names. Without this line a reader who looks the pair up

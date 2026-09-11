@@ -55,6 +55,17 @@ internal static class LoadBearingJson
     {
         return count > 0 ? count : null;
     }
+
+    /// <summary>
+    ///     A flag for an additive wire slot: <see langword="true" /> when there is something to report, and
+    ///     null — omitted — when there is not. <see cref="OmitZero" />'s reasoning for a boolean fact: false
+    ///     and absent say the same thing, so a flag that appears only when it means something keeps a clean
+    ///     document clean.
+    /// </summary>
+    public static bool? OmitFalse(bool flag)
+    {
+        return flag ? true : null;
+    }
 }
 
 // Source-generated metadata for the five document roots. The generator emits an ordinary property read per

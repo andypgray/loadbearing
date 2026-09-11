@@ -1,10 +1,9 @@
 {
   "schemaVersion": 2,
-  "digest": "abfa9ab9c94ad835918c83d4013cbda5570741c80c6eb3b3a26e9b99f193c644",
   "rules": {
     "clearance/engine/containment": {
       "entries": [
-        { "source": "T:Meridian.Web.Controllers.CustomsController", "target": "T:Meridian.Clearance.ContainerNumberValidator", "siteCount": 2 }
+        { "source": "T:Meridian.Web.Controllers.CustomsController", "target": "T:Meridian.Clearance.ContainerNumberValidator", "siteCount": 2, "seal": "4f7c29949ba9e4ff" }
       ]
     }
   }

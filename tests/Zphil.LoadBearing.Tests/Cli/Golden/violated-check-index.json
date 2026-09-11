@@ -4,8 +4,8 @@
   "specAssembly": "Zphil.LoadBearing.MyAppViolatedSpec.dll",
   "grain": "index",
   "summary": {
-    "rulesChecked": 31,
-    "rulesPassed": 2,
+    "rulesChecked": 32,
+    "rulesPassed": 3,
     "rulesFailed": 27,
     "rulesSkipped": 2,
     "violations": 51,
@@ -24,6 +24,18 @@
       "posture": "enforce",
       "status": "failed",
       "violationCount": 5,
+      "warnings": []
+    },
+    {
+      "id": "layering/projects-reached-only-by-themselves",
+      "posture": "migrate",
+      "status": "passed",
+      "baseline": {
+        "path": "arch/baselines/layering/projects-reached-only-by-themselves.json",
+        "grandfathered": 5,
+        "stale": 0
+      },
+      "violationCount": 0,
       "warnings": []
     },
     {

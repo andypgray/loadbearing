@@ -29,11 +29,20 @@ namespace Zphil.LoadBearing.Tests.DocHygiene;
 ///         failing run. A doc quoting growth would be quoting a red <c>check</c> or a <c>status</c> whose
 ///         <c>new</c> count is not zero, and the captures under gate are all of green ones; quote a grown
 ///         run and the count no longer reconciles, which is a drift report rather than a silence. Two of
-///         the four fenced shapes carry the stale count on the line, so for them the identity is checked
-///         whole. The other two do not, and are pinned as <c>entries = grandfathered</c>: the same
+///         the five fenced shapes carry the stale count on the line, so for them the identity is checked
+///         whole. The other three do not, and are pinned as <c>entries = grandfathered</c>: the same
 ///         identity with a stale term the quoted run reports as zero elsewhere in its own capture. Every
 ///         committed baseline here is at zero stale, and the day one is not, the capture it was quoted
 ///         from is stale too.
+///     </para>
+///     <para>
+///         <b>A per-cell split is a partition of the row above it.</b> A family rule's <c>status</c> row
+///         carries a keyed sub-line naming the cells its remaining debt sits in, and those counts sum to
+///         the row's own remaining count. So the split is lifted as one number — its sum — and held to the
+///         baseline the row above it in the same fence is held to. Two consequences worth stating: a split
+///         that stops adding up to its row is a drift report rather than a silence, because only one of
+///         the two can still agree with the committed entries; and a cell holding nothing is absent from
+///         the line by design, which changes no sum.
 ///     </para>
 ///     <para>
 ///         <b>Prose is composed, not parsed.</b> A sentence saying "twelve inline-SQL references" is
@@ -127,9 +136,20 @@ internal static class GrandfatheredCounts
     // like any other. Optional for the reason above.
     private const string MeasureClauses = @"(?:, \d+ shrunk)?(?:, \d+ uncounted)?";
 
-    /// <summary>A <c>status</c> ratchet line: the rule, its posture, then the three counters.</summary>
+    // One cell of a per-cell split: its name, its remaining pairs, and the site total it prints only when
+    // its pairs cover more than one site each — the row's own parenthetical, reused per cell and optional
+    // for the same reason.
+    private const string CellClause = @"[^,]+? (?<count>\d+)(?: \(\d+ sites\))?";
+
+    /// <summary>
+    ///     A <c>status</c> ratchet line: the rule, its posture, then the three counters. The third has two
+    ///     spellings and a row reads exactly one of them — <c>not measured</c> where the rule's own selection
+    ///     matched nothing, <c>fixed awaiting acceptance</c> where it was measured — so the alternation sits
+    ///     inside the group and the identity below is unaffected by which it was: an entry no violation
+    ///     matched is an entry no violation matched, and only what a reader should do about it differs.
+    /// </summary>
     private static readonly Regex StatusLine =
-        new($@"^\s*(?:pass|FAIL|warn|skip) (?<id>{RuleIdPattern}) \([a-z]+\) {EmDash} (?<count>\d+) grandfathered remaining{SitesClause}, \d+ new, (?<stale>\d+) fixed awaiting acceptance{MeasureClauses}\s*$",
+        new($@"^\s*(?:pass|FAIL|warn|skip) (?<id>{RuleIdPattern}) \([a-z]+\) {EmDash} (?<count>\d+) grandfathered remaining{SitesClause}, \d+ new, (?<stale>\d+) (?:fixed awaiting acceptance|not measured){MeasureClauses}\s*$",
             RegexOptions.CultureInvariant);
 
     /// <summary>A <c>baseline --init</c> capture line, singular or plural.</summary>
@@ -142,8 +162,14 @@ internal static class GrandfatheredCounts
     ///     clause is the one that carries the nudge to record the counts, so it is spelled out here rather
     ///     than shared with <see cref="MeasureClauses" />.
     /// </summary>
+    /// <remarks>
+    ///     Unlike a row, the roll-up can carry <em>both</em> unmatched terms at once: it sums rules, and one
+    ///     run can hold a rule that burned debt down beside a rule that rotted. So the second is its own
+    ///     optional group rather than an alternation, and <see cref="Count" /> adds the two — the identity is
+    ///     over every unmatched entry, however the line sorted them.
+    /// </remarks>
     private static readonly Regex BurndownLine =
-        new($@"\bBurndown: (?<count>\d+) grandfathered remaining{SitesClause}, (?<stale>\d+) fixed awaiting acceptance(?:, \d+ shrunk)?(?:, \d+ uncounted; run '[^']*' to record site counts)?\.",
+        new($@"\bBurndown: (?<count>\d+) grandfathered remaining{SitesClause}, (?<stale>\d+) fixed awaiting acceptance(?:, (?<unmeasured>\d+) not measured)?(?:, \d+ shrunk)?(?:, \d+ uncounted; run '[^']*' to record site counts)?\.",
             RegexOptions.CultureInvariant);
 
     /// <summary>
@@ -154,6 +180,20 @@ internal static class GrandfatheredCounts
     private static readonly Regex SubLine =
         new(@"^\s*""?grandfathered""?:\s*(?<count>\d+)\b", RegexOptions.CultureInvariant);
 
+    /// <summary>
+    ///     The per-cell split under a family rule's <c>status</c> row: the cell word as a key, then a cell
+    ///     name, its remaining pairs, and optionally the sites those cover. Like <see cref="SubLine" /> it
+    ///     names no rule and takes the one declared above it in its own fence.
+    /// </summary>
+    /// <remarks>
+    ///     The repeated group is what makes every cell's count a capture of <c>count</c>, so the whole line
+    ///     is lifted as one sum without the pattern having to know how many cells a family has. A cell name
+    ///     is anything up to the count that ends its clause — layer names are prose and may carry spaces —
+    ///     which the lazy quantifier resolves in favour of the longest name and the last number.
+    /// </remarks>
+    private static readonly Regex CellsLine =
+        new($@"^\s*(?:layer|project)s?: {CellClause}(?:, {CellClause})*\s*$", RegexOptions.CultureInvariant);
+
     /// <summary>A line that declares which rule the lines under it belong to, in a report or in JSON.</summary>
     private static readonly Regex RuleIdLine =
         new($@"^\s*(?:(?:pass|FAIL|warn|skip) (?<id>{RuleIdPattern})\b|""id"":\s*""(?<jsonId>{RuleIdPattern})"")",
@@ -162,9 +202,9 @@ internal static class GrandfatheredCounts
     /// <summary>
     ///     Extracts every grandfathered count from the fenced code blocks of <paramref name="docText" />.
     ///     Fence state comes from <see cref="SourceAnchors.FencedBlocks" />, which is also what keys a
-    ///     bare <c>grandfathered:</c> sub-line to the rule declared above it <em>in its own fence</em>: a
-    ///     rule id from the previous block must never answer for this one. A sub-line with no rule above
-    ///     it in its fence is unattributable and is reported through
+    ///     bare <c>grandfathered:</c> sub-line — and a family row's per-cell split — to the rule declared
+    ///     above it <em>in its own fence</em>: a rule id from the previous block must never answer for this
+    ///     one. A sub-line with no rule above it in its fence is unattributable and is reported through
     ///     <see cref="Classify" />'s no-baseline bucket rather than silently dropped.
     /// </summary>
     public static IReadOnlyList<GrandfatheredCount> Extract(string doc, string docText)
@@ -183,6 +223,13 @@ internal static class GrandfatheredCounts
                 if (status.Success)
                 {
                     counts.Add(Count(doc, number, status.Groups["id"].Value, status, hasStale: true));
+                    continue;
+                }
+
+                Match cells = CellsLine.Match(line);
+                if (cells.Success)
+                {
+                    counts.Add(Split(doc, number, currentRuleId, cells));
                     continue;
                 }
 
@@ -474,10 +521,26 @@ internal static class GrandfatheredCounts
         return mentions;
     }
 
+    // A per-cell split lifted as the one number it partitions: every cell's count summed, carrying no stale
+    // term of its own, because the split says where the row's remaining debt sits and the row beside it is
+    // where the stale count is quoted.
+    private static GrandfatheredCount Split(string doc, int number, string ruleId, Match match)
+    {
+        int total = match.Groups["count"]
+            .Captures.Sum(capture => int.Parse(capture.Value));
+        return new GrandfatheredCount(doc, number, ruleId, total, null);
+    }
+
     private static GrandfatheredCount Count(string doc, int number, string ruleId, Match match, bool hasStale)
     {
         int count = int.Parse(match.Groups["count"].Value);
-        int? stale = hasStale ? int.Parse(match.Groups["stale"].Value) : null;
+        // Both unmatched terms, because the identity is over every entry no violation matched and only the
+        // Burndown line splits them. A pattern that never names the second leaves a group that did not
+        // participate, so this reads as zero there rather than needing a flag of its own.
+        Group unmeasured = match.Groups["unmeasured"];
+        int? stale = hasStale
+            ? int.Parse(match.Groups["stale"].Value) + (unmeasured.Success ? int.Parse(unmeasured.Value) : 0)
+            : null;
         return new GrandfatheredCount(doc, number, ruleId, count, stale);
     }
 

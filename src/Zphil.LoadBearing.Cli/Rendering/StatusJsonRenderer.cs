@@ -51,7 +51,8 @@ internal static class StatusJsonRenderer
                 report.GrandfatheredSiteCount,
                 report.StaleBaselineEntryCount,
                 LoadBearingJson.OmitZero(report.ShrunkBaselineEntryCount),
-                LoadBearingJson.OmitZero(report.UncountedBaselineEntryCount)));
+                LoadBearingJson.OmitZero(report.UncountedBaselineEntryCount),
+                LoadBearingJson.OmitZero(report.UnmeasuredBaselineEntryCount)));
 
         output.WriteLine(JsonSerializer.Serialize(document, LoadBearingJson.Context.StatusJson));
     }
@@ -70,7 +71,10 @@ internal static class StatusJsonRenderer
     // The burndown block for any ratcheted rule (Migrate or Quarantine containment). Whether the ratchet has
     // burned to zero is RuleResult.Promotable's answer, one model fact the human line reads too; the wire
     // shape adds only that quarantine omits the key rather than carrying a permanent false, since
-    // Quarantine→Migrate is a human decision this document has nothing to say about.
+    // Quarantine→Migrate is a human decision this document has nothing to say about. The per-cell split
+    // comes off RatchetCells, which is also what composes the human row's sub-line, so the two channels
+    // cannot disagree about where one run's debt sits. Whether the rule measured anything is one model fact
+    // too, so a client reading `stale` learns it from the same predicate the human term is chosen by.
     private static RatchetStatusJson? ToRatchet(RuleResult result)
     {
         if (result.Rule.BaselinePath is not { } path) return null;
@@ -85,6 +89,15 @@ internal static class StatusJsonRenderer
             result.StaleBaselineEntries,
             LoadBearingJson.OmitZero(result.ShrunkBaselineEntries),
             LoadBearingJson.OmitZero(result.UncountedBaselineEntries),
-            promotable);
+            promotable,
+            ToCells(result),
+            LoadBearingJson.OmitFalse(result.SelectionMatchedNothing));
+    }
+
+    private static IReadOnlyList<RatchetCellJson>? ToCells(RuleResult result)
+    {
+        return RatchetCells.Of(result)
+            ?.Cells.Select(cell => new RatchetCellJson(cell.Name, cell.Remaining, cell.RemainingSites))
+            .ToList();
     }
 }

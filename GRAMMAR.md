@@ -581,10 +581,10 @@ uncounted until `--accept-reductions` records one. Subject entries carry no coun
 are declarations, and a verb like `MustHaveExactlyOneCounterpart` moves its whole site set when
 its arm flips. The count is neither identity nor annotation. It is excluded from entry equality,
 so a grown pair is one entry that grew rather than a stale entry beside a new violation, and it
-is included in the file's digest, so a hand-edited count is refused like any other edit. Three
-consequences follow from measuring evidence by line. A reformat that splits or joins two
-mentions of one target on one line moves the count; identity is unaffected, and `--add` on the
-entry re-records it. Where one symbol ID names several types (above), the recorded count covers
+is included in the entry's own seal (§4.4), so a hand-edited count is refused like any other
+edit. Three consequences follow from measuring evidence by line. A reformat that splits or joins
+two mentions of one target on one line moves the count; identity is unaffected, and `--add` on
+the entry re-records it. Where one symbol ID names several types (above), the recorded count covers
 the larger of the violations sharing it. And the catch and throw verbs, which key one edge but
 print different evidence, record the count *as measured by the verb that wrote it*: a rule
 switched from `MustNotCatchUnfiltered` to `MustNotCatch` sees the filtered clauses it never
@@ -602,6 +602,15 @@ counted as growth, and the reverse switch as a reduction. Growth is accepted in 
   resolved by the CLI against the solution directory (an absolute spec path wins). A run through a
   solution filter (`.slnf`) resolves against the directory of the solution the filter references,
   so the filter and its solution find the same committed file.
+- One file may carry many rules' sections, one entry per line, and every entry carries its own
+  `seal`: a hash over the rule ID and the entry's own fields. An edited entry, an edited count, and
+  an entry moved into another rule's section are all refused; a reformat or a CRLF checkout is not.
+  There is no whole-file digest, and that is what lets two branches burn the same file down at once.
+  Payoffs of different rules merge with nothing in common to conflict on. Payoffs of one rule
+  conflict only where their lines touch, and there the resolution is to keep whole entry lines from
+  either side: every line either branch committed is a complete entry, so nothing has to be
+  recomputed and no valve has to be re-run. What a seal cannot see is a line taken away — deleting
+  an entry is accepted, and the violation it grandfathered goes red on the next `check`.
 - `.WhileYoureThere(policy)` omitted ⇒ `MigrationPolicy.MigrateIfSmall`, and the default
   renders in the counter-prior prose (the boy-scout sentence always has content).
 
@@ -1126,10 +1135,13 @@ partition. Pinned semantics:
   projection (`arch.Each(a, b).Methods…`). As an operand, an `Except` payload, a union operand, a
   layer definition, a scoped selection or a boundary it is spec-build item 27 (§8): a partition
   means nothing in a position that consumes a set.
-- **Exactly three places read the cells**: the `MustOnly*` reference verbs' self-allowance
-  (§4.1), the three family verbs `MustNotReferenceEachOther`, `MustOnlyBeReferencedByItself` and
-  `MustNotHaveCircularReferences` (§5.3), and card placement (§6). To every other verb, walk and renderer a family is the union
-  of its cells — one ID, one sentence, one baseline, one board row, one test row.
+- **Exactly four places read the cells**: the `MustOnly*` reference verbs' self-allowance (§4.1),
+  the three family verbs `MustNotReferenceEachOther`, `MustOnlyBeReferencedByItself` and
+  `MustNotHaveCircularReferences` (§5.3), card placement (§6), and the burndown, which groups a
+  ratcheted family rule's remaining violations by the cell whose law each breaks — the referenced
+  cell under the inbound leaf, where the subject sits at the far end of the edge. To every other
+  verb, walk and renderer a family is the union of its cells — one ID, one sentence, one baseline,
+  one board row naming the cells its debt sits in, one test row.
 - **Cells partition the subject.** A layer-family subject type that sits in two cells fails the
   rule with a rule error naming the type and both cells (the same layer listed twice is the
   degenerate case); a project family needs no such check, because a multiply-declared type sits
@@ -1334,7 +1346,7 @@ no-reference string, and the generic sugar (§10).
 | Member | Notes |
 |---|---|
 | `.Because(prose)` | **required** on every rule and scope (§8 item 3) |
-| `.Fix(prose)` | optional; for Quarantine containment it is auto-derived from `BoundaryOnlyVia` ("use `IBillingFacade`") and deliberately not author-overridable — `IQuarantinedScope` carries no `.Fix`, and neither does `ICautionedScope`: a caution's "what to do instead" is the sanctioned-interaction clause its dragons prose already carries |
+| `.Fix(prose)` | optional; for Quarantine containment it is auto-derived from `BoundaryOnlyVia` ("use `IBillingFacade`") and not author-overridable — `IQuarantinedScope` carries no `.Fix`, and neither does `ICautionedScope`: a caution's "what to do instead" is the sanctioned-interaction clause its dragons prose already carries |
 | `.Purpose(prose)` | optional; `Layer` only: the one trailer on a definition (§3.2). Renders verbatim after the definition fragment in the module-map row (§5.1) and after the first sentence of the layer card's lede ("This directory holds the `Host` layer. {purpose} Its architecture rules:"); never places a card of its own — a layer earns a card only through an anchored Enforce/Migrate rule. Blank or multi-line is §8 item 5 and a second call item 6, both spec-wide and named by layer. |
 | `.Citation(uri)` | optional; `Enforce` and `Migrate` rules only — a scope documents itself through `Dragons`/`DragonsDoc`. The canonical page the rationale rests on, as an absolute `http`/`https` URL (§8 item 30; blank or multi-line is item 5, a second call item 6). Renders as a sentence of its own, `See <{url}>.`, after the reason in the rule's context bullet — and for a Migrate rule between the reason and the boy-scout policy, so the policy still ends the paragraph. `explain` and a failed rule's `check` block print it as a `citation:` line after `because:`; `check --json` carries it as `citation` after `fix`, elided at index grain with the rest of the prose; SARIF publishes it as the descriptor's `helpUri` and, joined to the `Fix`, inside `help.text`/`help.markdown`. |
 
@@ -1942,7 +1954,7 @@ agent fixing a spec sees every problem in one pass.
 | All-errors spec validation | EF Core fail-fast `ModelValidator` | agents fix specs in one pass |
 | Deterministic multi-spec discovery, loud failures | EF `ApplyConfigurationsFromAssembly` (order undefined, silent skips) | specs are law; law must load predictably |
 | "reference", not "depend on" | ArchUnit family "depend on"/"access" | v1 edges are literally Roslyn type references; "depends on" over-claims for a type-level edge |
-| One rule over a family, never N | ArchUnit `slices().matching("..(*)..").should().notDependOnEachOther()` | a family's cells are declared layers or the projects a selection names, never a capture in a pattern, and the rule stays one rule — one ID, one sentence, one baseline, one test row — because a cell is read by the self-allowance, the family verbs and card placement alone (§5.1); child rules minted from the codebase would put the codebase into the committed block and into the adapter's spec-time rows |
+| One rule over a family, never N | ArchUnit `slices().matching("..(*)..").should().notDependOnEachOther()` | a family's cells are declared layers or the projects a selection names, never a capture in a pattern, and the rule stays one rule — one ID, one sentence, one baseline, one test row — because a cell is read only by the self-allowance, the family verbs, card placement and the burndown (§5.1); child rules minted from the codebase would put the codebase into the committed block and into the adapter's spec-time rows |
 | A circle's debt is the pairs on its arrows, never the circle | ArchUnit `slices().should().beFreeOfCycles()` — cycles as findings, capped at `cycles.maxNumberToDetect` (100) and `cycles.maxNumberOfDependenciesPerEdge` (20) | a violation of `MustNotHaveCircularReferences` is every type pair on every arrow inside a strongly connected component of the cell graph (§4.3), so the edge key, the baseline, the ratchet and every renderer are untouched, nothing is capped, and a broken circle leaves stale entries rather than a rewritten cycle list; the intended direction is blamed beside the stray back-reference by design, and the author who knows the direction writes the ordering rule |
 
 ## 10. Naming morphology (style guide for vocabulary growth)
@@ -2091,7 +2103,7 @@ On the member axis (§4.5, §4.6): the `MustOnlyUse` / `MustNotBeUsedBy` verb tw
 member-granular *source* attribution on the dependency verbs (a violation names the using
 *type*, not the using member); string-FQN *member* anchoring — the escape hatch for a member
 that neither `typeof` + `nameof` nor an expression lambda can name (a member on a type the spec
-project cannot reference); indexer/operator bans (the syntax-walk boundary moves deliberately,
+project cannot reference); indexer/operator bans (the syntax-walk boundary moves,
 §4.5); and the remaining subject-side member *shape* adjectives (`.Methods.ThatAreVirtual()`,
 `.ThatAreAbstract()`, …) beside `.ThatAreStatic()` — the constraint-side verbs and the
 `IMemberInfo` flags exist (§5.7, §5.6).

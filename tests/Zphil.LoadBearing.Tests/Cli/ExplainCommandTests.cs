@@ -91,6 +91,7 @@ public sealed class ExplainCommandTests
                 "  layering/no-ghost\n" +
                 "  layering/no-ungoverned-types\n" +
                 "  layering/projects-independent\n" +
+                "  layering/projects-reached-only-by-themselves\n" +
                 "  layering/services-behind-contracts\n" +
                 "  layering/services-in-web\n" +
                 "  layering/web-cuts-not-circular\n" +

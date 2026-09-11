@@ -49,7 +49,7 @@ internal static class CheckPipeline
         Func<CancellationToken, Task<ExtractedCodebase>> extract = async token =>
         {
             CodebaseModel codebase = await source.ExtractAsync(source.Resolution.ExcludeProjectNames, token);
-            return new ExtractedCodebase(codebase, source.Diagnostics.UncheckedProjects);
+            return new ExtractedCodebase(codebase, source.Diagnostics);
         };
 
         Func<CancellationToken, Task<DiffContext>>? resolveDiff = diffBase is null

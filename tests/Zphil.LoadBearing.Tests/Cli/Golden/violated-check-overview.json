@@ -4,8 +4,8 @@
   "specAssembly": "Zphil.LoadBearing.MyAppViolatedSpec.dll",
   "grain": "overview",
   "summary": {
-    "rulesChecked": 31,
-    "rulesPassed": 2,
+    "rulesChecked": 32,
+    "rulesPassed": 3,
     "rulesFailed": 27,
     "rulesSkipped": 2,
     "violations": 51,
@@ -76,6 +76,22 @@
           "siteCount": 1
         }
       ],
+      "warnings": []
+    },
+    {
+      "id": "layering/projects-reached-only-by-themselves",
+      "posture": "migrate",
+      "status": "passed",
+      "sentence": "Each of the projects matching `MyApp.*` must be referenced only by itself.",
+      "because": "A project anything may reach into has no surface to change; every edge into it is part of its contract whether or not anyone meant it to be.",
+      "fix": "Reach the project through an abstraction it owns, or move the type both projects need into a project both may reference.",
+      "baseline": {
+        "path": "arch/baselines/layering/projects-reached-only-by-themselves.json",
+        "grandfathered": 5,
+        "stale": 0
+      },
+      "violationCount": 0,
+      "violations": [],
       "warnings": []
     },
     {

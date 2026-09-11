@@ -33,9 +33,9 @@ internal static class ArchCheckSequence
     /// <summary>
     ///     Runs the sequence and returns the report: the baselines for <paramref name="model" /> load from
     ///     <paramref name="solutionDirectory" />, then <paramref name="resolveDiff" /> (when given) produces
-    ///     the changed-file context, then <paramref name="extract" /> produces the codebase and the projects
-    ///     it left unchecked, then <paramref name="rules" /> are evaluated against it — over the whole
-    ///     solution, or over the narrowed universe a <c>.slnf</c> left.
+    ///     the changed-file context, then <paramref name="extract" /> produces the codebase and what the load
+    ///     knows about it, then <paramref name="rules" /> are evaluated against it — over the whole solution,
+    ///     over the narrowed universe a <c>.slnf</c> left, or over a model part of which never loaded.
     /// </summary>
     /// <param name="model">The finalized architecture model whose baseline files are loaded.</param>
     /// <param name="rules">The rules to evaluate — the whole model's, or a narrowed selection.</param>
@@ -45,8 +45,8 @@ internal static class ArchCheckSequence
     /// </param>
     /// <param name="solutionDirectory">The directory the rules' baseline paths resolve against.</param>
     /// <param name="extract">
-    ///     Produces the codebase to check and the declared projects this run did not. Invoked only once the
-    ///     baselines are in hand.
+    ///     Produces the codebase to check and the load's own diagnostics. Invoked only once the baselines are
+    ///     in hand.
     /// </param>
     /// <param name="resolveDiff">
     ///     Produces the changed-file context a scope tripwire warns from, or <see langword="null" /> when
@@ -68,9 +68,10 @@ internal static class ArchCheckSequence
         DiffContext? diff = resolveDiff is null ? null : await resolveDiff(ct);
 
         ExtractedCodebase extracted = await extract(ct);
-        NarrowedUniverse? narrowing = Narrowing(solutionPath, extracted.UncheckedProjects);
+        NarrowedUniverse? narrowing = Narrowing(solutionPath, extracted.Diagnostics.UncheckedProjects);
+        IncompleteModel? incomplete = Incomplete(extracted.Diagnostics);
 
-        return ArchChecker.Check(rules, extracted.Codebase, baselines, diff, narrowing);
+        return ArchChecker.Check(rules, extracted.Codebase, baselines, diff, narrowing, incomplete);
     }
 
     // Null unless this run actually checked less than the solution declares — measured from the load, never
@@ -83,5 +84,16 @@ internal static class ArchCheckSequence
         string filterName = Path.GetFileName(solutionPath);
         string reason = NarrowedUniverseNotice.RuleSkipReason(filterName, uncheckedProjects.Count);
         return new NarrowedUniverse(reason);
+    }
+
+    // The second Core-side value composed here, and composed the same way and for the same reason as the
+    // first: both are facts about a load that only this side can word, handed down as a sentence because Core
+    // cannot name a project path. Not gated on the operator's opt-in — that changes the exit code, never the
+    // truth about the model, and a rule whose selection matched nothing is owed the honest cure either way.
+    private static IncompleteModel? Incomplete(WorkspaceDiagnostics diagnostics)
+    {
+        return diagnostics.IsIncomplete
+            ? new IncompleteModel(IncompleteModelGate.EmptySelectionHint(diagnostics))
+            : null;
     }
 }

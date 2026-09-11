@@ -11,7 +11,8 @@ namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
 ///     The silent edge, made a permanent fact: a rule that reds on the restored tree does not pass on the
-///     same tree with the restore broken.
+///     same tree with the restore broken, and the cure it prints while inert names the partial model rather
+///     than the shape of its own selection.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -166,6 +167,16 @@ public sealed class RestoreFailureSilentEdgeE2ETests
         // No restore ran, so there are no NuGet logs for the SDK to replay and no warnings to point at. The
         // refusal has to be honest about that rather than sending the reader up the terminal.
         never.Err.ShouldNotContain("See the warnings above", customMessage: Transcript(never));
+        // check renders before it gates, so the rule's own report is on stdout beside the refusal — and this
+        // is the one place the inert warning's cure is read. Without the stamp reaching it, the cure here was
+        // about namespace globs: advice to check the selection against what the solution declares, for a
+        // selection that came up empty because a package never resolved.
+        never.Out.ShouldContain(
+            "hint: The model is incomplete: NuGet packages did not resolve for 1 project, so this selection "
+            + "may name types or rest on references that were never extracted; restore the solution "
+            + "(dotnet restore), then re-check before reading this as a spec defect.",
+            customMessage: Transcript(never));
+        never.Out.ShouldNotContain("never crosses a dot", customMessage: Transcript(never));
     }
 
     [Fact]
@@ -221,6 +232,21 @@ public sealed class RestoreFailureSilentEdgeE2ETests
             .ShouldBeFalse(Transcript(broken));
         CheckJson.Strings(document, "restoreFailedProjects")
             .ShouldBe(["FieldMini.Core/FieldMini.Core.csproj"]);
+        // The same fact the stamp above carries, reaching the rule that reported itself inert: the warning's
+        // own cure names the partial model rather than the selection's shape, so a client reading one rule's
+        // warning does not have to correlate it with a document-level flag to know what it means.
+        document.RootElement.GetProperty("rules")
+            .EnumerateArray()
+            .Single(rule => rule.GetProperty("id")
+                .GetString() == RuleId)
+            .GetProperty("warnings")[0]
+            .GetProperty("hint")
+            .GetString()
+            .ShouldBe(
+                "The model is incomplete: NuGet packages did not resolve for 1 project, so this selection may "
+                + "name types or rest on references that were never extracted; restore the solution "
+                + "(dotnet restore), then re-check before reading this as a spec defect.",
+                Transcript(broken));
     }
 
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────

@@ -40,9 +40,11 @@ internal sealed class ContextRunner(TextWriter output, ISolutionSource? source =
     public async Task<int> RunAsync(ContextRequest request, CancellationToken ct)
     {
         // Ahead of the load, so the incomplete-model caveat below never prints above a refusal it does not
-        // qualify. The other two shape refusals fire on no match; this verb has no no-match state — "no card
-        // covers this path" is a legitimate answer — so a bracketed value would come back as a well-formed
-        // proven negative on the exact call an agent makes before editing unfamiliar territory.
+        // qualify. The three glob and rule-ID shape refusals fire on a no match; this verb has no no-match
+        // state — "no card covers this path" is a legitimate answer — so a bracketed value would come back as a
+        // well-formed proven negative on the exact call an agent makes before editing unfamiliar territory.
+        // check's --diff-base is the other pre-flight, for the opposite reason: its no-match state is a git
+        // failure that needs the workspace to reach, so only its shape half can be judged this early.
         RefuseAStringifiedArrayPath(request.Path);
 
         // Cache-free, and the one verb whose policy is not about what it reads absence as: arch_context has

@@ -48,14 +48,15 @@ flowchart LR
         s_Checking["Checking"]
         s_Rendering["Rendering"]
     end
-    s_Extraction["Extraction"]
+    subgraph s_Extraction["Extraction"]
+        subgraph s_Zphil_LoadBearing_Roslyn_MsBuild["Quarantine: roslyn/msbuild-bootstrap"]
+            s_MsBuildBootstrap[["MsBuildBootstrap"]]
+        end
+    end
     s_Microsoft_CodeAnalysis("Microsoft.CodeAnalysis.*")
     s_Microsoft_Build("Microsoft.Build.*")
     s_Pack["Pack"]
     s_Adapter["Adapter"]
-    subgraph s_Zphil_LoadBearing_Roslyn_MsBuild["Quarantine: roslyn/msbuild-bootstrap"]
-        s_MsBuildBootstrap[["MsBuildBootstrap"]]
-    end
 
     s_Core --x s_Extraction
     s_Core --x s_Microsoft_CodeAnalysis

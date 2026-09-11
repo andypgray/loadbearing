@@ -10,7 +10,8 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 /// <remarks>
 ///     Launched through <see cref="ChildProcess" />, so this git gets the closed stdin, the bounded wait
 ///     and the kill-tree every child in this repository gets. A non-zero exit throws with git's own two
-///     output channels in the message, because the first question a failed setup raises is what git said.
+///     output channels in the message, because the first question a failed setup raises is what git said —
+///     except through <see cref="Attempt" />, whose callers are asking about the code itself.
 /// </remarks>
 internal static class GitCommand
 {
@@ -34,6 +35,16 @@ internal static class GitCommand
     }
 
     /// <summary>
+    ///     The same, returning git's whole result rather than throwing on a non-zero exit — for the callers
+    ///     whose subject <em>is</em> the exit code. <c>git merge-file</c> reports the number of conflicts
+    ///     that way, so a clean merge and a conflicted one are both successful runs of the command.
+    /// </summary>
+    internal static ChildProcess.ProcessResult Attempt(string workingDirectory, params string[] args)
+    {
+        return Execute(workingDirectory, args, throwOnFailure: false);
+    }
+
+    /// <summary>
     ///     <c>git init</c> in <paramref name="directory" /> plus the local identity a commit there needs, so
     ///     a commit succeeds whatever the host's global git config says — or does not say.
     /// </summary>
@@ -48,7 +59,8 @@ internal static class GitCommand
         Run(directory, "config", "user.name", "LoadBearing Test");
     }
 
-    private static ChildProcess.ProcessResult Execute(string workingDirectory, string[] args)
+    private static ChildProcess.ProcessResult Execute(
+        string workingDirectory, string[] args, bool throwOnFailure = true)
     {
         var startInfo = new ProcessStartInfo("git")
         {
@@ -60,7 +72,7 @@ internal static class GitCommand
         foreach (string argument in args) startInfo.ArgumentList.Add(argument);
 
         ChildProcess.ProcessResult result = ChildProcess.Run(startInfo);
-        if (result.ExitCode != 0)
+        if (throwOnFailure && result.ExitCode != 0)
             throw new InvalidOperationException(
                 $"'git {string.Join(" ", args)}' failed with exit code {result.ExitCode}."
                 + $"{Environment.NewLine}{result.StandardOutput}{Environment.NewLine}{result.StandardError}");

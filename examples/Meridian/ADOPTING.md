@@ -413,7 +413,7 @@ dotnet sln examples/Meridian/Meridian.slnx remove src/Zphil.LoadBearing.Packs.Do
 
 The path resolves against your working directory, not the solution file, and a path that matches nothing is reported and ignored; re-run `dotnet sln examples/Meridian/Meridian.slnx list` and expect exactly four projects. Second, `dotnet sln add` reformats the solution file, so a little `Meridian.slnx` churn in your final diff is expected.
 
-At the end, `git diff` lands on the committed spec and baselines byte for byte, content digests included. In the sandbox replay the only change left is that solution-file formatting:
+At the end, `git diff` lands on the committed spec and baselines byte for byte, the per-entry content seals included. In the sandbox replay the only change left is that solution-file formatting:
 
 ```text
 $ git status --porcelain

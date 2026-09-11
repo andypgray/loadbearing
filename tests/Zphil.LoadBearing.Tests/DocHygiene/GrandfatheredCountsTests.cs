@@ -4,8 +4,8 @@ using Xunit;
 namespace Zphil.LoadBearing.Tests.DocHygiene;
 
 /// <summary>
-///     Unit and negative tests for <see cref="GrandfatheredCounts" />. They pin the four fenced count
-///     shapes — including the sub-line that takes its rule from the header above it in its own fence —
+///     Unit and negative tests for <see cref="GrandfatheredCounts" />. They pin the five fenced count
+///     shapes — including the two that take their rule from the header above them in their own fence —
 ///     the baseline lookup, the classifier that decides whether a quoted count still agrees with the
 ///     committed <c>entries</c>, and the prose machinery the registered templates are composed and swept
 ///     with, so the gate and these tests exercise the same code path.
@@ -141,6 +141,69 @@ public sealed class GrandfatheredCountsTests
         count.DocLine.ShouldBe(4);
         count.RuleId.ShouldBe("data-access/no-inline-sql");
         count.Count.ShouldBe(12);
+    }
+
+    [Fact]
+    public void Extract_CellsSplitUnderAFamilyRow_SumsToOneCountForThatRule()
+    {
+        // Arrange: the row and the split under it are two quotes of the same remaining count — one whole,
+        // one partitioned — so both are lifted and both are held to the same baseline.
+        string doc = string.Join(
+            "\n",
+            "```text",
+            $"pass layering/no-circular-references (migrate) {EmDash} 12 grandfathered remaining (89 sites), 0 new, 0 fixed awaiting acceptance",
+            "  layers: Checking 1 (3 sites), Rendering 11 (86 sites)",
+            "```");
+
+        // Act
+        IReadOnlyList<GrandfatheredCount> counts = GrandfatheredCounts.Extract("d.md", doc);
+
+        // Assert
+        GrandfatheredCount split = counts.Last();
+        split.DocLine.ShouldBe(3);
+        split.RuleId.ShouldBe("layering/no-circular-references");
+        split.Count.ShouldBe(12);
+        split.Stale.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Extract_CellsSplitWhosePairsAreOneSiteEach_StillSums()
+    {
+        // Arrange: the site parenthetical extinguishes itself per cell, so a split can carry it on some
+        // cells, all of them or none — unrecognized, the line stops matching and the numbers go unheld.
+        string doc = string.Join(
+            "\n",
+            "```text",
+            $"pass modules/internals (migrate) {EmDash} 3 grandfathered remaining, 0 new, 0 fixed awaiting acceptance",
+            "  projects: Ops.Api 2, Ops.Web 1",
+            "```");
+
+        // Act
+        IReadOnlyList<GrandfatheredCount> counts = GrandfatheredCounts.Extract("d.md", doc);
+
+        // Assert
+        counts.Last()
+            .Count.ShouldBe(3);
+    }
+
+    [Fact]
+    public void Extract_CellsSplitOverALayerNamedInTwoWords_TakesTheWholeNameAndTheLastNumber()
+    {
+        // Arrange: layer names are prose, not identifiers, so a cell name can carry spaces — and the count
+        // is what ends its clause, never the first number the line happens to hold.
+        string doc = string.Join(
+            "\n",
+            "```text",
+            $"pass ops/order-entry (migrate) {EmDash} 4 grandfathered remaining, 0 new, 0 fixed awaiting acceptance",
+            "  layer: Order Entry 4 (9 sites)",
+            "```");
+
+        // Act
+        IReadOnlyList<GrandfatheredCount> counts = GrandfatheredCounts.Extract("d.md", doc);
+
+        // Assert
+        counts.Last()
+            .Count.ShouldBe(4);
     }
 
     [Fact]

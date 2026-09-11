@@ -91,6 +91,19 @@ internal sealed class CheckRunner(
         return named;
     }
 
+    // Ahead of the load and of the stamps, because a shape check needs neither the spec model nor the
+    // codebase, and a narrowing preamble above a refusal qualifies nothing. Genuine ref validation cannot
+    // move up here — git runs in the solution directory the load resolves — so a ref that simply does not
+    // exist stays GitChangedFiles' answer to give.
+    private static void RefuseAStringifiedArrayDiffBase(string diffBase)
+    {
+        var lead = $"Cannot resolve changed files since '{diffBase}'";
+        string? refusal = Refusals.StringifiedArrayRefusal(
+            diffBase, lead, elements => Refusals.SingleValueAdvice("pass one git ref", elements));
+
+        if (refusal is not null) throw new UserErrorException(refusal);
+    }
+
     // The check proper, over whichever pair of channels the caller handed it: the report and the human
     // stamps to `stdout`, the workspace diagnostics and the incomplete-model refusal to `stderr`. The
     // warning count rides back beside the exit code because hook mode needs both to decide what to write,
@@ -98,6 +111,8 @@ internal sealed class CheckRunner(
     private async Task<(int Code, int Warnings)> ExecuteAsync(
         CheckRequest request, TextWriter stdout, TextWriter stderr, CancellationToken ct)
     {
+        if (request.DiffBase is { } diffBase) RefuseAStringifiedArrayDiffBase(diffBase);
+
         TextWriter human = HumanChannel(request, stdout);
 
         using var source = await CodebaseSource.CreateWithSpecAsync(

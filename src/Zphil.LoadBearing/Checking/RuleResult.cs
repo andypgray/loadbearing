@@ -173,17 +173,40 @@ public sealed class RuleResult
     ///     Gets whether the rule's debt has burned to zero on a run that actually measured it, so its
     ///     posture could move from <see cref="Posture.Migrate" /> to <see cref="Posture.Enforce" />: a
     ///     captured baseline with nothing tolerated, nothing failing and nothing awaiting acceptance. The
-    ///     CLI's <c>status</c> verb reports it as a suggestion. False for every other posture, and false for
-    ///     a rule the run reached no verdict for.
+    ///     CLI's <c>status</c> verb reports it as a suggestion. False for every other posture, false for
+    ///     a rule the run reached no verdict for, and false where
+    ///     <see cref="SelectionMatchedNothing" /> — burned to zero and never measured read alike in the
+    ///     counts, and only one of them is progress.
     /// </summary>
     // The Skipped conjunct is load-bearing: a narrowing skip keeps BaselineCaptured truthful and zeroes
     // the counts, which is burned-to-zero's exact shape, so without it this would suggest enforcing a
-    // rule whose subject a solution filter had merely erased.
+    // rule whose subject a solution filter had merely erased. SelectionMatchedNothing is the same guard
+    // against the same shape arrived at a different way: a rule whose target rotted passes with nothing
+    // tolerated, nothing red and nothing stale, and enforcing it would pin a rule that measures nothing.
     public bool Promotable =>
         Rule.Posture == Posture.Migrate
         && Status != RuleStatus.Skipped
         && BaselineCaptured
         && Grandfathered.Count == 0
         && Violations.Count == 0
-        && StaleBaselineEntries == 0;
+        && StaleBaselineEntries == 0
+        && !SelectionMatchedNothing;
+
+    /// <summary>
+    ///     Gets whether this verdict rests on a selection that matched nothing, so the rule was reported
+    ///     without ever being measured against the code: its subject matched no types
+    ///     (<see cref="ViolationKind.EmptySubject" />, which fails it), or a forbidden target did
+    ///     (<see cref="CheckWarningKind.InertTarget" />, which leaves it passing). Either way every count on
+    ///     this result is a count of nothing, and a baseline entry no violation matched went unmatched for
+    ///     want of a measurement rather than because the debt was paid: repair the rule's selection, and do
+    ///     not accept the reduction.
+    /// </summary>
+    // The one predicate both rotted shapes answer, because every reader of it — the status row, the
+    // burndown roll-up, the baseline verb's refusal — needs the same fact and would otherwise test the
+    // violations for one shape and the warnings for the other, and miss whichever it forgot. Distinct from
+    // ArchChecker's private SelectedNothing, which asks the narrower question of whether EVERY violation is
+    // an empty subject: that one decides a skip, and one real finding disqualifies it.
+    public bool SelectionMatchedNothing =>
+        Violations.Any(violation => violation.Kind == ViolationKind.EmptySubject)
+        || Warnings.Any(warning => warning.Kind == CheckWarningKind.InertTarget);
 }

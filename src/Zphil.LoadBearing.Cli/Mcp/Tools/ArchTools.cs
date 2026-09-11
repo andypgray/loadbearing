@@ -117,7 +117,8 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
     [Description(CheckDescription)]
     public async Task<string> CheckAsync(
         [Description(
-            "Git ref; files changed since it that fall in a quarantined or cautioned scope raise a tripwire warning.")]
+            "Git ref as one string, not an array; files changed since it that fall in a quarantined or "
+            + "cautioned scope raise a tripwire warning.")]
         string? diffBase = null,
         [Description(
             "Rule-ID globs as one string, not an array, semicolon-separated ('*' spans '/'). Only matching "

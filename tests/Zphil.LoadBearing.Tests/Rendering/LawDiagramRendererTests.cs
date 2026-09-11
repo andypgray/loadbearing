@@ -616,6 +616,138 @@ public sealed class LawDiagramRendererTests
     }
 
     [Fact]
+    public void Block_AQuarantineOverALocativeRegion_IsDrawnInsideItsHeadLayer()
+    {
+        // Arrange — a layer anchored on its project carries no globs, so glob implication cannot reach a
+        // region inside it. Spelling the scope as a refinement of the layer is what says where it sits.
+        ArchitectureModel model = Checker.Model(arch =>
+        {
+            Layer core = arch.Layer("Core", arch.Project("Shop.Core"));
+            arch.Rule("r/one")
+                .Enforce(core.MustNotReference(arch.Namespace("Z.*")))
+                .Because("x");
+            arch.Scope("legacy/pricing")
+                .Quarantine(core.InNamespace("Shop.Core.Legacy.Pricing.*"))
+                .BoundaryOnlyVia(typeof(IPricingFacade))
+                .Dragons("Rounding happens at line-item level.")
+                .Because("x");
+        });
+
+        // Act
+        string block = LawDiagramRenderer.Block(model, SpecName);
+
+        // Assert — the scope box sits inside the layer it refines, and the facade stays inside the scope.
+        MermaidBlock.Diagram(block)
+            .ShouldBe([
+                "subgraph s_Core[\"Core\"]",
+                "subgraph s_Shop_Core_Legacy_Pricing[\"Quarantine: legacy/pricing\"]",
+                "s_IPricingFacade[[\"IPricingFacade\"]]",
+                "end",
+                "end",
+                "s_Z(\"Z.*\")",
+                "",
+                "s_Core --x s_Z",
+                "",
+                "subgraph l_legend[\"Legend\"]",
+                "l_ban[\"--x = must not reference\"]",
+                "l_quarantine[\"" + QuarantineLegendRow + "\"]",
+                "l_outside[\"Rounded box = a place named only as the target of a rule\"]",
+                "l_nesting[\"A box inside a box = the inner place is part of the outer\"]",
+                "end"
+            ]);
+    }
+
+    [Fact]
+    public void Block_ARegionNamedBareAndLocatively_DrawsOneNode()
+    {
+        // Arrange — the locative arm mints through the same glob place as a bare namespace noun, so the
+        // two spellings of one region have to meet on one node rather than draw the namespace twice.
+        ArchitectureModel model = Checker.Model(arch =>
+        {
+            Layer core = arch.Layer("Core", arch.Project("Shop.Core"));
+            arch.Rule("r/locative")
+                .Enforce(core.InNamespace("Shop.Core.Legacy.*").MustNotReference(arch.Namespace("Z.*")))
+                .Because("x");
+            arch.Rule("r/bare")
+                .Enforce(arch.Namespace("Shop.Core.Legacy.*").MustNotReference(arch.Namespace("Z.*")))
+                .Because("x");
+        });
+
+        // Act
+        string block = LawDiagramRenderer.Block(model, SpecName);
+
+        // Assert — one box for the region, drawn inside the layer, and one arrow for the two rules.
+        MermaidBlock.Diagram(block)
+            .ShouldBe([
+                "subgraph s_Core[\"Core\"]",
+                "s_Shop_Core_Legacy[\"Shop.Core.Legacy.*\"]",
+                "end",
+                "s_Z(\"Z.*\")",
+                "",
+                "s_Shop_Core_Legacy --x s_Z",
+                "",
+                .. BanAndNestingLegend
+            ]);
+    }
+
+    [Fact]
+    public void Block_ALocativeNarrowingAGlobLayerToItself_DrawsOneFlatBox()
+    {
+        // Arrange — the identity collapse makes the layer and the glob one place, so parenting the region
+        // on the head would register one key twice and throw rather than render.
+        ArchitectureModel model = Checker.Model(arch =>
+        {
+            Layer web = arch.Layer("Web", "Shop.Web.*");
+            arch.Rule("r/one")
+                .Enforce(web.InNamespace("Shop.Web.*").MustNotReference(arch.Namespace("Z.*")))
+                .Because("x");
+        });
+
+        // Act
+        string block = LawDiagramRenderer.Block(model, SpecName);
+
+        // Assert — one box, flat, and no nesting row because nothing is drawn inside anything.
+        MermaidBlock.Diagram(block)
+            .ShouldBe([
+                "s_Web[\"Web\"]",
+                "s_Z(\"Z.*\")",
+                "",
+                "s_Web --x s_Z",
+                "",
+                .. BanLegend
+            ]);
+    }
+
+    [Fact]
+    public void Block_ASubtractiveAdjectiveBesideTheLocative_KeepsTheArrowOnTheHead()
+    {
+        // Arrange — the noun-level rule holding at the drawing. `Except` narrows which types are governed,
+        // not where they are, so it draws no box and the arrow stays on the head.
+        ArchitectureModel model = Checker.Model(arch =>
+        {
+            Layer core = arch.Layer("Core", arch.Project("Shop.Core"));
+            arch.Rule("r/one")
+                .Enforce(core.InNamespace("Shop.Core.Legacy.*").Except(arch.Types.Named("Keep"))
+                    .MustNotReference(arch.Namespace("Z.*")))
+                .Because("x");
+        });
+
+        // Act
+        string block = LawDiagramRenderer.Block(model, SpecName);
+
+        // Assert
+        MermaidBlock.Diagram(block)
+            .ShouldBe([
+                "s_Core[\"Core\"]",
+                "s_Z(\"Z.*\")",
+                "",
+                "s_Core --x s_Z",
+                "",
+                .. BanLegend
+            ]);
+    }
+
+    [Fact]
     public void Block_AUnionDefinedLayer_DrawsEachOperandInsideIt()
     {
         // Arrange — a union of places is the box its operands sit in, and one of those operands is also

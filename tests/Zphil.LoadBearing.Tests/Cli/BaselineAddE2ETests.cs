@@ -84,7 +84,7 @@ public sealed class BaselineAddE2ETests
         using var workspace = new TempFixtureWorkspace();
         // A second forbidden edge (DataSet) so the captured Migrate rule carries two reds; --add takes one.
         FixtureEdits.InsertMember(workspace.PathOf(HomeControllerFile), DataSetMethod);
-        // Pre-write a digest-valid file that co-hosts the real section AND a foreign section, to prove --add
+        // Pre-write a valid file that co-hosts the real section AND a foreign section, to prove --add
         // rides the foreign section through byte-identical.
         string migratePath = workspace.PathOf(MigrateBaselineFile);
         File.WriteAllText(migratePath, BaselineComposer.Compose(
@@ -118,20 +118,19 @@ public sealed class BaselineAddE2ETests
                 ]),
                 (ForeignRule, [BaselineEntry.ForSubject(ForeignSubjectId)])));
 
-        // A one-line burndown-shaped diff: exactly one new entry line + one bumped digest line added,
-        // exactly one old digest line removed (the InvoiceController neighbour stays last, so no comma flip).
+        // A one-line burndown-shaped diff, and now literally one line: the new entry, with nothing removed.
+        // There is no whole-file digest to bump, and the InvoiceController neighbour stays last, so no comma
+        // flips and its own seal is untouched. That is what lets two branches grow or shrink one file at once.
         List<string> added = LineSet(afterText)
             .Except(LineSet(beforeText))
             .ToList();
         List<string> removed = LineSet(beforeText)
             .Except(LineSet(afterText))
             .ToList();
-        added.Count.ShouldBe(2);
-        added.ShouldContain(line => line.Contains("\"digest\""), expectedCount: 1);
-        added.ShouldContain(
-            line => line.Contains(HomeId) && line.Contains("\"because\": \"INC-1234\""), expectedCount: 1);
-        removed.ShouldHaveSingleItem()
-            .ShouldContain("\"digest\"");
+        string addedLine = added.ShouldHaveSingleItem();
+        addedLine.ShouldContain(HomeId);
+        addedLine.ShouldContain("\"because\": \"INC-1234\"");
+        removed.ShouldBeEmpty();
 
         // The bystanders are untouched: the same-rule DataSet red and the other-rule uncaptured containment
         // reds both still fail check.
@@ -203,7 +202,7 @@ public sealed class BaselineAddE2ETests
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
         captured.Out.ShouldHaveCaptured(ClockRule, 2);
 
-        // Un-capture the pair (composer as arrangement, the Migrate fact's idiom): a digest-valid EMPTY
+        // Un-capture the pair (composer as arrangement, the Migrate fact's idiom): a sealed, valid EMPTY
         // section turns both reads red again on a captured rule — the state the valve exists for.
         string clockPath = workspace.PathOf(ClockBaselineFile);
         File.WriteAllText(clockPath, BaselineComposer.Compose((ClockRule, [])));
@@ -219,7 +218,7 @@ public sealed class BaselineAddE2ETests
             "time/inject-clock: added 1 grandfathered entry — MyApp.Web.HomeController -> System.DateTime.Now (because: INC-1234).");
         add.Out.ShouldContain("wrote");
 
-        // Composer as oracle: exactly one appended entry line keying the P: member DocId, plus the digest change.
+        // Composer as oracle: exactly one appended entry line keying the P: member DocId, and nothing else moves.
         string afterText = File.ReadAllText(clockPath);
         afterText.NormalizedLines()
             .ShouldBe(BaselineComposer.Compose(
@@ -267,7 +266,7 @@ public sealed class BaselineAddE2ETests
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
         captured.Out.ShouldHaveCaptured(AsyncRule, 2);
 
-        // Un-capture the pair (composer as arrangement, the Migrate/clock fact's idiom): a digest-valid EMPTY
+        // Un-capture the pair (composer as arrangement, the Migrate/clock fact's idiom): a sealed, valid EMPTY
         // section turns both methods red again on a captured rule — the state the valve exists for.
         string asyncPath = workspace.PathOf(AsyncBaselineFile);
         File.WriteAllText(asyncPath, BaselineComposer.Compose((AsyncRule, [])));
@@ -283,7 +282,7 @@ public sealed class BaselineAddE2ETests
             "naming/async-suffix: added 1 grandfathered entry — MyApp.Web.HomeController.Save() (because: INC-1234).");
         add.Out.ShouldContain("wrote");
 
-        // Composer as oracle: exactly one appended entry keying the M: member DocId via ForSubject, plus the digest.
+        // Composer as oracle: exactly one appended entry keying the M: member DocId via ForSubject, and nothing else.
         File.ReadAllText(asyncPath)
             .NormalizedLines()
             .ShouldBe(BaselineComposer.Compose(
@@ -316,7 +315,7 @@ public sealed class BaselineAddE2ETests
         FixtureEdits.InsertMember(workspace.PathOf(HomeControllerFile), ConstructHandlerMethod);
 
         // Capture both construction reds (this also mints the arch/baselines/di/ directory), then un-capture the
-        // pair (composer as arrangement, the member facts' idiom): a digest-valid EMPTY section turns both reds
+        // pair (composer as arrangement, the member facts' idiom): a sealed, valid EMPTY section turns both reds
         // live again on a captured rule — the state the valve exists for.
         CliResult init = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
@@ -380,7 +379,7 @@ public sealed class BaselineAddE2ETests
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
         captured.Out.ShouldHaveCaptured(CaptiveRule, 2);
 
-        // Un-capture the pair (composer as arrangement, the member/construction facts' idiom): a digest-valid
+        // Un-capture the pair (composer as arrangement, the member/construction facts' idiom): a sealed, valid
         // EMPTY section turns both captive edges red again on a captured rule — the state the valve exists for.
         string captivePath = workspace.PathOf(CaptiveBaselineFile);
         File.WriteAllText(captivePath, BaselineComposer.Compose((CaptiveRule, [])));
@@ -446,7 +445,7 @@ public sealed class BaselineAddE2ETests
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
         captured.Out.ShouldHaveCaptured(CatchRule, 2);
 
-        // Un-capture (composer as arrangement, the member/construction/injection facts' idiom): a digest-valid
+        // Un-capture (composer as arrangement, the member/construction/injection facts' idiom): a sealed, valid
         // EMPTY section turns both catches red again on a captured rule — the state the valve exists for.
         string catchPath = workspace.PathOf(CatchBaselineFile);
         File.WriteAllText(catchPath, BaselineComposer.Compose((CatchRule, [])));
@@ -520,7 +519,7 @@ public sealed class BaselineAddE2ETests
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
         captured.Out.ShouldHaveCaptured(ExposeRule, 2);
 
-        // Un-capture the pair (composer as arrangement, the catch/injection facts' idiom): a digest-valid EMPTY
+        // Un-capture the pair (composer as arrangement, the catch/injection facts' idiom): a sealed, valid EMPTY
         // section turns both surfaces red again on a captured rule — the state the valve exists for.
         string exposePath = workspace.PathOf(ExposeBaselineFile);
         File.WriteAllText(exposePath, BaselineComposer.Compose((ExposeRule, [])));
@@ -588,7 +587,7 @@ public sealed class BaselineAddE2ETests
         second.ShouldSucceed(
             "data-access/no-inline-sql: entry already baselined — attribution updated and site count re-recorded (2 → 2).");
         second.Out.ShouldContain("wrote");
-        // No second entry — the count is unchanged and only the attribution (and its digest) moved.
+        // No second entry — the count is unchanged and only the attribution (and the entry's own seal) moved.
         afterSecond.NormalizedLines()
             .ShouldBe(BaselineComposer.Compose(
                 (MigrateRule,
@@ -622,7 +621,7 @@ public sealed class BaselineAddE2ETests
         File.ReadAllBytes(migratePath)
             .ShouldBe(snapshot);
 
-        // The Migrate rule is already captured, so --init leaves the attributed entry (and digest) byte-identical.
+        // The Migrate rule is already captured, so --init leaves the attributed entry byte-identical, seal and all.
         CliResult init = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
         init.ShouldSucceed();

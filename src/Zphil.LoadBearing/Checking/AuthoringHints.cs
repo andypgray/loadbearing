@@ -18,13 +18,22 @@ namespace Zphil.LoadBearing.Checking;
 ///         tail on it; <see cref="Sentence" /> is the only place either happens, and a clause must
 ///         therefore open with a letter.
 ///     </para>
+///     <para>
+///         A partial model <em>replaces</em> every cure here rather than appending to one, and every entry
+///         point therefore takes the fact. Telling a reader to check a selection against what the solution
+///         declares is wrong when the reason it came up empty may be that a project never loaded, and a
+///         sentence carrying both cures would break the single-semicolon shape these clauses are built to
+///         keep. It is a replacement rather than a precedence call: the shape advice is not merely less
+///         urgent there, it is advice about the wrong thing.
+///     </para>
 /// </remarks>
 internal static class AuthoringHints
 {
     /// <summary>
     ///     The cure on a member subject that resolved to nothing. It names both shapes that fail here,
     ///     because <c>EvaluateMember</c> dispatches ahead of the type-subject gate: a member rule whose
-    ///     type selection matched nothing reports the member message, not the type one.
+    ///     type selection matched nothing reports the member message, not the type one. Reached through
+    ///     <see cref="ForMemberSubject" />, which is what a partial model replaces.
     /// </summary>
     internal const string EmptyMemberSubject =
         "Either the type selection matched nothing or none of the members it reached survived; check the "
@@ -32,7 +41,8 @@ internal static class AuthoringHints
 
     /// <summary>
     ///     The cure on a project subject that resolved to nothing (GRAMMAR §4.10). It opens on the naming
-    ///     rule rather than on the emptiness: the message it sits under has just said that.
+    ///     rule rather than on the emptiness: the message it sits under has just said that. Reached through
+    ///     <see cref="ForProjectSubject" />, which is what a partial model replaces.
     /// </summary>
     internal const string EmptyProjectSubject =
         "A project is named by its csproj file name, and .Matching(...) globs that name with a `*` that has "
@@ -65,19 +75,45 @@ internal static class AuthoringHints
     private const string InertTail =
         "; a rule whose target matches nothing passes forever, so decide before keeping it";
 
-    /// <summary>What to change when <paramref name="subject" /> selected nothing.</summary>
-    internal static string ForSubject(Selection subject)
+    /// <summary>
+    ///     What to change when <paramref name="subject" /> selected nothing, or the partial-model cure where
+    ///     <paramref name="model" /> says part of the codebase never loaded.
+    /// </summary>
+    internal static string ForSubject(Selection subject, IncompleteModel? model)
     {
-        return Sentence(ShapeAdvice(subject) + SubjectTail);
+        return model?.EmptySelectionHint ?? Sentence(ShapeAdvice(subject) + SubjectTail);
+    }
+
+    /// <summary>
+    ///     What to change when a member subject resolved to nothing — the one fixed clause, or the partial
+    ///     model where there is one. The member and project cures read off no selection shape, so these two
+    ///     entry points exist only for the replacement: without them a failed project would reach half the
+    ///     raise sites and leave the other half advising a spec fix for a load failure.
+    /// </summary>
+    internal static string ForMemberSubject(IncompleteModel? model)
+    {
+        return model?.EmptySelectionHint ?? EmptyMemberSubject;
+    }
+
+    /// <summary>
+    ///     What to change when a project subject resolved to nothing, or the partial model where there is one
+    ///     (<see cref="ForMemberSubject" />'s reasoning).
+    /// </summary>
+    internal static string ForProjectSubject(IncompleteModel? model)
+    {
+        return model?.EmptySelectionHint ?? EmptyProjectSubject;
     }
 
     /// <summary>
     ///     What to change when a forbidden-set verb's target selected nothing. The advice is the first
     ///     pattern operand's — the same operand the inert gate itself tests for, so the sentence describes
-    ///     the selection that raised the warning rather than a sibling that did not.
+    ///     the selection that raised the warning rather than a sibling that did not. A partial model replaces
+    ///     it, the warning being the signal a rotted target and an unextracted one both arrive on.
     /// </summary>
-    internal static string ForInertTarget(IReadOnlyList<Selection> operands)
+    internal static string ForInertTarget(IReadOnlyList<Selection> operands, IncompleteModel? model)
     {
+        if (model is { } incomplete) return incomplete.EmptySelectionHint;
+
         Selection? pattern = operands.FirstOrDefault(SelectionEvaluator.IsPatternSelection);
         return Sentence(ShapeAdvice(pattern) + InertTail);
     }

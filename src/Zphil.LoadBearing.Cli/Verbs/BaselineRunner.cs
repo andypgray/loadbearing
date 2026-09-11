@@ -39,7 +39,7 @@ namespace Zphil.LoadBearing.Cli.Verbs;
 ///         legacy file's schema version while reporting it unchanged.
 ///     </para>
 ///     <para>
-///         <b>What it refuses.</b> Tamper (a hand-edited digest) refuses loudly with the restore hint, the
+///         <b>What it refuses.</b> Tamper (a hand-edited entry) refuses loudly with the recovery hint, the
 ///         same as <c>check</c>. A workspace-load failure refuses the whole command on <c>check</c>'s
 ///         terms — exit 2, nothing written, opt-out
 ///         <see cref="BaselineRequest.AllowWorkspaceDiagnostics" />
@@ -51,8 +51,12 @@ namespace Zphil.LoadBearing.Cli.Verbs;
 ///         unchecked refuses in the same position and on the same reasoning
 ///         (<see cref="NarrowedUniverseNotice.BaselineRefusal" />), but only for those two modes:
 ///         <c>--add</c> records one violation the run did see and claims nothing about what it did not.
-///         Short of that the command reports rather than gates — a red rule is the state to capture, not a
-///         failure, so it exits 0 on success.
+///         A rule whose own selection matched nothing is refused per rule rather than per run, by the same
+///         reasoning at the one grain that fits it: the run is sound and its other rules capture normally,
+///         but this rule measured nothing, so <c>--init</c> would record "zero debt" it never saw and
+///         <c>--accept-reductions</c> would delete its whole captured section as violations that "no longer
+///         occur". Short of that the command reports rather than gates — a red rule is the state to capture,
+///         not a failure, so it exits 0 on success.
 ///     </para>
 ///     <para>
 ///         <b>The persisted extraction cache is fronted by <c>--add</c> alone</b>, and the split falls out
@@ -292,9 +296,23 @@ internal sealed class BaselineRunner(
     private bool ApplyRule(BaselineRequest request, RuleResult result, Dictionary<string, IReadOnlyList<BaselineEntry>> sections)
     {
         string ruleId = result.Rule.Id;
+        // The rotted rule, refused ahead of the unbaselinable one because it is the dangerous half and the
+        // two overlap: an empty subject reaches both, and only this sentence describes a rule whose forbidden
+        // TARGET matched nothing — which produces no violations at all, so CurrentEntries hands back an empty
+        // list rather than null and --accept-reductions would intersect the captured section with nothing and
+        // delete every entry in it. It gates both modes for the reason the incomplete-model and narrowing
+        // gates above gate both: --init would record "zero debt" for a rule that measured nothing.
+        if (result.SelectionMatchedNothing)
+        {
+            output.WriteLine(
+                $"{ruleId}: cannot capture — the rule's selection matched nothing, so this run measured no "
+                + "debt for it; skipped. Fix the rule's selection, then re-run.");
+            return false;
+        }
+
         if (CurrentEntries(result) is not { } current)
         {
-            output.WriteLine($"{ruleId}: cannot capture — the rule has an empty subject or an evaluation error; skipped.");
+            output.WriteLine($"{ruleId}: cannot capture — the rule had an evaluation error; skipped.");
             return false;
         }
 

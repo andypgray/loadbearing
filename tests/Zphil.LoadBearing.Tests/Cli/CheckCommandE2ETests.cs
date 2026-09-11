@@ -175,7 +175,7 @@ public sealed class CheckCommandE2ETests
         // grandfather, so the report gains one skip line and no red anywhere.
         result.Out.ShouldNotContain("domain/retry-budget/containment");
         result.Out.ShouldNotContain("FAIL domain/retry-budget");
-        result.Out.ShouldContain("Checked 31 rules: 2 passed, 27 failed, 2 skipped (51 violations, 1 warning).");
+        result.Out.ShouldContain("Checked 32 rules: 3 passed, 27 failed, 2 skipped (51 violations, 1 warning).");
     }
 
     [Fact]
@@ -596,7 +596,7 @@ public sealed class CheckCommandE2ETests
         // Assert — exit 0, because the rules that were not selected were not run. That is the whole hazard the
         // stamp exists for: a green subset of a red spec looks exactly like a green solution without it.
         result.ShouldSucceed(
-            "Checking 1 of 31 rules matching 'layering/billing-independent'; the verdict below covers only those, "
+            "Checking 1 of 32 rules matching 'layering/billing-independent'; the verdict below covers only those, "
             + "so a clean result here is not a clean solution.");
         result.Out.ShouldNotContain("layering/domain-independent");
     }
@@ -610,7 +610,7 @@ public sealed class CheckCommandE2ETests
 
         // Assert — the exit contract is untouched: narrowing changes what runs, never what a violation means.
         result.ShouldReportViolations(
-            "Checking 5 of 31 rules matching 'exceptions/*'; the verdict below covers only those, so a clean "
+            "Checking 5 of 32 rules matching 'exceptions/*'; the verdict below covers only those, so a clean "
             + "result here is not a clean solution.",
             "FAIL exceptions/no-general-catch",
             "FAIL exceptions/no-bare-bcl-throw");
@@ -691,6 +691,27 @@ public sealed class CheckCommandE2ETests
             "No rule matched '[\"layering/domain-independent\"]'. That is a JSON array written as text; "
             + "pass the globs as one semicolon-separated string: 'layering/domain-independent'.");
         result.Err.ShouldNotContain("Available rule IDs");
+        result.Out.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Check_DiffBaseAsAStringifiedArray_RefusesOnTheShape()
+    {
+        // Act — the same client defect as the row above, on the other string parameter of the same verb. A
+        // client that serializes arrays does it uniformly, so meeting one good message and one git failure
+        // on one tool is the inconsistency the shape refusals exist to remove.
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll,
+            "--diff-base", """["HEAD","main"]""");
+
+        // Assert — git's own words are the absence that matters. Unguarded this reached git, which called
+        // the token an ambiguous argument: a message that quotes what arrived without naming what is wrong
+        // with it, under a lede that spells a CLI flag the MCP caller never passed.
+        result.ShouldRefuseWith(
+            "Cannot resolve changed files since '[\"HEAD\",\"main\"]'. That is a JSON array written as "
+            + "text; pass one git ref.");
+        result.Err.ShouldNotContain("ambiguous argument");
+        result.Err.ShouldNotContain("--diff-base could not resolve changed files");
         result.Out.ShouldBeEmpty();
     }
 

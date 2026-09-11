@@ -185,7 +185,7 @@ Checked 8 rules: 8 passed, 0 failed, 0 skipped (0 violations, 1 warning).
 Claude Code delivers that as a `Stop hook additional context` message and lets the turn continue
 once, which is the whole of the tripwire: the dragons arrive under the warning that fired, so the
 agent reads them where it is standing rather than paying a round trip to `explain`. It answered
-them point by point, and this is the part worth reading twice:
+them point by point:
 
 > **The dragons warn about the letter-value table specifically** — `A=10, B=12 … U=32`, every
 > multiple of 11 skipped, gaps load-bearing. I didn't touch `ContainerCheckDigit`. The table is

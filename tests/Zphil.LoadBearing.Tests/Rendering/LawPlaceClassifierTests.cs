@@ -430,6 +430,151 @@ public sealed class LawPlaceClassifierTests
             .ShouldBeNull();
     }
 
+    [Fact]
+    public void SubjectPlace_APlaceHeadNarrowedByOneInNamespace_IsThatRegionInsideTheHead()
+    {
+        // Arrange — the locative adjective says where the region sits, which is the only thing that can
+        // say so here: the head is a project place, and a project place has no globs to imply anything.
+        ArchitectureModel model = Checker.Model(arch =>
+        {
+            Layer core = arch.Layer("Core", arch.Project("MyApp.Core"));
+            arch.Rule("r/one")
+                .Enforce(core.InNamespace("MyApp.Core.Legacy.*").MustNotReference(arch.Namespace("B.*")))
+                .Because("x");
+        });
+
+        // Act
+        LawPlace? place = LawPlaceClassifier.SubjectPlace(Subject(model), model.Layers);
+
+        // Assert
+        place.ShouldNotBeNull();
+        place.Key.ShouldBe("MyApp.Core.Legacy.*");
+        place.Globs.ShouldBe(["MyApp.Core.Legacy.*"]);
+        place.Parent.ShouldNotBeNull()
+            .Key.ShouldBe("project:MyApp.Core");
+        place.Parent.Label.ShouldBe("Core");
+    }
+
+    [Fact]
+    public void SubjectPlace_ARegionNamedBareAndLocatively_CollapsesToOnePlace()
+    {
+        // Arrange — the locative arm mints through the same glob place, so the two spellings of one region
+        // are one node rather than two boxes for the same namespace.
+        ArchitectureModel model = Checker.Model(arch =>
+        {
+            Layer core = arch.Layer("Core", arch.Project("MyApp.Core"));
+            arch.Rule("r/bare")
+                .Enforce(arch.Namespace("MyApp.Core.Legacy.*").MustNotReference(arch.Namespace("B.*")))
+                .Because("x");
+            arch.Rule("r/locative")
+                .Enforce(core.InNamespace("MyApp.Core.Legacy.*").MustNotReference(arch.Namespace("B.*")))
+                .Because("x");
+        });
+
+        // Act
+        LawPlace? bare = LawPlaceClassifier.SubjectPlace(Subject(model), model.Layers);
+        LawPlace? locative = LawPlaceClassifier.SubjectPlace(Subject(model, 1), model.Layers);
+
+        // Assert
+        bare.ShouldNotBeNull();
+        locative.ShouldNotBeNull();
+        locative.Key.ShouldBe(bare.Key);
+    }
+
+    [Fact]
+    public void SubjectPlace_ALocativeNarrowingAHeadToTheRegionItAlreadyIs_DoesNotNestInsideItself()
+    {
+        // Arrange — the identity collapse makes a single-glob layer and its glob one place, so parenting
+        // the region on the head would register one key twice and throw while drawing.
+        ArchitectureModel model = Checker.Model(arch =>
+        {
+            Layer web = arch.Layer("Web", "MyApp.Web.*");
+            arch.Rule("r/one")
+                .Enforce(web.InNamespace("MyApp.Web.*").MustNotReference(arch.Namespace("B.*")))
+                .Because("x");
+        });
+
+        // Act
+        LawPlace? place = LawPlaceClassifier.SubjectPlace(Subject(model), model.Layers);
+
+        // Assert
+        place.ShouldNotBeNull();
+        place.Key.ShouldBe("MyApp.Web.*");
+        place.Parent.ShouldBeNull();
+    }
+
+    [Fact]
+    public void SubjectPlace_ASubtractiveAdjectiveBesideTheLocative_LeavesTheNodeOnTheHead()
+    {
+        // Arrange — the noun-level rule holding. `Except` says which types are governed, not where they
+        // are, and a drawing has no room for "except these four types", so it moves nothing. Two locatives
+        // are an intersection of regions whose honest node is likewise the head.
+        ArchitectureModel model = Checker.Model(arch =>
+        {
+            Layer core = arch.Layer("Core", arch.Project("MyApp.Core"));
+            arch.Rule("r/except")
+                .Enforce(core.InNamespace("MyApp.Core.Legacy.*").Except(arch.Types.Named("Keep"))
+                    .MustNotReference(arch.Namespace("B.*")))
+                .Because("x");
+            arch.Rule("r/two")
+                .Enforce(core.InNamespace("MyApp.Core.*").InNamespace("MyApp.Core.Legacy.*")
+                    .MustNotReference(arch.Namespace("B.*")))
+                .Because("x");
+        });
+
+        // Act + Assert
+        LawPlaceClassifier.SubjectPlace(Subject(model), model.Layers)
+            .ShouldNotBeNull()
+            .Key.ShouldBe("project:MyApp.Core");
+        LawPlaceClassifier.SubjectPlace(Subject(model, 1), model.Layers)
+            .ShouldNotBeNull()
+            .Key.ShouldBe("project:MyApp.Core");
+    }
+
+    [Fact]
+    public void SubjectPlace_ALocativeOnANonPlaceHead_IsNoPlace()
+    {
+        // Arrange — a registration is a lifetime rather than a location, so narrowing it to a namespace
+        // still names no region a box could stand for.
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Rule("r/one")
+                .Enforce(arch.Registered(Lifetime.Singleton).InNamespace("MyApp.*")
+                    .MustNotReference(arch.Namespace("B.*")))
+                .Because("x"));
+
+        // Act + Assert
+        LawPlaceClassifier.SubjectPlace(Subject(model), model.Layers)
+            .ShouldBeNull();
+    }
+
+    [Fact]
+    public void OperandPlace_APlaceHeadNarrowedByOneInNamespace_IsTheSameRegionAsInSubjectPosition()
+    {
+        // Arrange — a region is the same place whichever position names it, which is what keeps one
+        // namespace on one node however the rules reach it.
+        ArchitectureModel model = Checker.Model(arch =>
+        {
+            Layer core = arch.Layer("Core", arch.Project("MyApp.Core"));
+            arch.Rule("r/one")
+                .Enforce(core.InNamespace("MyApp.Core.Legacy.*").MustNotReference(arch.Namespace("B.*")))
+                .Because("x");
+            arch.Rule("r/two")
+                .Enforce(arch.Namespace("B.*").MustNotReference(core.InNamespace("MyApp.Core.Legacy.*")))
+                .Because("x");
+        });
+
+        // Act
+        LawPlace? asSubject = LawPlaceClassifier.SubjectPlace(Subject(model), model.Layers);
+        LawPlace? asOperand = LawPlaceClassifier.OperandPlace(Operand(model, 1), model.Layers);
+
+        // Assert
+        asSubject.ShouldNotBeNull();
+        asOperand.ShouldNotBeNull();
+        asOperand.Key.ShouldBe(asSubject.Key);
+        asOperand.Parent.ShouldNotBeNull()
+            .Key.ShouldBe("project:MyApp.Core");
+    }
+
     private static Selection Subject(ArchitectureModel model, int rule = 0)
     {
         return model.Rules[rule].Constraint!.Subject!;

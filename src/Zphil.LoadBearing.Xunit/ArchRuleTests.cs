@@ -219,9 +219,14 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
 
         var diagnostics = new List<string>();
         LoadedSolution? opened = null;
-        // Escapes the extraction delegate the way `opened` does, and for the same reason: the merge's two
-        // facts exist only once a model has been merged, and this is the one place the adapter holds one.
-        CodebaseModel? extracted = null;
+        // Escapes the extraction delegate the way `opened` does, and for the same reason: every fact in it
+        // exists only once a model has been merged, and this is the one place the adapter holds one. It is
+        // composed inside the delegate rather than after the sequence returns, because the check now reads
+        // the load's diagnostics too — one composition serving the checker and the completeness test is what
+        // keeps them from ever describing the same load differently. Seeded with the no-load value rather
+        // than null: the sequence invokes the delegate exactly once and the report below is its return value,
+        // so the seed is never the value read, and a nullable here would only buy a dereference to justify.
+        WorkspaceDiagnostics loadDiagnostics = WorkspaceDiagnostics.None;
         try
         {
             CheckReport report = await ArchCheckSequence.ExecuteAsync(
@@ -241,25 +246,22 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
                         : SpecExclusion.Compute(loaded.Solution, declaredMembers, excludeProjectName);
                     CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
                         loaded.Solution, exclude, loaded.TargetFrameworks, declaredMembers, ct);
-                    extracted = codebase;
-                    // The unchecked projects come out of this load, which is why they ride the extraction
-                    // rather than the call: nothing above this line has opened a workspace to measure them.
-                    return new ExtractedCodebase(codebase, loaded.UncheckedProjects);
+                    // Both of the merge's two facts ride this one value, and neither is rendered: the adapter
+                    // has no channel that shows them, but they are documented as one pair filled from one
+                    // read. Every list comes off this load, which is why the whole value rides the extraction
+                    // rather than the call: nothing above this line has opened a workspace to measure any of
+                    // them.
+                    var composed = new WorkspaceDiagnostics(
+                        diagnostics, codebase.MergeNotes, loaded.FailedProjects, loaded.UncheckedProjects,
+                        loaded.RestoreFailedProjects, loaded.UnsupportedProjects,
+                        MultiTargetedProjects.Of(codebase));
+                    loadDiagnostics = composed;
+                    return new ExtractedCodebase(codebase, composed);
                 },
                 null, CancellationToken.None);
 
             Dictionary<string, RuleResult> byId = report.Results.ToDictionary(r => r.Rule.Id, r => r, StringComparer.Ordinal);
-            // Both of the merge's two facts, and neither is rendered: the adapter has no channel that shows
-            // them, but they are documented as one pair filled from one read. The project lists come off
-            // the load itself — null only where no load happened, which is also the case where there is
-            // nothing to have failed, gone unchecked, or been out of reach.
-            return new ArchCheckRun(
-                byId, solutionDirectory, fullSolutionPath,
-                new WorkspaceDiagnostics(
-                    diagnostics, extracted?.MergeNotes ?? [], opened?.FailedProjects ?? [],
-                    opened?.UncheckedProjects ?? [], opened?.RestoreFailedProjects ?? [],
-                    opened?.UnsupportedProjects ?? [],
-                    extracted is null ? [] : MultiTargetedProjects.Of(extracted)));
+            return new ArchCheckRun(byId, solutionDirectory, fullSolutionPath, loadDiagnostics);
         }
         finally
         {

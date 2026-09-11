@@ -108,7 +108,7 @@ Each test's display name is its rule ID, so a broken rule is named in the run su
 
 ## As SARIF
 
-`check --sarif` writes the same verdict as SARIF 2.1.0, which is what GitHub code scanning reads. A `Migrate` rule is where that matters most, and this repository no longer has one: its own ratchet reached zero and was promoted, which is the last step of the recipe rather than a gap in it. So the two fences below are the [Meridian example](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian), a legacy monolith retiring inline SQL out of its controllers over a counted baseline:
+`check --sarif` writes the same verdict as SARIF 2.1.0, which is what GitHub code scanning reads. A `Migrate` rule is where that matters most, and this repository no longer has one: its own ratchet reached zero and was promoted, which is the last step of the recipe rather than a gap in it. So the two fences below are the [Meridian example](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian), a mid-migration monolith retiring inline SQL out of its controllers over a counted baseline:
 
 ```csharp
         arch.Rule("data-access/no-inline-sql")
@@ -240,14 +240,15 @@ flowchart LR
         s_Checking["Checking"]
         s_Rendering["Rendering"]
     end
-    s_Extraction["Extraction"]
+    subgraph s_Extraction["Extraction"]
+        subgraph s_Zphil_LoadBearing_Roslyn_MsBuild["Quarantine: roslyn/msbuild-bootstrap"]
+            s_MsBuildBootstrap[["MsBuildBootstrap"]]
+        end
+    end
     s_Microsoft_CodeAnalysis("Microsoft.CodeAnalysis.*")
     s_Microsoft_Build("Microsoft.Build.*")
     s_Pack["Pack"]
     s_Adapter["Adapter"]
-    subgraph s_Zphil_LoadBearing_Roslyn_MsBuild["Quarantine: roslyn/msbuild-bootstrap"]
-        s_MsBuildBootstrap[["MsBuildBootstrap"]]
-    end
 
     s_Core --x s_Extraction
     s_Core --x s_Microsoft_CodeAnalysis

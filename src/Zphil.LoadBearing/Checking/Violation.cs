@@ -95,6 +95,17 @@ public sealed class Violation
     public string? Hint { get; private set; }
 
     /// <summary>
+    ///     Gets the name of the family cell whose law this violation breaks — the layer or the project the
+    ///     rule was speaking about when the violation was found. Populated only by the verbs of a rule whose
+    ///     subject is a family (<c>arch.Each</c>), and null on every violation of every other rule. Where a
+    ///     verb constrains what may reference the subject, the cell is the one the referenced type sits in,
+    ///     not the referencing type's: it is the cell whose law was broken either way. The burndown printed
+    ///     by <c>loadbearing status</c> groups a family rule's tolerated violations by it; nothing else reads
+    ///     it, and it is no part of what a baseline file records.
+    /// </summary>
+    public string? Cell { get; private set; }
+
+    /// <summary>
     ///     This violation's deterministic within-rule report order key: (Source|Subject FullName, Target
     ///     FullName, Member SymbolId, Target|Subject ProjectName), compared ordinal by the checker. A
     ///     MemberUse mirrors Reference's (source, target) as (source FullName, member SymbolId); a
@@ -178,6 +189,24 @@ public sealed class Violation
         TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites, string detail)
     {
         return new Violation(ViolationKind.Reference, sites) { Source = source, Target = target, Detail = detail };
+    }
+
+    /// <summary>
+    ///     Labels a just-minted violation with the family cell whose law it breaks, and hands it back so a
+    ///     per-cell walk can annotate at the mint site. A null <paramref name="cell" /> labels nothing, which
+    ///     is what the same walks passing through for a plain subject want.
+    /// </summary>
+    /// <remarks>
+    ///     A step of its own rather than a parameter on each factory, because the cell is orthogonal to the
+    ///     kind and would arrive beside a string the mint already takes — the cycle gate's circle detail — and
+    ///     two strings in a row is the transposition the factories above are shaped to prevent. Mutating here
+    ///     is safe for the same reason the private setters are: only this class can reach them, and a walk
+    ///     labels the instance it has just made, before any consumer has seen it.
+    /// </remarks>
+    internal Violation InCell(string? cell)
+    {
+        Cell = cell;
+        return this;
     }
 
     internal static Violation Construction(TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites)

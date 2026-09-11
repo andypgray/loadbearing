@@ -62,9 +62,16 @@ internal sealed class LayerNoun : SelectionNoun
     /// <remarks>
     ///     The same two shapes the law drawing calls a namespace place: a namespace noun, and
     ///     <c>arch.Types</c> narrowed by exactly one <c>InNamespace</c>. Adjectives beside them do not move
-    ///     the region, for the reason no adjective moves a node on the drawing — they narrow which types
-    ///     inside the region the layer holds, not where the region is. Computed at the mint so one answer
-    ///     serves the row's collapse, the drawing's key and the public payload.
+    ///     the region, for the reason a subtractive adjective moves no node on the drawing — they narrow
+    ///     which types inside the region the layer holds, not where the region is. Computed at the mint so
+    ///     one answer serves the row's collapse, the drawing's key and the public payload.
+    ///     <para>
+    ///         The drawing has a third region shape this deliberately does not share: a place-shaped noun
+    ///         narrowed by one <c>InNamespace</c>, which it draws as that region inside the head's place. A
+    ///         <em>named</em> layer must not take it. Answering with a region here would fill
+    ///         <see cref="Globs" /> for a refinement-defined layer, which routes it down the classifier's glob
+    ///         arm, costs it the declared parent it arrives with, and flattens the box it was nested in.
+    ///     </para>
     /// </remarks>
     internal static IReadOnlyList<string> RegionOf(Selection definition)
     {

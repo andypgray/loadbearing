@@ -1,12 +1,11 @@
 {
   "schemaVersion": 2,
-  "digest": "1a7b8124ecd2808b9b3602daf0589555d297f2075b6513aa654c5755b6bd6561",
   "rules": {
     "async/no-sync-over-async": {
       "entries": [
-        { "source": "T:Meridian.Interchange.Partners.LegacyManifestClient", "target": "M:System.Runtime.CompilerServices.TaskAwaiter`1.GetResult", "siteCount": 1 },
-        { "source": "T:Meridian.Interchange.Partners.LegacyManifestClient", "target": "M:System.Threading.Tasks.Task.Wait(System.Threading.CancellationToken)", "siteCount": 1 },
-        { "source": "T:Meridian.Interchange.Partners.LegacyManifestClient", "target": "P:System.Threading.Tasks.Task`1.Result", "siteCount": 1 }
+        { "source": "T:Meridian.Interchange.Partners.LegacyManifestClient", "target": "M:System.Runtime.CompilerServices.TaskAwaiter`1.GetResult", "siteCount": 1, "seal": "8229de8aefc8210a" },
+        { "source": "T:Meridian.Interchange.Partners.LegacyManifestClient", "target": "M:System.Threading.Tasks.Task.Wait(System.Threading.CancellationToken)", "siteCount": 1, "seal": "d756a70e707cf074" },
+        { "source": "T:Meridian.Interchange.Partners.LegacyManifestClient", "target": "P:System.Threading.Tasks.Task`1.Result", "siteCount": 1, "seal": "600b01ac50ec2e12" }
       ]
     }
   }

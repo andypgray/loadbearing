@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A rule that matched nothing is no longer reported as a rule that ran.** A rule whose subject
+  matched no types, or whose forbidden target did, was reported in the same words as a rule that had
+  been measured against the code. Three surfaces now part them. `status` reads `not measured` where a
+  ratcheted rule's unmatched baseline entries would have read `fixed awaiting acceptance`, withholds
+  both `baseline` nudges, and adds one keyed line under the row carrying the same cure `check` prints:
+  `  not measured: the rule's selection matched nothing, so these entries are untested, not fixed.`
+  The burndown summary totals those entries under their own term, so a rotted rule no longer reads as
+  a migration somebody finished, and a rule that matched nothing is never suggested for promotion to
+  `Enforce`. The check report withholds the rule's authored `fix:`, which advises correcting a
+  violation the run never found, and keeps `because:` and `citation:`, which are facts about the rule
+  whatever happened to it. And where a project failed to load or its NuGet packages did not resolve,
+  both authoring cures say so instead of advising a spec fix: the selection may name types the model
+  never saw, and the repair is `dotnet restore` and `dotnet build` rather than a glob. `status --json`
+  carries `ratchet.matchedNothing` and `summary.unmeasured`, absent where every rule was measured, and
+  `schemaVersion` stays 2; `check --json` keeps `because` and `fix` on every rule, those being
+  properties of the spec rather than of the run, and `schemaVersion` stays 3. SARIF output is
+  unchanged.
+
+- **`status` says where a family rule's remaining debt sits.** One rule over `arch.Each(...)` is one
+  row, one baseline and one count, which is what makes a family a family — but a count cannot say
+  whether twelve tolerated pairs are spread evenly across the cells or eleven of them sit in one. A
+  ratcheted family rule with debt left now carries a keyed line under its row naming each layer or
+  project that still holds some of it, with the same site total the row itself prints and the same
+  self-extinguishing rule: `  layers: Checking 1 (3 sites), Rendering 11 (86 sites)`. `status --json`
+  carries the same split as `ratchet.cells`, and `arch_status` with it. A pair is attributed to the
+  cell whose law it breaks, which for `MustOnlyBeReferencedByItself` is the referenced cell rather
+  than the referencing type's — the referencing type is often in no cell at all. Cells appear in the
+  order the family declares them, and a cell with nothing left is absent rather than reading zero.
+  Nothing else moves: the row above is unchanged, `check` output, SARIF and the baseline file are
+  untouched, the burndown `schemaVersion` stays 2, and the split is derived on every render and
+  stored nowhere, so redrawing the cells regroups the same entries with no file to migrate.
+
 - **Both authoring signals carry their cure.** A rule whose subject matched nothing, and a rule whose
   forbidden target matched nothing, now say what to change beside what went wrong. The check report
   prints a `hint:` line under the diagnosis, and `check --json` carries it as `hint`: on the violation
@@ -275,7 +307,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`check --hook-json`: a tripwire warning reaches the agent.** A Quarantine tripwire is the one
   rule that reports by warning, and a warning never moves the exit code — so for as long as the
-  hook recipe simply exited 0 on a clean check, every tripwire warning it was handed was
+  hook recipe exited 0 on a clean check, every tripwire warning it was handed was
   discarded. `--hook-json` renders the run for a Claude Code `PostToolUse` hook instead: a clean
   check that warned writes its report as
   `{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"…"}}`, which is the
@@ -291,6 +323,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   read.
 
 ### Changed
+
+- **The law diagram draws a region inside the place it refines.** Nesting on that drawing is glob
+  implication, so a layer anchored on its project rather than a namespace glob carries no globs and
+  nothing declared inside it could be drawn there — a namespace region sat flat beside its own layer.
+  A place-shaped noun narrowed by exactly one `InNamespace`, such as
+  `extraction.InNamespace("MyApp.Extraction.Legacy.*")`, is now drawn as that region inside the head's
+  own place. The containment is declared rather than guessed, and it mints no layer to declare it: no
+  module-map row, no purpose and no per-directory card for something that is not a layer of the
+  architecture. Every other adjective still moves no node — `Except`, `Named`, `Where` and `Authored`
+  narrow which types inside a region a rule governs, not where that region is, and the exact
+  subject reaches a reader through `loadbearing explain` either way. The region draws on the same
+  node a bare namespace noun would take, so the two spellings of one region meet on one box.
+
+- **A baseline entry carries its own seal, and the file carries no digest.** Two branches that each
+  ran `loadbearing baseline --accept-reductions` rewrote one `digest` line covering every entry in
+  the file, so their merge always conflicted on it. No hand resolution was right either: the
+  surviving entry set was neither side's, so whichever digest a reviewer kept matched nothing, and
+  `check`, `status` and all three `baseline` modes refused the file as tampered. Integrity now rides
+  on the entry. Each one ends with a `seal`, sixteen lowercase hex characters over the rule ID and
+  the entry's own fields, so payoffs of different rules in a shared file merge with nothing in common
+  to conflict on, and payoffs of one rule conflict only where their lines touch. Where they do, the
+  resolution is to keep whole entry lines from either side: every line either branch committed is a
+  complete entry, and nothing has to be recomputed. Sealing the rule ID in keeps the one property the
+  whole-file digest had, so an entry moved into another rule's section fails there. What a seal does
+  not see is a line taken away — deleting an entry is accepted, and the violation it grandfathered
+  goes red on the next `check`, which announces itself. The two refusals name the recovery that fits:
+  a sealed file names the entry that failed and steers a merge, and a v1 file says that both
+  committed sides carry a stale digest and to re-run the shrink valve against one of them.
+  `schemaVersion` stays 2, the format not having shipped: the root is `schemaVersion` and `rules`, a
+  `digest` beside them is now an unknown property, and v1 files are read exactly as before,
+  whole-file digest and all. GRAMMAR §4.4 states the seal.
 
 - **The `derive_spec` recipe bounds its own loop and names the rule it could not settle.** Step 4
   said to iterate globs until the failures that remain are genuine, with no bound. Each rule's
@@ -549,12 +612,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already-grandfathered type passed: new code in the old pattern was red only where the
   surrounding type was clean. The count is a measure beside the identity — `siteCount` on edge
   entries, out of entry equality (a grown pair is one entry that grew, not a stale entry beside
-  a new violation) and in the digest (a hand-edited count is refused like any other edit);
-  subject entries carry none. The file format is v2 (`"schemaVersion": 2`, digest preamble
-  `loadbearing-baseline-digest-v2`) and every write composes it. v1 files are read exactly as
-  before, their entries grandfathering the whole pair as they always did, and
-  `loadbearing status` names them uncounted until `baseline --accept-reductions` records the
-  counts — the same run that lowers a count whose sites have gone. Growth is accepted one way
+  a new violation) and inside the entry's seal (a hand-edited count is refused like any other
+  edit); subject entries carry none. The file format is v2 (`"schemaVersion": 2`) and every write
+  composes it. v1 files are read exactly as before, their entries grandfathering the whole pair as
+  they always did, and `loadbearing status` names them uncounted until
+  `baseline --accept-reductions` records the counts — the same run that lowers a count whose sites
+  have gone. Growth is accepted one way
   only: `baseline --add` on the existing entry re-records the observed count under its
   mandatory `--because`. `status` reports remaining sites beside remaining pairs, `check --json`
   carries `grandfatheredSiteCount` on a grown violation and `shrunk` / `uncounted` on the
@@ -603,11 +666,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`baseline --accept-reductions` no longer deletes a whole section for a rule that merely rotted.**
+  A Migrate rule whose forbidden target had rotted to matching nothing reported no violations at all,
+  which a reduction cannot tell from every violation having been fixed: the captured section was
+  intersected with nothing, every entry was removed, and the run reported `accepted 12 reductions`.
+  `status` pointed at that command, because it read the unmatched entries as fixed debt. Both modes
+  now refuse such a rule by name, write nothing, and say what to repair — the same answer the verb
+  already gives for the two sibling causes, a run narrowed by a solution filter and a model that did
+  not load completely. `--init` is covered too: it would have recorded "zero debt" for a rule that
+  measured none.
+
 - **A ratcheted rule failing only on an empty subject no longer offers `baseline --init`.** An
   empty-subject violation has no baseline identity, so there was nothing for `--init` to grandfather
   and the hint was an instruction that silently did nothing. It now appears only on a rule carrying
   violations a baseline can hold, where until now it sat directly above the line saying what had
-  actually gone wrong.
+  actually gone wrong. A rule whose predicate threw is covered by the same sentence: it has no
+  identity either, and the hint was asking for the kinds that lack one rather than for the identity.
 
 - **`baseline --accept-reductions` and `--init` no longer write a file they put nothing into.** For a
   rule with no captured section, `--accept-reductions` says to run `--init` first and then wrote an

@@ -18,6 +18,34 @@
       "warnings": 0
     },
     {
+      "id": "layering/projects-reached-only-by-themselves",
+      "posture": "migrate",
+      "status": "passed",
+      "violations": 0,
+      "warnings": 0,
+      "ratchet": {
+        "baselinePath": "arch/baselines/layering/projects-reached-only-by-themselves.json",
+        "captured": true,
+        "remaining": 5,
+        "remainingSites": 9,
+        "newViolations": 0,
+        "stale": 0,
+        "promotable": false,
+        "cells": [
+          {
+            "name": "MyApp.Legacy.Billing",
+            "remaining": 3,
+            "remainingSites": 5
+          },
+          {
+            "name": "MyApp.Web",
+            "remaining": 2,
+            "remainingSites": 4
+          }
+        ]
+      }
+    },
+    {
       "id": "layering/web-cuts-not-circular",
       "posture": "enforce",
       "status": "failed",
@@ -302,12 +330,12 @@
     }
   ],
   "summary": {
-    "rulesChecked": 31,
-    "rulesPassed": 2,
+    "rulesChecked": 32,
+    "rulesPassed": 3,
     "rulesFailed": 27,
     "rulesSkipped": 2,
-    "grandfatheredRemaining": 2,
-    "grandfatheredSites": 3,
+    "grandfatheredRemaining": 7,
+    "grandfatheredSites": 12,
     "fixedAwaitingAcceptance": 0
   }
 }

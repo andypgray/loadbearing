@@ -9,14 +9,21 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     End-to-end <c>baseline</c> against a private, restored copy of the MyApp fixture
 ///     (<see cref="TempFixtureWorkspace" />, one per fact): <c>--init</c> grandfathers an uncaptured
 ///     rule's current violations and is idempotent; <c>--accept-reductions</c> shrinks a fixed entry and
-///     refuses new growth; and a hand-edited-up baseline (a digest that no longer matches its entries) is
-///     refused by <c>check</c> and <c>baseline --init</c> alike. Each fact batches its assertions to keep
-///     the expensive CLI/workspace runs to a minimum.
+///     refuses new growth; a hand-edited-up baseline (a forged entry whose seal does not match it) is
+///     refused by <c>check</c> and <c>baseline --init</c> alike; and a file whose shape its declared
+///     version does not describe is refused by <c>check</c> and <c>status</c> without either ever
+///     reporting the rule as uncaptured. Each fact batches its assertions to keep the expensive
+///     CLI/workspace runs to a minimum.
 /// </summary>
 [Collection("Serial")]
 public sealed class BaselineCommandE2ETests
 {
     private const string InlineSqlRule = "data-access/no-inline-sql";
+
+    // The opening words of the hint a rule with nothing captured carries, in both the check report and
+    // the status line. Named here because the rows below assert its absence, and an absence pinned
+    // against a re-typed fragment stops meaning anything the moment the real sentence is reworded.
+    private const string UncapturedHint = "no baseline captured";
 
     private const string FixedInvoiceController =
         """
@@ -98,7 +105,7 @@ public sealed class BaselineCommandE2ETests
 
         accept.ShouldSucceed("accepted 1 reduction");
         accept.Out.ShouldContain("refused 1 addition");
-        // The Invoice entry is gone; the section is empty (with a fresh digest).
+        // The Invoice entry is gone, and with it its seal; the section renders as an empty array.
         File.ReadAllText(workspace.PathOf(ConventionalFile))
             .NormalizedLines()
             .ShouldBe(EmptySectionComposed());
@@ -113,14 +120,16 @@ public sealed class BaselineCommandE2ETests
     {
         using var workspace = new TempFixtureWorkspace();
         string file = workspace.PathOf(ConventionalFile);
-        // Append a HomeController entry by hand without updating the digest — the tamper the ratchet refuses.
-        // Forged in the shape of the entry beside it, site count and all, so what the refusal rests on is the
-        // digest rather than anything the walk could notice about the line.
+        // Append a HomeController entry by hand — the tamper the ratchet refuses. Forged in the shape of the
+        // entry beside it, site count and all, down to a seal that is sixteen lowercase hex characters and
+        // simply not this entry's, so what the refusal rests on is the seal rather than anything the walk
+        // could notice about the line. HomeController sorts first, so the forgery takes the comma and the
+        // captured entry stays last.
+        const string forged =
+            "        { \"source\": \"T:MyApp.Web.HomeController\", \"target\": \"T:System.Data.DataTable\", " +
+            "\"siteCount\": 2, \"seal\": \"0123456789abcdef\" },\n";
         File.WriteAllText(file, File.ReadAllText(file)
-            .Replace(
-                "        { \"source\": \"T:MyApp.Web.InvoiceController\", \"target\": \"T:System.Data.DataTable\", \"siteCount\": 2 }\n",
-                "        { \"source\": \"T:MyApp.Web.HomeController\", \"target\": \"T:System.Data.DataTable\", \"siteCount\": 2 },\n" +
-                "        { \"source\": \"T:MyApp.Web.InvoiceController\", \"target\": \"T:System.Data.DataTable\", \"siteCount\": 2 }\n"));
+            .Replace("      \"entries\": [\n", "      \"entries\": [\n" + forged));
 
         CliResult check = await CliRunner.InvokeAsync("check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll);
         check.ShouldRefuseWith("failed its integrity check");
@@ -133,6 +142,39 @@ public sealed class BaselineCommandE2ETests
         CliResult init = await CliRunner.InvokeAsync(
             "baseline", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--init");
         init.ShouldRefuseWith("failed its integrity check");
+    }
+
+    [Fact]
+    public async Task Check_BaselineInAShapeItsVersionDoesNotDescribe_RefusesRatherThanReportingItUncaptured()
+    {
+        using var workspace = new TempFixtureWorkspace();
+        string file = workspace.PathOf(ConventionalFile);
+        // A whole-file digest beside the entries: the envelope every baseline carried before integrity
+        // moved onto the entry, under a version that now describes a sealed file. The digest's own value
+        // is never reached — the key is a stranger under this version before anything recomputes it — so
+        // sixty-four zeros stand in for a real one, and what the row is about is which of two diagnoses
+        // a reader gives a file it cannot read.
+        var envelope = $"  \"schemaVersion\": {BaselineFormat.SchemaVersion},\n";
+        var digest = $"  \"digest\": \"{new string('0', 64)}\",\n";
+        File.WriteAllText(file, File.ReadAllText(file).Replace(envelope, envelope + digest));
+
+        CliResult check = await CliRunner.InvokeAsync("check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll);
+        check.ShouldRefuseWith("is not valid", "unknown property 'digest'", "no-inline-sql.json");
+
+        // The point of the row, and why the absence is asserted rather than left to the exit code: a file
+        // the reader refuses and a rule nothing has captured are different diagnoses whose recoveries run
+        // opposite ways. Uncaptured advertises 'baseline --init', which grandfathers every current
+        // violation fresh and drops the attribution the ratchet exists to keep — the worst available move
+        // against a file whose entries are all still there and merely unreadable. So a refusal must never
+        // reach the operator wearing the other one's hint, on either channel.
+        check.Out.ShouldNotContain(UncapturedHint);
+        check.Err.ShouldNotContain(UncapturedHint);
+
+        // status reads the same files through the same store, so it refuses on the same terms.
+        CliResult status = await CliRunner.InvokeAsync("status", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll);
+        status.ShouldRefuseWith("is not valid", "unknown property 'digest'", "no-inline-sql.json");
+        status.Out.ShouldNotContain(UncapturedHint);
+        status.Err.ShouldNotContain(UncapturedHint);
     }
 
     // Both controllers declare the DataTable twice — as a return type and as a construction, on two lines —

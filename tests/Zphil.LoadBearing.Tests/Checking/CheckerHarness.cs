@@ -57,7 +57,7 @@ internal static class Checker
     public static CheckReport Run(
         CodebaseModel codebase, BaselineIndex baselines, NarrowedUniverse? narrowing, Action<Arch> define)
     {
-        return ArchChecker.Check(Model(define).Rules, codebase, baselines, null, narrowing);
+        return ArchChecker.Check(Model(define).Rules, codebase, baselines, null, narrowing, null);
     }
 
     /// <summary>The same narrowed run, extracting <paramref name="source" /> first.</summary>
@@ -65,6 +65,19 @@ internal static class Checker
         string source, BaselineIndex baselines, NarrowedUniverse? narrowing, Action<Arch> define)
     {
         return Run(CompilationFactory.Extract(source), baselines, narrowing, define);
+    }
+
+    /// <summary>
+    ///     Checks over a run part of whose model never loaded — the sibling of the narrowed overload above,
+    ///     through the same internal seam, so a test can put a selection that matched nothing in front of a
+    ///     model that is smaller than the codebase rather than in front of a spec defect.
+    /// </summary>
+    public static CheckReport Run(
+        string source, IncompleteModel? incompleteModel, Action<Arch> define)
+    {
+        return ArchChecker.Check(
+            Model(define).Rules, CompilationFactory.Extract(source), BaselineIndex.Empty, null, null,
+            incompleteModel);
     }
 
     /// <summary>The reified model of a one-off spec — for the tests whose subject is the model, not the check.</summary>

@@ -9,20 +9,22 @@ using Zphil.LoadBearing.Roslyn.Caching;
 namespace Zphil.LoadBearing.Roslyn.Baselines;
 
 /// <summary>
-///     The baseline I/O boundary of the host layer (Core owns the format and digest; this owns the disk).
+///     The baseline I/O boundary of the host layer (Core owns the format and its seals; this owns the disk).
 /// </summary>
 /// <remarks>
 ///     Reads a baseline file with a strict JSON walk (exact properties, a <c>schemaVersion</c>
 ///     <see cref="BaselineFormat.IsSupported" /> accepts, well-formed entries, each optionally carrying a
-///     <c>siteCount</c> measure and a <c>because</c> attribution), then <em>recanonicalizes</em>
-///     the parsed entries and re-derives the digest — a mismatch is loud tamper. A missing file
-///     or missing rule section is uncaptured, not an error. Writes are canonical (fresh digest, unknown
-///     sections preserved), UTF-8 no BOM, LF, and report wrote/unchanged on a CRLF-normalized compare so
-///     an autocrlf checkout is a true zero-diff.
+///     <c>siteCount</c> measure and a <c>because</c> attribution), verifying each entry's <c>seal</c> as it
+///     is read — a mismatch is loud tamper, naming that entry. A missing file or missing rule section is
+///     uncaptured, not an error. Writes are canonical (fresh seals, unknown sections preserved), UTF-8 no
+///     BOM, LF, and report wrote/unchanged on a CRLF-normalized compare so an autocrlf checkout is a true
+///     zero-diff.
 ///     The file's own version governs the whole read and must reach both ends of it: the walk, because
-///     <c>siteCount</c> is a stranger in a legacy file rather than an optional key, and the
-///     recanonicalization, because a legacy file's stored digest was computed in the grammar of its day.
-///     A write always composes the current version, so any write is also the upgrade.
+///     <c>siteCount</c> and <c>seal</c> are strangers in a legacy file rather than keys it admits, and the
+///     integrity check, because a legacy file has no per-entry seals — it carries one whole-file
+///     <c>digest</c>, computed in the grammar of its day, which is <em>recanonicalized</em> from the parsed
+///     entries and compared instead. A write always composes the current version, so any write is also the
+///     upgrade.
 /// </remarks>
 internal static class BaselineStore
 {
@@ -30,7 +32,7 @@ internal static class BaselineStore
     ///     Builds the <see cref="BaselineIndex" /> for a model's ratcheted rules — Migrate and Quarantine
     ///     containment (any rule with a <see cref="ArchRule.BaselinePath" />): resolves each rule's
     ///     baseline path against <paramref name="solutionDirectory" />, parses each distinct file once
-    ///     (verifying its digest — tamper fails fast), and captures the matching section.
+    ///     (verifying its integrity — tamper fails fast), and captures the matching section.
     /// </summary>
     /// <remarks>
     ///     A missing file or missing section leaves the rule uncaptured. A scope tripwire (no baseline
@@ -61,8 +63,9 @@ internal static class BaselineStore
     /// <param name="absolutePath">Absolute path to the baseline file.</param>
     /// <returns>The verified document, or <see langword="null" /> when the file does not exist (uncaptured).</returns>
     /// <exception cref="UserErrorException">
-    ///     The file is malformed JSON, violates the schema, or fails its digest check. The message names the
-    ///     path; a digest mismatch also carries the restore hint.
+    ///     The file is malformed JSON, violates the schema, or fails its integrity check. The message names
+    ///     the path; an integrity failure also carries the recovery hint, and under the current version the
+    ///     entry that failed.
     /// </exception>
     public static BaselineDocument? TryReadDocument(string absolutePath)
     {
@@ -83,8 +86,10 @@ internal static class BaselineStore
         {
             JsonElement root = json.RootElement;
             if (root.ValueKind != JsonValueKind.Object) throw Malformed(absolutePath, "the root must be a JSON object.");
-            RequireExactProperties(absolutePath, root, "schemaVersion", "digest", "rules");
 
+            // The version leads the read, because the root's own property set depends on it — a legacy file
+            // carries a whole-file digest and a current one does not. Read with TryGetProperty so a file
+            // missing it reports the missing property rather than throwing out of the walk.
             int schemaVersion = ReadSchemaVersion(absolutePath, root);
             if (!BaselineFormat.IsSupported(schemaVersion))
                 throw Malformed(
@@ -92,14 +97,26 @@ internal static class BaselineStore
                     $"unsupported schemaVersion {schemaVersion} "
                     + $"(expected {BaselineFormat.LegacySchemaVersion} or {BaselineFormat.SchemaVersion}).");
 
-            string digest = ReadDigest(absolutePath, root);
-            Dictionary<string, IReadOnlyList<BaselineEntry>> sections = ReadSections(absolutePath, root, schemaVersion);
+            bool sealsEntries = BaselineFormat.CarriesSeal(schemaVersion);
+            if (sealsEntries)
+                RequireExactProperties(absolutePath, root, "schemaVersion", "rules");
+            else
+                RequireExactProperties(absolutePath, root, "schemaVersion", "digest", "rules");
 
-            // Recanonicalize + verify: rebuild the digest from the parsed entries, in the grammar of the
-            // version the file declares. Formatting/order/CRLF changes are invisible; any entry change is
-            // not — so a mismatch is a hand edit (tamper).
-            string recomputed = BaselineFormat.ComputeDigest(ToComposeInput(sections), schemaVersion);
-            if (!string.Equals(recomputed, digest, StringComparison.Ordinal)) throw Tampered(absolutePath);
+            string? legacyDigest = sealsEntries ? null : ReadDigest(absolutePath, root);
+
+            using BaselineSealer? sealer = sealsEntries ? new BaselineSealer() : null;
+            Dictionary<string, IReadOnlyList<BaselineEntry>> sections = ReadSections(absolutePath, root, schemaVersion, sealer);
+
+            // A sealed file verified itself entry by entry on the way in. A legacy one has one digest over
+            // all of them, so it is rebuilt here from the parsed entries in that version's frozen grammar:
+            // formatting, order and CRLF changes are invisible; any entry change is not.
+            if (legacyDigest is not null)
+            {
+                string recomputed = BaselineFormat.LegacyDigest(ToComposeInput(sections));
+                if (!string.Equals(recomputed, legacyDigest, StringComparison.Ordinal))
+                    throw LegacyDigestMismatch(absolutePath);
+            }
 
             return new BaselineDocument(sections);
         }
@@ -133,7 +150,7 @@ internal static class BaselineStore
     }
 
     private static Dictionary<string, IReadOnlyList<BaselineEntry>> ReadSections(
-        string path, JsonElement root, int schemaVersion)
+        string path, JsonElement root, int schemaVersion, BaselineSealer? sealer)
     {
         var sections = new Dictionary<string, IReadOnlyList<BaselineEntry>>(StringComparer.Ordinal);
         JsonElement rules = root.GetProperty("rules");
@@ -150,32 +167,35 @@ internal static class BaselineStore
 
             var entries = new List<BaselineEntry>();
             foreach (JsonElement entryElement in entriesElement.EnumerateArray())
-                entries.Add(ReadEntry(path, ruleProperty.Name, entryElement, schemaVersion));
+                entries.Add(ReadEntry(path, ruleProperty.Name, entryElement, schemaVersion, sealer));
             sections[ruleProperty.Name] = entries;
         }
 
         return sections;
     }
 
-    private static BaselineEntry ReadEntry(string path, string ruleId, JsonElement entry, int schemaVersion)
+    private static BaselineEntry ReadEntry(
+        string path, string ruleId, JsonElement entry, int schemaVersion, BaselineSealer? sealer)
     {
         if (entry.ValueKind != JsonValueKind.Object) throw Malformed(path, $"rule '{ruleId}' has a non-object entry.");
 
-        // One pass over the properties answers the whole six-way shape question — {subject}, {source,
-        // target}, and either of those plus a because, plus the two an edge's siteCount adds — and keeps
+        // One pass over the properties answers the whole shape question — {subject}, {source, target}, and
+        // either of those plus a because, plus the two an edge's siteCount adds, plus the seal — and keeps
         // each value it meets, so nothing below walks the object a second time. This runs per entry, per
-        // baseline file, on every check and status: materializing the names and set-comparing them six
-        // times was work proportional to a team's whole debt ledger for a fixed question about five words.
+        // baseline file, on every check and status: materializing the names and set-comparing them once per
+        // shape was work proportional to a team's whole debt ledger for a fixed question about six words.
         JsonElement? subject = null;
         JsonElement? source = null;
         JsonElement? target = null;
         JsonElement? because = null;
         JsonElement? siteCount = null;
+        JsonElement? seal = null;
         var hasStranger = false;
         var propertyCount = 0;
-        // A legacy file has no measure, so 'siteCount' there is a stranger rather than an optional key:
-        // a v1 file carrying one was hand-edited, and its digest was computed without it.
+        // A legacy file has no measure and no seal, so both are strangers there rather than optional keys:
+        // a v1 file carrying either was hand-edited, and its digest was computed without them.
         bool measured = BaselineFormat.CarriesSiteCount(schemaVersion);
+        bool sealsEntries = BaselineFormat.CarriesSeal(schemaVersion);
 
         foreach (JsonProperty property in entry.EnumerateObject())
         {
@@ -197,6 +217,9 @@ internal static class BaselineStore
                 case "siteCount" when measured:
                     siteCount = property.Value;
                     break;
+                case "seal" when sealsEntries:
+                    seal = property.Value;
+                    break;
                 default:
                     hasStranger = true;
                     break;
@@ -205,7 +228,8 @@ internal static class BaselineStore
 
         // Counting the distinct names back against the properties read is what rejects a repeated key: a
         // second 'subject' is a hand edit whose second value would silently never be read.
-        int distinctNames = Present(subject) + Present(source) + Present(target) + Present(because) + Present(siteCount);
+        int distinctNames = Present(subject) + Present(source) + Present(target) + Present(because)
+                            + Present(siteCount) + Present(seal);
         bool exactlyNamed = !hasStranger && propertyCount == distinctNames;
 
         bool isSubject = exactlyNamed && subject is not null && source is null && target is null;
@@ -216,6 +240,10 @@ internal static class BaselineStore
         if (isSubject && siteCount is not null)
             throw Malformed(path, $"rule '{ruleId}' has a 'siteCount' on a subject entry — only edge entries carry one.");
 
+        // A seal is required where the version carries them, so its absence is a missing property rather
+        // than tamper: the more precise diagnosis, and both refusals exit the same way.
+        if (sealsEntries && seal is null) throw Malformed(path, $"rule '{ruleId}' has an entry with no 'seal'.");
+
         BaselineEntry parsed = isSubject
             ? BaselineEntry.ForSubject(RequireNonEmptyString(path, ruleId, "subject", subject!.Value))
             : BaselineEntry.ForEdge(
@@ -225,9 +253,20 @@ internal static class BaselineStore
         if (siteCount is { } count)
             parsed = parsed.WithSiteCount(ReadSiteCount(path, ruleId, count));
 
-        return because is { } attribution
-            ? parsed.WithBecause(ReadBecause(path, ruleId, attribution))
-            : parsed;
+        if (because is { } attribution)
+            parsed = parsed.WithBecause(ReadBecause(path, ruleId, attribution));
+
+        // Verified here rather than after the file is read, so the refusal names the entry that failed and
+        // the rule it sits under while both are in hand.
+        if (seal is { } stored)
+        {
+            string declared = ReadSeal(path, ruleId, stored);
+            string computed = sealer!.Seal(ruleId, parsed);
+            if (!string.Equals(computed, declared, StringComparison.Ordinal))
+                throw SealMismatch(path, ruleId, parsed);
+        }
+
+        return parsed;
     }
 
     private static int Present(JsonElement? property)
@@ -251,14 +290,28 @@ internal static class BaselineStore
         return text;
     }
 
+    private static string ReadSeal(string path, string ruleId, JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.String) throw Malformed(path, $"rule '{ruleId}' has a non-string 'seal'.");
+
+        string seal = value.GetString()!;
+        if (seal.Length != BaselineFormat.SealLength || !seal.All(IsLowerHex))
+            throw Malformed(
+                path, $"rule '{ruleId}' has a 'seal' that is not {BaselineFormat.SealLength} lowercase hex characters.");
+        return seal;
+    }
+
     private static int ReadSchemaVersion(string path, JsonElement root)
     {
-        JsonElement value = root.GetProperty("schemaVersion");
+        if (!root.TryGetProperty("schemaVersion", out JsonElement value))
+            throw Malformed(path, "missing property 'schemaVersion'.");
         if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt32(out int schemaVersion))
             throw Malformed(path, "schemaVersion must be an integer.");
         return schemaVersion;
     }
 
+    // The whole-file digest is a legacy-version field: a current file carries none, its entries sealing
+    // themselves one at a time.
     private static string ReadDigest(string path, JsonElement root)
     {
         JsonElement value = root.GetProperty("digest");
@@ -311,11 +364,27 @@ internal static class BaselineStore
         return new UserErrorException($"Baseline file '{path}' is not valid: {detail}");
     }
 
-    private static UserErrorException Tampered(string path)
+    // The two integrity refusals read differently because the two formats fail differently, and the
+    // difference is the recovery: one entry's line went wrong, or the one digest covering all of them did.
+    private static UserErrorException SealMismatch(string path, string ruleId, BaselineEntry entry)
+    {
+        string identity = entry.Subject ?? $"{entry.Source} -> {entry.Target}";
+        return new UserErrorException(
+            $"Baseline file '{path}' failed its integrity check: the entry '{identity}' under rule '{ruleId}' " +
+            "does not match its seal. " +
+            "A baseline shrinks via 'loadbearing baseline --accept-reductions' and grows only via 'loadbearing baseline --add' " +
+            "(one attributed entry at a time). If that entry was edited by hand, restore its line from version control. " +
+            "If this file came out of a merge, resolve the conflict by keeping whole entry lines from either side rather " +
+            "than editing one — every line carries its own seal.");
+    }
+
+    private static UserErrorException LegacyDigestMismatch(string path)
     {
         return new UserErrorException(
             $"Baseline file '{path}' failed its integrity check: the digest does not match the entries. " +
             "A baseline shrinks via 'loadbearing baseline --accept-reductions' and grows only via 'loadbearing baseline --add' " +
-            "(one attributed entry at a time). If the file was edited by hand, restore it from version control.");
+            "(one attributed entry at a time). If the file was edited by hand, restore it from version control. " +
+            "If it came out of a merge, both committed sides carry a digest that is stale for the merged entries, so check " +
+            "out one side's file and re-run 'loadbearing baseline --accept-reductions'.");
     }
 }

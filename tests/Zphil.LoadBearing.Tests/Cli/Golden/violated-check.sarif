@@ -46,6 +46,24 @@
               }
             },
             {
+              "id": "layering/projects-reached-only-by-themselves",
+              "shortDescription": {
+                "text": "Each of the projects matching `MyApp.*` must be referenced only by itself."
+              },
+              "fullDescription": {
+                "text": "A project anything may reach into has no surface to change; every edge into it is part of its contract whether or not anyone meant it to be."
+              },
+              "help": {
+                "text": "Reach the project through an abstraction it owns, or move the type both projects need into a project both may reference."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "migrate"
+              }
+            },
+            {
               "id": "layering/web-cuts-not-circular",
               "shortDescription": {
                 "text": "Each of the Reporting and Invoicing layers must not have circular references with the others."
@@ -869,6 +887,276 @@
             "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:MyApp.Legacy.Billing.RoundingMode||MyApp.Web/InvoiceController.cs|0"
           },
           "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/projects-reached-only-by-themselves",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 9
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.HomeController||MyApp.Domain/OrderService.cs|0"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json"
+            }
+          ]
+        },
+        {
+          "ruleId": "layering/projects-reached-only-by-themselves",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.HomeController||MyApp.Domain/OrderService.cs|1"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json"
+            }
+          ]
+        },
+        {
+          "ruleId": "layering/projects-reached-only-by-themselves",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 13
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.HomeController||MyApp.Domain/OrderService.cs|2"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json"
+            }
+          ]
+        },
+        {
+          "ruleId": "layering/projects-reached-only-by-themselves",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.WebTextExtensions"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.WebTextExtensions||MyApp.Domain/OrderService.cs|0"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json"
+            }
+          ]
+        },
+        {
+          "ruleId": "layering/projects-reached-only-by-themselves",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Web.HomeController references MyApp.Legacy.Billing.IBillingFacade"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 17
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.HomeController|T:MyApp.Legacy.Billing.IBillingFacade||MyApp.Web/HomeController.cs|0"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json"
+            }
+          ]
+        },
+        {
+          "ruleId": "layering/projects-reached-only-by-themselves",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Web.HomeController references MyApp.Legacy.Billing.IBillingFacade"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 20
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.HomeController|T:MyApp.Legacy.Billing.IBillingFacade||MyApp.Web/HomeController.cs|1"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json"
+            }
+          ]
+        },
+        {
+          "ruleId": "layering/projects-reached-only-by-themselves",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 9
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:MyApp.Legacy.Billing.BillingCalculator||MyApp.Web/InvoiceController.cs|0"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json"
+            }
+          ]
+        },
+        {
+          "ruleId": "layering/projects-reached-only-by-themselves",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:MyApp.Legacy.Billing.BillingCalculator||MyApp.Web/InvoiceController.cs|1"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json"
+            }
+          ]
+        },
+        {
+          "ruleId": "layering/projects-reached-only-by-themselves",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.RoundingMode"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "loadBearingViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:MyApp.Legacy.Billing.RoundingMode||MyApp.Web/InvoiceController.cs|0"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json"
+            }
+          ]
         },
         {
           "ruleId": "layering/web-cuts-not-circular",

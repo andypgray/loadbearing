@@ -20,7 +20,12 @@ public sealed class CheckReport
         WarningCount = results.Sum(r => r.Warnings.Count);
         GrandfatheredCount = results.Sum(r => r.Grandfathered.Count);
         GrandfatheredSiteCount = results.Sum(r => r.GrandfatheredSiteCount);
-        StaleBaselineEntryCount = results.Sum(r => r.StaleBaselineEntries);
+        // The two halves of the mechanical unmatched total, partitioned on the one question that decides
+        // what an unmatched entry means: did the rule that left it unmatched measure anything at all.
+        StaleBaselineEntryCount = results.Where(r => !r.SelectionMatchedNothing)
+            .Sum(r => r.StaleBaselineEntries);
+        UnmeasuredBaselineEntryCount = results.Where(r => r.SelectionMatchedNothing)
+            .Sum(r => r.StaleBaselineEntries);
         ShrunkBaselineEntryCount = results.Sum(r => r.ShrunkBaselineEntries);
         UncountedBaselineEntryCount = results.Sum(r => r.UncountedBaselineEntries);
     }
@@ -76,10 +81,22 @@ public sealed class CheckReport
     public int GrandfatheredSiteCount { get; }
 
     /// <summary>
-    ///     Gets how many recorded baseline entries no current violation matched, across every rule — debt
-    ///     that has since been fixed. <c>loadbearing baseline --accept-reductions</c> retires them.
+    ///     Gets how many recorded baseline entries no current violation matched, across the rules this run
+    ///     measured — debt that has since been fixed. <c>loadbearing baseline --accept-reductions</c> retires
+    ///     them. An entry left unmatched by a rule whose own selection matched nothing is counted by
+    ///     <see cref="UnmeasuredBaselineEntryCount" /> instead, never here: it is not fixed debt, and
+    ///     accepting it would delete a live entry.
     /// </summary>
     public int StaleBaselineEntryCount { get; }
+
+    /// <summary>
+    ///     Gets how many recorded baseline entries went unmatched because their rule measured nothing, summed
+    ///     over every rule with <see cref="RuleResult.SelectionMatchedNothing" /> set — one whose subject, or
+    ///     whose forbidden target, now matches no types. The entries are untouched debt of unknown size, so
+    ///     the remedy is the rule's selection rather than a baseline write. Together with
+    ///     <see cref="StaleBaselineEntryCount" /> this totals every unmatched entry the run saw.
+    /// </summary>
+    public int UnmeasuredBaselineEntryCount { get; }
 
     /// <summary>
     ///     Gets how many matched baseline entries now cover fewer sites than they record, across every rule.

@@ -65,7 +65,7 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
         Exceptions(arch, shipping);
         StaticState(arch, shipping);
         Naming(arch, shipping, repo);
-        Scopes(arch, model);
+        Scopes(arch, model, extraction);
     }
 
     private static void Layering(
@@ -605,10 +605,14 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
             .Fix("Give the interface the `I` prefix.");
     }
 
-    private static void Scopes(Arch arch, Layer model)
+    private static void Scopes(Arch arch, Layer model, Layer extraction)
     {
+        // The scope is spelled as a region of Extraction rather than a bare namespace so the drawing can
+        // say where it sits: Extraction is its project, which carries no globs for containment to be
+        // inferred from. Both spellings select the same four types, this being the only project that
+        // declares into that namespace.
         arch.Scope("roslyn/msbuild-bootstrap")
-            .Quarantine(arch.Namespace("Zphil.LoadBearing.Roslyn.MsBuild.*"))
+            .Quarantine(extraction.InNamespace("Zphil.LoadBearing.Roslyn.MsBuild.*"))
             .BoundaryOnlyVia(typeof(MsBuildBootstrap))
             .Dragons("We pick a VS 16/17 via vswhere and hand it to the out-of-process BuildHost through " +
                      "VSINSTALLDIR/VSCMD_VER=99.0. That preference is caution about a moving target, not a " +

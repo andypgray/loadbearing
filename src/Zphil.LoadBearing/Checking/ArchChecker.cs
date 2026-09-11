@@ -126,21 +126,27 @@ public static class ArchChecker
     public static CheckReport Check(
         IReadOnlyList<ArchRule> rules, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff)
     {
-        return Check(rules, codebase, baselines, diff, null);
+        return Check(rules, codebase, baselines, diff, null, null);
     }
 
     /// <summary>
     ///     Checks exactly <paramref name="rules" /> over a run whose universe may be smaller than the
-    ///     solution: with <paramref name="narrowing" /> supplied, a rule whose whole subject lives in the
-    ///     projects a solution filter left out is <see cref="RuleStatus.Skipped" /> rather than red, because
-    ///     its empty subject is that filter's doing and not a defect in the spec.
+    ///     solution, or whose model may be smaller than the codebase: with <paramref name="narrowing" />
+    ///     supplied, a rule whose whole subject lives in the projects a solution filter left out is
+    ///     <see cref="RuleStatus.Skipped" /> rather than red, because its empty subject is that filter's doing
+    ///     and not a defect in the spec; with <paramref name="incompleteModel" /> supplied, a rule whose
+    ///     selection matched nothing still fails or warns as it would, but carries that fact as its cure
+    ///     instead of advice about the shape it was written in.
     /// </summary>
     /// <remarks>
-    ///     Internal, so the narrowing can be: the public surface is the four overloads above, and a run
-    ///     with no filter behaves byte for byte as it always did (they pass <see langword="null" />). Only a
-    ///     rule whose <em>every</em> violation is <see cref="ViolationKind.EmptySubject" /> skips — a
+    ///     Internal, so both facts can be: the public surface is the four overloads above, and a run over a
+    ///     whole solution and a whole model behaves byte for byte as it always did (they pass
+    ///     <see langword="null" /> for each). Only a rule whose <em>every</em> violation is
+    ///     <see cref="ViolationKind.EmptySubject" /> skips for narrowing — a
     ///     <see cref="ViolationKind.RuleError" /> is a real defect whatever the universe, and every edge and
-    ///     shape kind is a positive finding over types that did load.
+    ///     shape kind is a positive finding over types that did load. A partial model skips nothing: unlike a
+    ///     filter it is a fault rather than a smaller question, so the surfaces above it refuse the whole run
+    ///     and a rule that still reports is owed an honest cure rather than a skip.
     /// </remarks>
     /// <param name="rules">The rules to evaluate, in the order they are to be reported.</param>
     /// <param name="codebase">The extracted codebase to evaluate them against.</param>
@@ -150,10 +156,13 @@ public static class ArchChecker
     ///     The solution filter that answered this run over part of the solution, or null when the run's
     ///     universe is the whole of it.
     /// </param>
+    /// <param name="incompleteModel">
+    ///     The fact that part of the codebase never loaded, or null when the model is whole.
+    /// </param>
     /// <returns>The aggregate report over <paramref name="rules" /> only, in the order they were given.</returns>
     internal static CheckReport Check(
         IReadOnlyList<ArchRule> rules, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff,
-        NarrowedUniverse? narrowing)
+        NarrowedUniverse? narrowing, IncompleteModel? incompleteModel)
     {
         Guard.NotNull(rules, nameof(rules));
         Guard.NotNull(codebase, nameof(codebase));
@@ -163,7 +172,7 @@ public static class ArchChecker
         // Its constructor materializes the solution-declared type list and the noun indexes, so building a
         // second would repeat a full pass over the model; it holds no per-rule mutable state.
         var selections = new SelectionEvaluator(codebase);
-        var evaluator = new ConstraintEvaluator(codebase, selections);
+        var evaluator = new ConstraintEvaluator(codebase, selections, incompleteModel);
         List<RuleResult> results = rules
             .Select(rule => CheckRule(rule, evaluator, selections, baselines, diff, narrowing))
             .ToList();

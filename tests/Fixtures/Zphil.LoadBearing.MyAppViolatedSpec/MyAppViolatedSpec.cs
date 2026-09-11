@@ -38,6 +38,20 @@ public sealed class MyAppViolatedSpec : IArchitectureSpec
             .Because("Each MyApp project is its own deployable unit; a reference from one into another couples their release cadences.")
             .Fix("Move the shared type into a project both may reference, or reach the other project through an abstraction it owns.");
 
+        // Migrate (family, project form, inbound leaf): the same partition the rule above reds, read from
+        // the other end — a reference INTO a project from anywhere but that project. Its conventional
+        // baseline is committed and holds all five pairs, so the rule passes and its whole debt burns down,
+        // which makes it the spec's one grouped burndown: the status row splits the pairs by the cell whose
+        // law each breaks, and for an inbound verb that is the REFERENCED project, never the referencing
+        // one. So the golden reads Legacy.Billing 3, Web 2 — where attributing to the source would read
+        // Web 3, Domain 2 — and a regression to source-cell grouping reds it rather than passing quietly.
+        arch.Rule("layering/projects-reached-only-by-themselves")
+            .Migrate(
+                "Several projects are reached straight from another project rather than only from their own.",
+                arch.Each(arch.Projects.Matching("MyApp.*")).MustOnlyBeReferencedByItself())
+            .Because("A project anything may reach into has no surface to change; every edge into it is part of its contract whether or not anyone meant it to be.")
+            .Fix("Reach the project through an abstraction it owns, or move the type both projects need into a project both may reference.");
+
         // Fails (family, circular references): two cuts inside Web that reference each other in a circle —
         // ReportEndpoint → InvoiceService one way, InvoiceCreatedHandler → ReportEndpoint the other — so both
         // arrows' pairs red under one ID, each carrying the JSON-only detail naming the circle. The cross-cell

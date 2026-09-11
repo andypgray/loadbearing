@@ -421,6 +421,69 @@ public sealed class MigrateRatchetTests
     }
 
     [Fact]
+    public void Check_MigrateInertTargetOverACapturedSection_MarksTheRuleAsHavingMeasuredNothing()
+    {
+        // The arm the warns-and-passes row above cannot reach: its baseline is empty, so the whole captured
+        // section going unmatched never happens there. Here two entries are captured and the target has rotted,
+        // which leaves the rule passing with nothing tolerated, nothing red, and its entire section stale —
+        // the four counts a burned-down migration has, on a rule that measured nothing. The predicate is what
+        // parts them, and every surface downstream (the status term, the roll-up, the baseline refusal,
+        // Promotable) reads it rather than re-deriving it.
+        BaselineIndex index = Checker.Baselines(
+            "data/x",
+            OldControllerToDb,
+            BaselineEntry.ForEdge("T:App.Web.GhostController", "T:App.Data.Db"));
+
+        RuleResult result = Checker.Run("namespace App.Web { public class HomeController {} }", index, arch =>
+                arch.Rule("data/x")
+                    .Migrate("old", arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Ghost.*")))
+                    .Baseline("ghost.json")
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHaveWarnedInertTarget();
+        result.ShouldHaveGrandfathered(0);
+        result.ShouldHaveStale(2);
+        result.SelectionMatchedNothing.ShouldBeTrue();
+        result.Promotable.ShouldBeFalse("a rule that measured nothing must never be offered for promotion");
+    }
+
+    [Fact]
+    public void Check_MigrateEmptySubject_MarksTheRuleAsHavingMeasuredNothingToo()
+    {
+        // The same fact arriving as a failure rather than a warning: an empty subject is one violation no
+        // baseline can hold, so the rule reds and its whole section still goes unmatched. One predicate
+        // answers for both, because a reader testing only the violations would miss the inert half and a
+        // reader testing only the warnings would miss this one.
+        BaselineIndex index = Checker.Baselines("data/x", OldControllerToDb);
+
+        RuleResult result = Checker.Run("namespace App.Data { public class Db {} }", index, arch =>
+                arch.Rule("data/x")
+                    .Migrate("old", arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
+                    .Baseline("ghost.json")
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHaveFailed();
+        result.Violations.ShouldHaveSingleItem()
+            .Kind.ShouldBe(ViolationKind.EmptySubject);
+        result.ShouldHaveStale(1);
+        result.SelectionMatchedNothing.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Check_MigrateThatMeasuredItsSubject_DoesNotReadAsHavingMeasuredNothing()
+    {
+        // The other side of the predicate, so it cannot pass by answering true always: a rule with a real
+        // subject and a real target reds on a real finding and nothing about its selection came up empty.
+        RuleResult result = Checker.Run(Sources.OneControllerModel, BaselineIndex.Empty, Sources.NoDataAccess)
+            .Single();
+
+        result.ShouldHaveFailed();
+        result.SelectionMatchedNothing.ShouldBeFalse();
+    }
+
+    [Fact]
     public void Check_TwoArgOverload_TreatsBaselinesAsEmpty()
     {
         RuleResult result = Checker.Run(Sources.OneControllerModel, Sources.NoDataAccess)

@@ -1,16 +1,15 @@
 {
   "schemaVersion": 2,
-  "digest": "a4d5699c2ac383abda87cf7a72aa3aabcbebb50d639568517498f2baeca2182a",
   "rules": {
     "time/inject-clock": {
       "entries": [
-        { "source": "T:Meridian.Web.Controllers.CustomsController", "target": "P:System.DateTime.UtcNow", "siteCount": 1 },
-        { "source": "T:Meridian.Web.Controllers.DriversController", "target": "P:System.DateTime.Now", "siteCount": 1 },
-        { "source": "T:Meridian.Web.Controllers.InvoicesController", "target": "P:System.DateTime.Now", "siteCount": 1 },
-        { "source": "T:Meridian.Web.Controllers.InvoicesController", "target": "P:System.DateTime.UtcNow", "siteCount": 1 },
-        { "source": "T:Meridian.Web.Controllers.ManifestsController", "target": "P:System.DateTime.UtcNow", "siteCount": 1 },
-        { "source": "T:Meridian.Web.Controllers.RatesController", "target": "P:System.DateTime.UtcNow", "siteCount": 1 },
-        { "source": "T:Meridian.Web.Controllers.ShipmentsController", "target": "P:System.DateTime.UtcNow", "siteCount": 1 }
+        { "source": "T:Meridian.Web.Controllers.CustomsController", "target": "P:System.DateTime.UtcNow", "siteCount": 1, "seal": "3b17612ded466feb" },
+        { "source": "T:Meridian.Web.Controllers.DriversController", "target": "P:System.DateTime.Now", "siteCount": 1, "seal": "4373e74b899ece78" },
+        { "source": "T:Meridian.Web.Controllers.InvoicesController", "target": "P:System.DateTime.Now", "siteCount": 1, "seal": "b1a53cab8fb9ea28" },
+        { "source": "T:Meridian.Web.Controllers.InvoicesController", "target": "P:System.DateTime.UtcNow", "siteCount": 1, "seal": "dc2df99a9f299099" },
+        { "source": "T:Meridian.Web.Controllers.ManifestsController", "target": "P:System.DateTime.UtcNow", "siteCount": 1, "seal": "f785611b939ea131" },
+        { "source": "T:Meridian.Web.Controllers.RatesController", "target": "P:System.DateTime.UtcNow", "siteCount": 1, "seal": "fcdb1b4feea2254b" },
+        { "source": "T:Meridian.Web.Controllers.ShipmentsController", "target": "P:System.DateTime.UtcNow", "siteCount": 1, "seal": "f31e04a664d01258" }
       ]
     }
   }

@@ -12,8 +12,10 @@ namespace Zphil.LoadBearing.Rendering;
 ///     inside the most specific other place whose glob set strictly covers its own. When two candidate
 ///     parents are incomparable — neither covers the other — there is no "most specific" answer, and the
 ///     node stays flat rather than picking one and implying a hierarchy the spec never declared. A layer
-///     whose definition refines or unions other places arrives already nested, because its containment is
-///     declared rather than inferred, and a project place has no globs to infer anything from.
+///     whose definition refines or unions other places arrives already nested, and so does a region a rule
+///     names locatively (<c>layer.InNamespace(glob)</c>), because in both the containment is declared
+///     rather than inferred — which is the only way to reach it when the container is a project place,
+///     since a project place has no globs to infer anything from.
 /// </remarks>
 internal sealed class LawPlaces(IReadOnlyList<LayerDefinition> layers)
 {

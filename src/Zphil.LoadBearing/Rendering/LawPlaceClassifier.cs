@@ -11,9 +11,14 @@ namespace Zphil.LoadBearing.Rendering;
 ///     rule this classifier cannot place is still visible — the drawing narrows, the law never does.
 /// </summary>
 /// <remarks>
-///     The honest approximation is noun-level. A noun names a region of the codebase; adjectives narrow
-///     which types inside it the rule governs, and no adjective moves the node, because a diagram has no
-///     room to say "except these four types" and <c>loadbearing explain</c> carries the exact subject. A
+///     The honest approximation is noun-level, with one exception. A noun names a region of the codebase,
+///     and a subtractive adjective — <c>Except</c>, <c>Named</c>, <c>Where</c>, <c>Authored</c> — narrows
+///     which types inside it the rule governs without moving the node, because a diagram has no room to
+///     say "except these four types" and <c>loadbearing explain</c> carries the exact subject. The
+///     exception is the locative one: a place-shaped noun narrowed by exactly one <c>InNamespace</c> says
+///     where a region sits, not which types it holds, so it draws as that region inside the head's own
+///     place. That is the only adjective that moves a node, and it is what lets a region nest inside a
+///     layer anchored on a project, which carries no globs for containment to be inferred from. A
 ///     union has no single noun (and <see cref="Selection.Noun" /> throws on one), a registration is a
 ///     lifetime rather than a location, bare <c>arch.Types</c> is the whole solution, and a family
 ///     (<c>arch.Each</c>) is several places at once — none of the four is a place, so all four go to the
@@ -147,7 +152,7 @@ internal static class LawPlaceClassifier
             default:
                 // A region noun — a layer, a namespace, a project — is the same place in every position,
                 // and a layer definition's own head is read through the same arm.
-                return NounPlace(selection.Noun, layers);
+                return FromLocative(selection, layers);
         }
     }
 
@@ -161,6 +166,44 @@ internal static class LawPlaceClassifier
             ProjectNoun project => FromProject(project.Name, layers),
             _ => null
         };
+    }
+
+    // The one adjective that moves a node. A place-shaped noun narrowed by exactly one InNamespace names a
+    // region and says where it sits, so it draws as that region inside the head's own place — the declared
+    // containment a refinement-defined layer earns in FromLayer, without minting a layer to declare it.
+    // Every other adjective is subtractive and leaves the node on the head, which is the noun-level rule
+    // holding. The region takes FromGlob's key, so a rule naming the glob and a rule naming it locatively
+    // stay one node.
+    private static LawPlace? FromLocative(Selection selection, IReadOnlyList<LayerDefinition> layers)
+    {
+        LawPlace? head = NounPlace(selection.Noun, layers);
+        if (head is null || selection.Adjectives.Count != 1) return head;
+
+        if (selection.Adjectives[0] is not InNamespaceAdjective locative) return head;
+
+        LawPlace region = FromGlob(locative.Glob, layers);
+
+        // The identity collapse can make the region and its head the same place — a layer narrowed to the
+        // one glob that defines it. Registering a place inside itself adds its key twice and throws, so the
+        // head stands alone; the adjective named the region the head already is.
+        return Encloses(head, region.Key) ? head : Parented(region, head);
+    }
+
+    private static LawPlace Parented(LawPlace region, LawPlace parent)
+    {
+        region.Parent = parent;
+        return region;
+    }
+
+    // Whether a key is already on a place's parent chain. Walking the whole chain rather than comparing the
+    // one candidate keeps the containment a strict order, which is what lets the drawing recurse at all.
+    private static bool Encloses(LawPlace? place, string key)
+    {
+        for (LawPlace? candidate = place; candidate is not null; candidate = candidate.Parent)
+            if (string.Equals(candidate.Key, key, StringComparison.Ordinal))
+                return true;
+
+        return false;
     }
 
     // A layer's name is its identity in the spec's own vocabulary, so it is the label whatever defines it.

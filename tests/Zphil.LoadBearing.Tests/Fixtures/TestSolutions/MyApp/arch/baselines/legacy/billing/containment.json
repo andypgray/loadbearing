@@ -1,11 +1,10 @@
 {
   "schemaVersion": 2,
-  "digest": "ef0c4ad0b7f66ea1a63189e1dc8f9213e03124de79ff6370311670da681e0d89",
   "rules": {
     "legacy/billing/containment": {
       "entries": [
-        { "source": "T:MyApp.Web.InvoiceController", "target": "T:MyApp.Legacy.Billing.BillingCalculator", "siteCount": 2 },
-        { "source": "T:MyApp.Web.InvoiceController", "target": "T:MyApp.Legacy.Billing.RoundingMode", "siteCount": 1 }
+        { "source": "T:MyApp.Web.InvoiceController", "target": "T:MyApp.Legacy.Billing.BillingCalculator", "siteCount": 2, "seal": "f82de435ad58a6ea" },
+        { "source": "T:MyApp.Web.InvoiceController", "target": "T:MyApp.Legacy.Billing.RoundingMode", "siteCount": 1, "seal": "8cca73a6f56c69c9" }
       ]
     }
   }

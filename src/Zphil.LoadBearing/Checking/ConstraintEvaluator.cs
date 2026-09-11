@@ -61,14 +61,16 @@ internal sealed class ConstraintEvaluator
     private readonly EdgeIndex<ReferenceEdge> _edgesBySource;
     private readonly EdgeIndex<ReferenceEdge> _edgesByTarget;
     private readonly EdgeIndex<ExposureEdge> _exposureEdgesBySource;
+    private readonly IncompleteModel? _incompleteModel;
     private readonly EdgeIndex<InjectionEdge> _injectionEdgesBySource;
     private readonly EdgeIndex<MemberEdge> _memberEdgesBySource;
     private readonly IReadOnlyList<ProjectNode> _projects;
     private readonly SelectionEvaluator _selections;
     private readonly EdgeIndex<ThrowEdge> _throwEdgesBySource;
 
-    internal ConstraintEvaluator(CodebaseModel model, SelectionEvaluator selections)
+    internal ConstraintEvaluator(CodebaseModel model, SelectionEvaluator selections, IncompleteModel? incompleteModel = null)
     {
+        _incompleteModel = incompleteModel;
         _projects = model.Projects;
         _edgesBySource = new EdgeIndex<ReferenceEdge>(model.Edges, e => e.Source);
         _edgesByTarget = new EdgeIndex<ReferenceEdge>(model.Edges, e => e.Target);
@@ -115,8 +117,11 @@ internal sealed class ConstraintEvaluator
 
         HashSet<TypeNode> subjects = admission.Members;
         if (subjects.Count == 0)
-            return ([Violation.EmptySubject(EmptySubjectMessage, AuthoringHints.ForSubject(constraint.Subject!))],
-                NoWarnings, default);
+            return (
+            [
+                Violation.EmptySubject(
+                    EmptySubjectMessage, AuthoringHints.ForSubject(constraint.Subject!, _incompleteModel))
+            ], NoWarnings, default);
 
         (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings) =
             Dispatch(constraint, subjects, admission, family);
@@ -305,7 +310,7 @@ internal sealed class ConstraintEvaluator
             ?
             [
                 new CheckWarning(CheckWarningKind.InertTarget, InertTargetMessage,
-                    hint: AuthoringHints.ForInertTarget(operands))
+                    hint: AuthoringHints.ForInertTarget(operands, _incompleteModel))
             ]
             : NoWarnings;
 
@@ -546,7 +551,9 @@ internal sealed class ConstraintEvaluator
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyReference(
         SelectionAdmission subject, IReadOnlyList<Selection> allowedTargets, FamilySubject? family)
     {
-        return AllowList(subject, allowedTargets, family, (cell, allowed) => Outbound(cell, allowed, wantHit: false));
+        return AllowList(
+            subject, allowedTargets, family,
+            (cell, allowed, label) => Outbound(cell, allowed, wantHit: false, label));
     }
 
     /// <summary>
@@ -570,18 +577,23 @@ internal sealed class ConstraintEvaluator
 
     // The allow-list shape both directions take (GRAMMAR §4.1, §5.1): the operands resolved once, the
     // subject allowed implicitly, and — over a family — one walk per cell whose allow-set is the operands
-    // plus that cell as declared. Only the walk differs, which is what `walk` carries.
+    // plus that cell as declared. Only the walk differs, which is what `walk` carries; its third argument is
+    // the cell each violation is labelled with, and it is the LOOP index rather than anything read off the
+    // edge, so the label is the cell whose law was broken at either end. That distinction is real for the
+    // inbound direction alone: there the subject sits at the edge's target, so the referencing type is
+    // regularly outside the family altogether and has no cell to be attributed to.
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) AllowList(
         SelectionAdmission subject, IReadOnlyList<Selection> allowed, FamilySubject? family,
-        Func<SelectionAdmission, SelectionAdmission, List<Violation>> walk)
+        Func<SelectionAdmission, SelectionAdmission, string?, List<Violation>> walk)
     {
         SelectionAdmission operands = ResolveOperands(allowed);
-        if (family is null) return (walk(subject, operands.IncludingSelf(subject)), NoWarnings);
+        if (family is null) return (walk(subject, operands.IncludingSelf(subject), null), NoWarnings);
 
         IReadOnlyList<SelectionAdmission> declared = DeclaredCells(family);
         var violations = new List<Violation>();
         for (var cell = 0; cell < declared.Count; cell++)
-            violations.AddRange(walk(family.Subjects[cell], operands.IncludingSelf(declared[cell])));
+            violations.AddRange(
+                walk(family.Subjects[cell], operands.IncludingSelf(declared[cell]), family.CellName(cell)));
 
         return (Deduplicated(violations), NoWarnings);
     }
@@ -607,7 +619,9 @@ internal sealed class ConstraintEvaluator
         var violations = new List<Violation>();
         for (var cell = 0; cell < declared.Count; cell++)
             violations.AddRange(
-                Outbound(family.Subjects[cell], SelectionAdmission.AllBut(declared, cell), wantHit: true));
+                Outbound(
+                    family.Subjects[cell], SelectionAdmission.AllBut(declared, cell), wantHit: true,
+                    family.CellName(cell)));
 
         return (Deduplicated(violations), NoWarnings);
     }
@@ -666,8 +680,9 @@ internal sealed class ConstraintEvaluator
             if (arrow.Count == 0 || components[source] != components[target]) continue;
 
             string detail = circles[components[source]];
+            string cell = family.CellName(source);
             foreach (ReferenceEdge edge in arrow)
-                violations.Add(Violation.Reference(edge.Source, edge.Target, edge.Sites, detail));
+                violations.Add(Violation.Reference(edge.Source, edge.Target, edge.Sites, detail).InCell(cell));
         }
 
         return (Deduplicated(violations), NoWarnings);
@@ -702,10 +717,12 @@ internal sealed class ConstraintEvaluator
     // The outbound reference walk the allow-list, the leaf and the cross-cell ban share, parameterized by
     // the polarity each asks with. External targets are exempt either way: the complement universe is
     // solution-declared, and a cell never holds an external type to be an "other" of.
-    private List<Violation> Outbound(SelectionAdmission subject, SelectionAdmission operand, bool wantHit)
+    private List<Violation> Outbound(
+        SelectionAdmission subject, SelectionAdmission operand, bool wantHit, string? cell = null)
     {
         return OutboundEdges(subject, operand, wantHit)
-            .Select(edge => Violation.Reference(edge.Source, edge.Target, edge.Sites))
+            .Select(edge => Violation.Reference(edge.Source, edge.Target, edge.Sites)
+                .InCell(cell))
             .ToList();
     }
 
@@ -724,13 +741,14 @@ internal sealed class ConstraintEvaluator
     }
 
     // The inbound twin, keyed on the edge's target so the subject bounds ownership where it sits.
-    private List<Violation> Inbound(SelectionAdmission subject, SelectionAdmission allowed)
+    private List<Violation> Inbound(SelectionAdmission subject, SelectionAdmission allowed, string? cell = null)
     {
         var violations = new List<Violation>();
         foreach (ReferenceEdge edge in Keyed(subject.Members, _edgesByTarget.Lookup))
             if (SelectionAdmission.CountsEdge(
                     subject, allowed, edge.Source, edge.Target, subjectAtSource: false, wantHit: false))
-                violations.Add(Violation.Reference(edge.Source, edge.Target, edge.Sites));
+                violations.Add(Violation.Reference(edge.Source, edge.Target, edge.Sites)
+                    .InCell(cell));
 
         return violations;
     }
@@ -747,7 +765,10 @@ internal sealed class ConstraintEvaluator
 
     // One violation per (source, target) pair however many cells minted it (GRAMMAR §4.3): a project
     // family's cells overlap wherever one source file compiles into two of them, so the same edge can be
-    // judged twice while the baseline still keys on the pair.
+    // judged twice while the baseline still keys on the pair. Keeping the FIRST of a duplicated pair is
+    // also what settles which cell such an edge is attributed to — the first in declaration order, the
+    // walk being in that order — so the burndown's per-cell split names one cell per pair and totals to
+    // the rule's own count.
     private static IReadOnlyList<Violation> Deduplicated(List<Violation> violations)
     {
         if (violations.Count < 2) return violations;
@@ -825,7 +846,8 @@ internal sealed class ConstraintEvaluator
             collected.Add(matched);
             if (matched.Count == 0)
                 violations.Add(Violation.EmptySubject(
-                    EmptyOperandMessage(SentenceRenderer.Reference(part)), AuthoringHints.ForSubject(part)));
+                    EmptyOperandMessage(SentenceRenderer.Reference(part)),
+                    AuthoringHints.ForSubject(part, _incompleteModel)));
         }
 
         return (collected, violations);
@@ -1001,8 +1023,11 @@ internal sealed class ConstraintEvaluator
         // members themselves take the set alone: a member verb is shape-only, with no edge to attribute.
         IReadOnlyList<MemberNode> members = MemberSelectionEvaluator.Resolve(constraint.MemberSubject, sourceTypes);
         if (members.Count == 0)
-            return ([Violation.EmptySubject(EmptyMemberSubjectMessage, AuthoringHints.EmptyMemberSubject)],
-                NoWarnings, default);
+            return (
+            [
+                Violation.EmptySubject(
+                    EmptyMemberSubjectMessage, AuthoringHints.ForMemberSubject(_incompleteModel))
+            ], NoWarnings, default);
 
         (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings) = DispatchMember(constraint, members);
         return (violations, warnings, MemberCoverageOf(members));
@@ -1104,8 +1129,11 @@ internal sealed class ConstraintEvaluator
     {
         IReadOnlyList<ProjectNode> subjects = ProjectSelectionEvaluator.Resolve(constraint.ProjectSubject, _projects);
         if (subjects.Count == 0)
-            return ([Violation.EmptySubject(EmptyProjectSubjectMessage, AuthoringHints.EmptyProjectSubject)],
-                NoWarnings, default);
+            return (
+            [
+                Violation.EmptySubject(
+                    EmptyProjectSubjectMessage, AuthoringHints.ForProjectSubject(_incompleteModel))
+            ], NoWarnings, default);
 
         IReadOnlyList<Violation> violations = DispatchProject(constraint, subjects);
         return (violations, NoWarnings, default);
@@ -1235,5 +1263,26 @@ internal sealed class ConstraintEvaluator
 
         /// <summary>The declared layer cells, or null for a project family — the partition's own kind.</summary>
         internal IReadOnlyList<Layer>? LayerCells { get; } = layerCells;
+
+        /// <summary>
+        ///     The name of the cell at <paramref name="index" /> — the layer's, or the project's for a
+        ///     project family — which is what a violation minted under that cell's law is labelled with.
+        /// </summary>
+        /// <remarks>
+        ///     Read off the cell's own noun rather than held beside it: a project cell is minted as
+        ///     <c>arch.Project(name)</c> would be, so the name it resolved to is already there. A cell can
+        ///     be nothing else, and a noun with no name is a new cell kind whose label nobody has decided —
+        ///     so it throws rather than grouping the burndown under a blank.
+        /// </remarks>
+        internal string CellName(int index)
+        {
+            return SelectionWalk.NounOf(Cells[index]) switch
+            {
+                LayerNoun layer => layer.Name,
+                ProjectNoun project => project.Name,
+                { } noun => throw new InvalidOperationException($"Unhandled family cell noun '{noun.GetType().Name}'."),
+                null => throw new InvalidOperationException("A family cell is never a union.")
+            };
+        }
     }
 }

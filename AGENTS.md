@@ -72,5 +72,5 @@ registered = named in a source-level container registration (`AddSingleton`/`Add
 - `naming/interfaces` — Interfaces in `Zphil.LoadBearing.*` must be named `I*`. Nearly every seam here is an interface — ISolutionSource, IEnvironment, IArchitectureSpec — and the `I` prefix is what lets a reader or an agent tell the port from its implementation at a glance, and what makes `I*` a reliable grep for the seams. A convention that holds for most types tells you nothing; this one is total. See <https://learn.microsoft.com/dotnet/standard/design-guidelines/names-of-classes-structs-and-interfaces>.
 
 ### Quarantined scopes
-- `roslyn/msbuild-bootstrap` — Types in `Zphil.LoadBearing.Roslyn.MsBuild.*`, except `MsBuildBootstrap`, must be referenced only by types in `Zphil.LoadBearing.Roslyn.MsBuild.*` or `MsBuildBootstrap`. Fragile host bootstrap; contain it behind MsBuildBootstrap. Sanctioned surface: `MsBuildBootstrap`.
+- `roslyn/msbuild-bootstrap` — Types in the Extraction layer in `Zphil.LoadBearing.Roslyn.MsBuild.*`, except `MsBuildBootstrap`, must be referenced only by types in the Extraction layer in `Zphil.LoadBearing.Roslyn.MsBuild.*` or `MsBuildBootstrap`. Fragile host bootstrap; contain it behind MsBuildBootstrap. Sanctioned surface: `MsBuildBootstrap`.
 <!-- loadbearing:end -->

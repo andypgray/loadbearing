@@ -1,12 +1,11 @@
 {
   "schemaVersion": 2,
-  "digest": "e3b39a5a27d98f6ddaa7423b26bf12fe238fca07e874f7bc4ec6591a86d189bd",
   "rules": {
     "roslyn/msbuild-bootstrap/containment": {
       "entries": [
-        { "source": "T:Zphil.LoadBearing.Tests.Roslyn.MsBuildBootstrapTests", "target": "T:Zphil.LoadBearing.Roslyn.MsBuild.VsInstance", "siteCount": 13 },
-        { "source": "T:Zphil.LoadBearing.Tests.Roslyn.VsWhereLocatorTests", "target": "T:Zphil.LoadBearing.Roslyn.MsBuild.VsInstance", "siteCount": 9 },
-        { "source": "T:Zphil.LoadBearing.Tests.Roslyn.VsWhereLocatorTests", "target": "T:Zphil.LoadBearing.Roslyn.MsBuild.VsWhereLocator", "siteCount": 5 }
+        { "source": "T:Zphil.LoadBearing.Tests.Roslyn.MsBuildBootstrapTests", "target": "T:Zphil.LoadBearing.Roslyn.MsBuild.VsInstance", "siteCount": 13, "seal": "df11ad4c6108f109" },
+        { "source": "T:Zphil.LoadBearing.Tests.Roslyn.VsWhereLocatorTests", "target": "T:Zphil.LoadBearing.Roslyn.MsBuild.VsInstance", "siteCount": 9, "seal": "157526c8089b6233" },
+        { "source": "T:Zphil.LoadBearing.Tests.Roslyn.VsWhereLocatorTests", "target": "T:Zphil.LoadBearing.Roslyn.MsBuild.VsWhereLocator", "siteCount": 5, "seal": "5bc3b5631457ebb7" }
       ]
     }
   }

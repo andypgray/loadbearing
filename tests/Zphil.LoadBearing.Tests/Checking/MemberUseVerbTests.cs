@@ -273,8 +273,8 @@ public sealed class MemberUseVerbTests
             .Member!.SymbolId
             .ShouldBe("M:System.Threading.Tasks.Task.Wait(System.TimeSpan)");
 
-        // Hand-edit the member entry's target line without rebuilding the digest → tamper refusal,
-        // proving the digest is computed over member ids too (prefix-agnostic, zero changes).
+        // Hand-edit the member entry's target line without rebuilding its seal → tamper refusal,
+        // proving the seal is computed over member ids too (prefix-agnostic, zero changes).
         File.WriteAllText(path, File.ReadAllText(path)
             .Replace(
                 "M:System.Threading.Tasks.Task.Wait", "M:System.Threading.Tasks.Task.Wait(System.TimeSpan)"));

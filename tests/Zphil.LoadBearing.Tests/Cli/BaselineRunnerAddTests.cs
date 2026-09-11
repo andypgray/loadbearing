@@ -98,7 +98,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
         string written = File.ReadAllText(path)
             .NormalizedLines();
         written.ShouldContain(
-            "        { \"source\": \"T:MyApp.Web.HomeController\", \"target\": \"P:System.DateTime.Now\", \"siteCount\": 1, \"because\": \"INC-1234\" }");
+            "        { \"source\": \"T:MyApp.Web.HomeController\", \"target\": \"P:System.DateTime.Now\", \"siteCount\": 1, \"because\": \"INC-1234\", \"seal\": ");
         // Composer as oracle: the whole file is the canonical composition of exactly that one entry.
         written.ShouldBe(BaselineComposer.Compose(
             RuleId,
@@ -140,7 +140,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
         string written = File.ReadAllText(path)
             .NormalizedLines();
         written.ShouldContain(
-            "        { \"source\": \"T:MyApp.Web.OrderController\", \"target\": \"T:MyApp.Data.Db\", \"siteCount\": 1, \"because\": \"INC-9\" }");
+            "        { \"source\": \"T:MyApp.Web.OrderController\", \"target\": \"T:MyApp.Data.Db\", \"siteCount\": 1, \"because\": \"INC-9\", \"seal\": ");
         // Composer as oracle: the whole file is the canonical composition of exactly that one edge entry.
         written.ShouldBe(BaselineComposer.Compose(
             CtorRuleId,

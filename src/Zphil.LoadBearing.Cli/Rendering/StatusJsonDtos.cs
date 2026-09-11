@@ -9,9 +9,15 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 // document is byte-identical. The ratchet's two measure counts are additive the same way, on both the
 // per-rule block and the summary. The two site totals beside them are not: a burndown unit that appears
 // only sometimes is worse than one more integer, so they are written whatever they read, and the schema
-// stays at 2 because a consumer that never asked for them is unaffected by two more keys. A new posture is
+// stays at 2 because a consumer that never asked for them is unaffected by two more keys. The ratchet's
+// per-cell split is additive in the first sense: only a family rule with debt left carries it, so every
+// document that could be produced before this key existed is still produced byte for byte. A new posture is
 // additive in the same sense — `caution` is one more value of an enum the schema already carries, not a new
-// shape — so the schema stays at 2 for that too.
+// shape — so the schema stays at 2 for that too. The two rot keys are additive in the first sense as well
+// (only a rule that matched nothing carries either), but they also change what an existing key COUNTS rather
+// than merely sitting beside it: a rotted rule's unmatched entries leave `fixedAwaitingAcceptance` for
+// `unmeasured`. No document a measured run could produce moves, which is what keeps the schema at 2 — the
+// only figures that move are the ones that were wrong.
 
 /// <summary>The root <c>status --json</c> document.</summary>
 /// <param name="SchemaVersion">The burndown document's schema version — 2.</param>
@@ -110,6 +116,20 @@ internal sealed record StatusRuleJson(
 ///     omitted at zero, so a rule whose section is fully counted and still holding carries neither key.
 /// </param>
 /// <param name="Promotable">Whether the Migrate ratchet has burned to zero; omitted for Quarantine.</param>
+/// <param name="MatchedNothing">
+///     <see langword="true" /> when the rule's own selection matched nothing, so it was reported without
+///     being measured against the code and <see cref="Stale" /> counts entries that went untested rather
+///     than debt that was paid; null (omitted) on every rule the run measured. The cure rides
+///     <c>check --json</c>, on the violation for an empty subject and on the warning for an inert target.
+/// </param>
+/// <param name="Cells">
+///     Where the remaining debt sits, for a rule whose subject is a family (<c>arch.Each</c>) — one entry
+///     per cell that still holds a tolerated pair, in the order the family declares its cells, summing to
+///     <see cref="Remaining" /> and <see cref="RemainingSites" />. Null (omitted) for every other rule and
+///     for a family rule with nothing left, so a consumer that never asked for it sees the document it saw
+///     before. A cell whose pairs are all fixed drops out rather than reading zero: the array says where
+///     work remains, and a project family can name every project in a solution.
+/// </param>
 internal sealed record RatchetStatusJson(
     string BaselinePath,
     bool Captured,
@@ -119,7 +139,15 @@ internal sealed record RatchetStatusJson(
     int Stale,
     int? Shrunk,
     int? Uncounted,
-    bool? Promotable);
+    bool? Promotable,
+    IReadOnlyList<RatchetCellJson>? Cells,
+    bool? MatchedNothing);
+
+/// <summary>One cell's share of a family rule's remaining debt.</summary>
+/// <param name="Name">The cell — the layer's name, or the project's.</param>
+/// <param name="Remaining">How many tolerated pairs this cell's law holds.</param>
+/// <param name="RemainingSites">How many source sites those pairs cover between them.</param>
+internal sealed record RatchetCellJson(string Name, int Remaining, int RemainingSites);
 
 /// <summary>The roll-up: rule counts plus the ratchet burndown totals.</summary>
 /// <param name="RulesChecked">How many rules the run evaluated.</param>
@@ -131,9 +159,17 @@ internal sealed record RatchetStatusJson(
 ///     The same burndown in sites — <see cref="RatchetStatusJson.RemainingSites" /> totalled, and
 ///     unconditional for its reason.
 /// </param>
-/// <param name="FixedAwaitingAcceptance">Stale entries across every rule.</param>
+/// <param name="FixedAwaitingAcceptance">
+///     Stale entries across the rules this run measured. An entry left unmatched by a rule that measured
+///     nothing is counted by <see cref="Unmeasured" /> instead, so the two partition every unmatched entry
+///     and the sum of the per-rule <see cref="RatchetStatusJson.Stale" /> counts.
+/// </param>
 /// <param name="Shrunk">Shrunk entries across every rule, or null (omitted) when there are none.</param>
 /// <param name="Uncounted">Uncounted entries across every rule, or null (omitted) when there are none.</param>
+/// <param name="Unmeasured">
+///     Entries left unmatched by a rule whose own selection matched nothing, across every rule, or null
+///     (omitted) when every rule was measured. Untouched debt of unknown size, not progress.
+/// </param>
 internal sealed record StatusSummaryJson(
     int RulesChecked,
     int RulesPassed,
@@ -143,4 +179,5 @@ internal sealed record StatusSummaryJson(
     int GrandfatheredSites,
     int FixedAwaitingAcceptance,
     int? Shrunk,
-    int? Uncounted);
+    int? Uncounted,
+    int? Unmeasured);

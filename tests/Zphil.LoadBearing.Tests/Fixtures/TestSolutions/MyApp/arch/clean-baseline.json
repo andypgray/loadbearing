@@ -1,11 +1,10 @@
 {
   "schemaVersion": 2,
-  "digest": "042bb3d28c34863127714187c93b2c94c37d857a70c9120759858d1896e9e03b",
   "rules": {
     "data-access/no-inline-sql": {
       "entries": [
-        { "source": "T:MyApp.Web.HomeController", "target": "T:System.Data.DataTable", "siteCount": 2 },
-        { "source": "T:MyApp.Web.InvoiceController", "target": "T:System.Data.DataTable", "siteCount": 2 }
+        { "source": "T:MyApp.Web.HomeController", "target": "T:System.Data.DataTable", "siteCount": 2, "seal": "7d6171ec78737e34" },
+        { "source": "T:MyApp.Web.InvoiceController", "target": "T:System.Data.DataTable", "siteCount": 2, "seal": "1bb6eab278025871" }
       ]
     }
   }

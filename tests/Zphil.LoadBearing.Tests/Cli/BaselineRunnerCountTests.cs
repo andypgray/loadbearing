@@ -108,6 +108,12 @@ public sealed class BaselineRunnerCountTests : IDisposable
                                        namespace App.Data { public class Ledger {} }
                                        """;
 
+    // The other half of the same rot, and the dangerous one: the subject is intact and the forbidden TARGET
+    // matched nothing, so the rule warns itself inert and produces no violations at all.
+    private const string NoDataSource = """
+                                        namespace App.Web { public class ReportController {} }
+                                        """;
+
     private readonly TempDirectory _temp = TestTempRoot.Fresh("baseline-runner-count");
 
     private static BaselineEntry Pair => BaselineEntry.ForEdge(ControllerId, LedgerId);
@@ -319,17 +325,56 @@ public sealed class BaselineRunnerCountTests : IDisposable
     [Fact]
     public void Init_RuleWithNothingCapturable_WritesNoFile()
     {
-        // An empty subject is unbaselinable and is echoed as skipped; the file it would have gone into is not
-        // created around that absence.
+        // An empty subject is a selection that matched nothing, so it is refused as rot rather than as an
+        // unbaselinable identity; either way the file it would have gone into is not created around that
+        // absence.
         CheckReport report = Check(NoWebSource);
 
         string echo = Init(report.Results);
 
         echo.ShouldContain(
-            "data-access/ledger-behind-repository: cannot capture — the rule has an empty subject or an evaluation error; skipped.");
+            "data-access/ledger-behind-repository: cannot capture — the rule's selection matched nothing, so "
+            + "this run measured no debt for it; skipped. Fix the rule's selection, then re-run.");
         echo.ShouldNotContain("wrote");
         Directory.EnumerateFiles(_temp.Path, "*", SearchOption.AllDirectories)
             .ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Init_RuleThatErrored_SaysSoInItsOwnTerms()
+    {
+        // The sentence the rot guard left behind, and the only state that still reaches it: a rule that threw
+        // has no stable identity either, but nothing about its selection was wrong and telling the author to
+        // fix one would send them after the wrong defect.
+        var errored = new RuleResult(Model().Rule(RuleId), RuleStatus.Failed, [Violation.RuleError("boom")]);
+
+        string echo = Init([errored]);
+
+        echo.ShouldContain("data-access/ledger-behind-repository: cannot capture — the rule had an evaluation error; skipped.");
+        echo.ShouldNotContain("wrote");
+    }
+
+    [Fact]
+    public void AcceptReductions_RuleWhoseTargetRotted_RefusesRatherThanDeletingTheWholeSection()
+    {
+        // The harm that made the status wording load-bearing. The target selection matched nothing, so the
+        // rule warns itself inert and reports no violations — which is indistinguishable, to an intersection,
+        // from every violation having been fixed. Before the guard this echoed "accepted 2 reductions" and
+        // wrote an empty section over two live entries, on the command status itself told the reader to run.
+        CheckReport report = Check(NoDataSource);
+        string before = BaselineComposer.Compose(RuleId, ExportPair.WithSiteCount(2), Pair.WithSiteCount(2));
+        string path = WriteBaseline(before);
+
+        string echo = AcceptReductions(report.Results);
+
+        echo.ShouldSatisfyAllConditions(
+            () => echo.ShouldContain(
+                "data-access/ledger-behind-repository: cannot capture — the rule's selection matched nothing, so "
+                + "this run measured no debt for it; skipped. Fix the rule's selection, then re-run."),
+            () => echo.ShouldNotContain("reduction"),
+            () => echo.ShouldNotContain("wrote"));
+        Read(path)
+            .ShouldBe(before);
     }
 
     // One ratcheted reference rule over the two synthetic namespaces, checked against an empty baseline so

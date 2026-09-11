@@ -16,7 +16,10 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 ///     CLI + xUnit-adapter surface): the unlocated <c>error:</c> (RuleError) and empty-subject lines, the
 ///     site-less Shape fallback, the unlocated-before-located ordering, the ratchet's grown trailer, the
 ///     dragons lines beneath a fired scope tripwire, and the <c>Render</c> summary tail — down to how it
-///     inflects its counts and files a warned rule under <c>passed</c>. Pinned strings are the spec.
+///     inflects its counts and files a warned rule under <c>passed</c>. Two gates on a rule that reached no
+///     verdict about the code are here too: the authored <c>fix:</c> is withheld, and the
+///     <c>baseline --init</c> hint stays withheld for every violation with no identity to record. Pinned
+///     strings are the spec.
 /// </summary>
 public sealed class HumanReportRendererTests
 {
@@ -148,6 +151,69 @@ public sealed class HumanReportRendererTests
         block.ShouldSatisfyAllConditions(
             () => block.ShouldNotContain("baseline --init"),
             () => block.ShouldContain("hint: THE-REAL-CURE"));
+    }
+
+    [Fact]
+    public void RuleBlock_FailingOnlyOnAnEmptySubject_KeepsTheReasonAndWithholdsTheFix()
+    {
+        // The fix advises correcting a violation of the rule, and an empty subject is not one: the rule never
+        // ran, so the advice is for a situation that did not arise, sitting directly above the hint that says
+        // what actually went wrong. The reason stays — it is a fact about the rule whatever happened to it,
+        // and the xunit adapter's failure message is this same block.
+        var result = new RuleResult(
+            FixedRule("naming/x"), RuleStatus.Failed,
+            [Violation.EmptySubject("matched nothing", "THE-REAL-CURE")], [], null, []);
+
+        string block = result.HumanBlock();
+
+        block.ShouldSatisfyAllConditions(
+            () => block.ShouldContain("because: A reader cannot find the type."),
+            () => block.ShouldNotContain("fix: Rename it."),
+            () => block.ShouldContain("hint: THE-REAL-CURE"));
+    }
+
+    [Fact]
+    public void RuleBlock_FailingOnlyOnARuleError_WithholdsTheFixToo()
+    {
+        // The same question, the same answer: a predicate that threw reached no verdict about the code either,
+        // so the gate is keyed on that rather than on the one kind the empty-subject case named.
+        var result = new RuleResult(
+            FixedRule("naming/x"), RuleStatus.Failed, [Violation.RuleError("boom")], [], null, []);
+
+        string block = result.HumanBlock();
+
+        block.ShouldSatisfyAllConditions(
+            () => block.ShouldContain("because: A reader cannot find the type."),
+            () => block.ShouldNotContain("fix: Rename it."),
+            () => block.ShouldContain("error: boom"));
+    }
+
+    [Fact]
+    public void RuleBlock_FailingOnTheCode_StillPrintsTheFix()
+    {
+        // The control: a real finding is exactly what the fix is advice for, so the block a reader has always
+        // got is unchanged. Without this row the gate could pass by withholding the fix from everything.
+        var result = new RuleResult(
+            FixedRule("naming/x"), RuleStatus.Failed, [Violation.Shape(SyntheticNodes.Type("App.Orphan"), [])],
+            [], null, []);
+
+        result.HumanBlock()
+            .ShouldContain("fix: Rename it.");
+    }
+
+    [Fact]
+    public void RuleBlock_RatchetedRuleThatErrored_OmitsTheBaselineHintAsWell()
+    {
+        // The latent half of the same defect. --init grandfathers by identity, and a rule error has none
+        // either (GRAMMAR §4.3) — so a ratcheted, errored rule was told to run a command that would silently
+        // record nothing, which is the instruction the empty-subject gate removed for its sibling kind. Keying
+        // the gate on the identity rather than on the kinds that lack one is what covered this without anyone
+        // having to remember it.
+        var result = new RuleResult(
+            MigrateRule("data/x"), RuleStatus.Failed, [Violation.RuleError("boom")], [], null, []);
+
+        result.HumanBlock()
+            .ShouldNotContain("baseline --init");
     }
 
     [Fact]
@@ -507,6 +573,14 @@ public sealed class HumanReportRendererTests
     private static ArchRule EnforceRule(string id)
     {
         return new ArchRule(id, Posture.Enforce, "b", null, "s", null, null, null);
+    }
+
+    // A rule carrying both halves of the failing rule's framing, spelled out rather than placeholders: the
+    // rows below assert which of them reached the page, so a reader of a red has to be able to tell the two
+    // lines apart.
+    private static ArchRule FixedRule(string id)
+    {
+        return new ArchRule(id, Posture.Enforce, "A reader cannot find the type.", "Rename it.", "s", null, null, null);
     }
 
     // A tripwire that fired: one warning per changed file, which is what the checker produces and what lets

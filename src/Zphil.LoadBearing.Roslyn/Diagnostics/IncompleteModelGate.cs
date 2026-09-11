@@ -287,6 +287,48 @@ internal static class IncompleteModelGate
             null);
     }
 
+    /// <summary>
+    ///     The cure a rule whose own selection matched nothing reports while the model is partial — an empty
+    ///     subject or an inert target alike. It gates nothing, like <see cref="ContextCaveat" />: it is the
+    ///     same two causes with the same two remedies, said at the one moment a reader is about to act on
+    ///     advice that would otherwise send them after a spec defect that is not there.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         One sentence rather than this class's usual evidence block, and that is the constraint that
+    ///         shapes it: an authoring cure is a single line on a single slot, so it cannot carry a block, a
+    ///         project list, or the two-blocks-one-per-cause shape <see cref="Message" /> composes. The causes
+    ///         therefore fold into one clause and the remedies into one, keeping load's repair ahead of
+    ///         restore's wherever both apply — the same precedence every message here keeps.
+    ///     </para>
+    ///     <para>
+    ///         It must read in the voice of the cures it replaces, which are pinned as one line ending in a
+    ///         full stop, opening upper-case, parting diagnosis from cure with a semicolon, and never in the
+    ///         second person.
+    ///     </para>
+    /// </remarks>
+    internal static string EmptySelectionHint(WorkspaceDiagnostics diagnostics)
+    {
+        bool load = diagnostics.FailedProjects.Count > 0;
+        bool restore = diagnostics.RestoreFailedProjects.Count > 0;
+
+        string cause = (load, restore) switch
+        {
+            (true, true) => $"{Failed(diagnostics)} failed to load and NuGet packages did not resolve for "
+                            + $"{Unrestored(diagnostics)}",
+            (true, false) => $"{Failed(diagnostics)} failed to load",
+            _ => $"NuGet packages did not resolve for {Unrestored(diagnostics)}"
+        };
+
+        // A failed load needs the build as well as the restore; an unresolved package needs only the restore.
+        string repair = load
+            ? "restore and build the solution (dotnet restore, dotnet build)"
+            : "restore the solution (dotnet restore)";
+
+        return $"The model is incomplete: {cause}, so this selection may name types or rest on references "
+               + $"that were never extracted; {repair}, then re-check before reading this as a spec defect.";
+    }
+
     // The count, as a noun phrase every lede can take: "1 project" / "3 projects". A gate that knows exactly
     // which projects failed has no business saying "one or more".
     private static string Failed(WorkspaceDiagnostics diagnostics)
