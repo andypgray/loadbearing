@@ -18,11 +18,21 @@ internal static class Plurals
 {
     /// <summary>
     ///     <paramref name="noun" /> inflected for <paramref name="count" />: bare for exactly one,
-    ///     suffixed with <c>s</c> for anything else — zero included.
+    ///     pluralized for anything else — zero included. A final <c>y</c> after a consonant becomes
+    ///     <c>ies</c> (<c>entry</c> → <c>entries</c>); everything else takes <c>s</c>.
     /// </summary>
+    /// <remarks>
+    ///     The vowel test is the whole content of the second rule: it is what keeps <c>day</c> from
+    ///     becoming <c>daies</c>. Written out here rather than at the one caller that needs it, because a
+    ///     second copy of English is exactly the drift this owner exists to prevent.
+    /// </remarks>
     internal static string Noun(int count, string noun)
     {
-        return count == 1 ? noun : noun + "s";
+        if (count == 1) return noun;
+
+        int last = noun.Length - 1;
+        bool consonantY = last > 0 && noun[last] == 'y' && "aeiouAEIOU".IndexOf(noun[last - 1]) < 0;
+        return consonantY ? noun.Substring(0, last) + "ies" : noun + "s";
     }
 
     /// <summary>

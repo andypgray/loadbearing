@@ -1,5 +1,6 @@
-using Shouldly;
+﻿using Shouldly;
 using Xunit;
+using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Hosting;
@@ -12,8 +13,8 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 /// <summary>
 ///     The human failure-text renderer's violation arms (<see cref="HumanReportRenderer" />, the shared
 ///     CLI + xUnit-adapter surface): the unlocated <c>error:</c> (RuleError) and empty-subject lines, the
-///     site-less Shape fallback, the unlocated-before-located ordering, and the <c>Render</c> summary tail.
-///     Pinned strings are the spec.
+///     site-less Shape fallback, the unlocated-before-located ordering, the ratchet's grown trailer, and the
+///     <c>Render</c> summary tail. Pinned strings are the spec.
 /// </summary>
 public sealed class HumanReportRendererTests
 {
@@ -73,7 +74,7 @@ public sealed class HumanReportRendererTests
     public void RuleBlock_ShapeSubjectWithoutDeclarationSites_RendersUnlocatedFullName()
     {
         // A Shape violation carrying no site has no file:line, so the renderer emits its bare FullName as
-        // an unlocated line (HumanReportRenderer.cs:129-130) rather than a located `path:line — …` line.
+        // an unlocated line (HumanReportRenderer.cs:151-152) rather than a located `path:line — …` line.
         TypeNode subject = Node("App.Orphan");
         var result = new RuleResult(
             EnforceRule("shape/x"), RuleStatus.Failed, [Violation.Shape(subject, [])], [], null, []);
@@ -224,7 +225,7 @@ public sealed class HumanReportRendererTests
     public void RuleBlock_MixedUnlocatedAndLocated_EmitsUnlocatedBeforeLocated()
     {
         // Every unlocated line (EmptySubject/RuleError/site-less Shape) is emitted before the file-ordered
-        // located lines, regardless of input order (HumanReportRenderer.cs:155-163).
+        // located lines, regardless of input order (HumanReportRenderer.cs:177-185).
         var site = new SourceLocation("Located.cs", 7);
         TypeNode located = Node("App.Located", site);
         var result = new RuleResult(
@@ -240,6 +241,46 @@ public sealed class HumanReportRendererTests
     }
 
     [Fact]
+    public void RuleBlock_GrownPair_RendersRedSitesAndTheGrownTrailer()
+    {
+        // A grandfathered pair carrying one site more than its entry records. Every site is red, not just the
+        // new one — which site is new is a diff question the count cannot answer — and the trailer is what
+        // says why a pair the baseline names is red at all: the allowance beside what the run measured.
+        const string source = """
+                              namespace App.Web
+                              {
+                                  public class OldController
+                                  {
+                                      public App.Data.Db A() => new App.Data.Db();
+                                      public App.Data.Db B() => new App.Data.Db();
+                                  }
+                              }
+                              namespace App.Data { public class Db {} }
+                              """;
+        BaselineIndex index = Checker.Baselines(
+            "data/x",
+            BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db")
+                .WithSiteCount(1));
+
+        RuleResult result = Checker.Run(source, index, arch =>
+                arch.Rule("data/x")
+                    .Migrate(
+                        "Controllers open the data layer directly (legacy Active Record style).",
+                        arch.Namespace("App.Web.*").WithSuffix("Controller").MustNotReference(arch.Namespace("App.Data.*")))
+                    .Because("Repository pattern for testability."))
+            .Single();
+
+        string block = result.HumanBlock();
+
+        block.ShouldContain("Test.cs:5 — App.Web.OldController references App.Data.Db");
+        block.ShouldContain("Test.cs:6 — App.Web.OldController references App.Data.Db");
+        block.ShouldContain("  grown: 1 grandfathered pair exceeded the baseline site count (1 baselined, 2 observed)");
+        // The pair is red, so nothing passed for the grandfathered count to report — the trailer is the only
+        // place the baseline is named.
+        block.ShouldNotContain("grandfathered:");
+    }
+
+    [Fact]
     public void RuleBlock_SkippedRatchetedRule_IsTheHeaderAndTheReasonAndNothingElse()
     {
         // A ratcheted rule the run reached no verdict for has no burndown to print: the grandfathered count
@@ -247,7 +288,7 @@ public sealed class HumanReportRendererTests
         // whole block rather than as two absences, so any line that ever creeps in below the reason reds.
         const string reason = "'BillingOnly.slnf' narrowed this run.";
         ArchRule rule = MigrateRule("data/x");
-        var result = new RuleResult(rule, RuleStatus.Skipped, [], [], reason, [], 0, true);
+        var result = new RuleResult(rule, RuleStatus.Skipped, [], [], reason, [], default, true);
 
         string block = result.HumanBlock();
 

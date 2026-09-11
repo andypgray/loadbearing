@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 1,
-  "digest": "9947aa54ef300f1ad2fce4aca938e67c378a30e3c6d0343cca8b9cf2fe79ff25",
+  "schemaVersion": 2,
+  "digest": "714225a87811044475463196e1650fd60e5ed7481995a8852c493621405b29d6",
   "rules": {
     "naming/async-suffix": {
       "entries": [

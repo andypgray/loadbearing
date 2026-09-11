@@ -1,10 +1,10 @@
 {
-  "schemaVersion": 1,
-  "digest": "5a2d44770632c921c27c338f9178d1e2d4d76b775056f17a54f39e33b8a40eaf",
+  "schemaVersion": 2,
+  "digest": "fdaa8af68f61753f7ebfe94a48888f983994aa5e4b07edb96e66e1412dbb2582",
   "rules": {
     "data-access/no-inline-sql": {
       "entries": [
-        { "source": "T:MyApp.Web.InvoiceController", "target": "T:System.Data.DataTable" }
+        { "source": "T:MyApp.Web.InvoiceController", "target": "T:System.Data.DataTable", "siteCount": 2 }
       ]
     }
   }

@@ -16,15 +16,18 @@ public sealed class StatusCommandE2ETests
     {
         CliResult result = await CliRunner.InvokeAsync("status", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
 
+        // The Invoice pair covers two DataTable sites, so the burndown states them: the pair count is what
+        // the baseline holds and the site count is what the work is. Services-behind-contracts below is one
+        // subject declaration, so its line is unchanged — the parenthetical extinguishes itself.
         result.ShouldSucceed(
-            "FAIL data-access/no-inline-sql (migrate) — 1 grandfathered remaining, 1 new, 0 fixed awaiting acceptance");
+            "FAIL data-access/no-inline-sql (migrate) — 1 grandfathered remaining (2 sites), 1 new, 0 fixed awaiting acceptance");
         // Quarantine containment ratchets like Migrate (uncaptured here) but never suggests promotion.
         result.Out.ShouldContain(
             "FAIL legacy/billing/containment (quarantine) — no baseline captured; run 'loadbearing baseline --init' (2 current violations)");
         result.Out.ShouldContain("skip legacy/billing/tripwire (tripwire) — diff-aware; run 'loadbearing check --diff-base <ref>'");
         result.Out.ShouldContain(
             "FAIL layering/services-behind-contracts (migrate) — 1 grandfathered remaining, 1 new, 0 fixed awaiting acceptance");
-        result.Out.ShouldContain("Burndown: 2 grandfathered remaining, 0 fixed awaiting acceptance.");
+        result.Out.ShouldContain("Burndown: 2 grandfathered remaining (3 sites), 0 fixed awaiting acceptance.");
     }
 
     [Fact]

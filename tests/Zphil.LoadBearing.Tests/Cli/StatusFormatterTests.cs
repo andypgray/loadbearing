@@ -2,6 +2,7 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Rendering;
+using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Tests.Checking;
 
@@ -12,7 +13,8 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     <see cref="RuleResult" />s — no workspace: Enforce pass/FAIL with counts, the four Migrate states
 ///     (captured-failing, promotable, interim-awaiting-acceptance, and uncaptured), the Quarantine
 ///     containment ratchet lines (which never promote) and the tripwire's diff-aware skip, the
-///     narrowing skip that overrides posture dispatch entirely, plus the burndown summary.
+///     narrowing skip that overrides posture dispatch entirely, the three measure terms and their
+///     self-extinguishing behaviour, plus the burndown summary and the nudge it carries once per run.
 /// </summary>
 public sealed class StatusFormatterTests
 {
@@ -125,6 +127,60 @@ public sealed class StatusFormatterTests
             .ShouldBe("FAIL data-access/no-inline-sql (migrate) — 1 grandfathered remaining, 1 new, 0 fixed awaiting acceptance");
     }
 
+    [Theory]
+    [InlineData(1, "1 grandfathered remaining")]
+    [InlineData(3, "1 grandfathered remaining (3 sites)")]
+    public void Migrate_GrandfatheredPairCoveringSeveralSites_StatesTheSiteTotal(int sitesEach, string expected)
+    {
+        // The burndown's real unit: one pair over three sites is three migrations, not one. The parenthetical
+        // is self-extinguishing — at one site per pair it says nothing the pair count does not, and the line
+        // is byte-for-byte the one this rule printed before the measure existed.
+        Line(Result(
+                Model.Rule("data-access/no-inline-sql"), RuleStatus.Failed, 1, grandfathered: 1, captured: true,
+                sitesEach: sitesEach))
+            .ShouldBe($"FAIL data-access/no-inline-sql (migrate) — {expected}, 1 new, 0 fixed awaiting acceptance");
+    }
+
+    [Fact]
+    public void Migrate_ShrunkEntries_TrailTheAwaitingAcceptanceTerm()
+    {
+        // A matched entry whose pair came in under the count it records: a real reduction, never red, and
+        // reported so 'baseline --accept-reductions' has something to lower the count to. It trails the stale
+        // term rather than joining the head of the list, because like it, it names a state a write clears.
+        Line(Result(
+                Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, grandfathered: 4, captured: true,
+                shrunk: 1))
+            .ShouldBe(
+                "pass data-access/no-inline-sql (migrate) — 4 grandfathered remaining, 0 new, "
+                + "0 fixed awaiting acceptance, 1 shrunk");
+    }
+
+    [Fact]
+    public void Summary_UncountedEntries_CarryTheRecordingNudgeOnceUnderTheBurndown()
+    {
+        // The nudge is advice, so it rides the summary's uncounted clause and nowhere else: repeated down
+        // every rule line it would be noise on a run whose remedy is one command. The rule line still says
+        // how many of its own entries are uncounted, which is the number the command will record.
+        var report = new CheckReport(
+        [
+            Result(
+                Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, grandfathered: 2, captured: true,
+                sitesEach: 4, uncounted: 2)
+        ]);
+
+        IReadOnlyList<string> lines = StatusFormatter.Lines(report);
+
+        lines[0]
+            .ShouldBe(
+                "pass data-access/no-inline-sql (migrate) — 2 grandfathered remaining (8 sites), 0 new, "
+                + "0 fixed awaiting acceptance, 2 uncounted");
+        lines.Last()
+            .ShouldBe(
+                "Checked 1 rules: 1 passed, 0 failed, 0 skipped. Burndown: 2 grandfathered remaining (8 sites), "
+                + "0 fixed awaiting acceptance, 2 uncounted; run 'loadbearing baseline --accept-reductions' "
+                + "to record site counts.");
+    }
+
     [Fact]
     public void Migrate_PromotableWhenBaselineEmpty()
     {
@@ -168,8 +224,12 @@ public sealed class StatusFormatterTests
 
     private static RuleResult Result(
         ArchRule rule, RuleStatus status, int violations = 0, int warnings = 0, int grandfathered = 0, int stale = 0,
-        bool captured = false, string? skipReason = null)
+        bool captured = false, string? skipReason = null, int sitesEach = 0, int shrunk = 0, int uncounted = 0)
     {
+        IReadOnlyList<Violation> remaining = sitesEach > 0
+            ? SitedDummies(grandfathered, sitesEach)
+            : Dummies(grandfathered);
+
         return new RuleResult(
             rule,
             status,
@@ -178,15 +238,48 @@ public sealed class StatusFormatterTests
                 .Select(_ => new CheckWarning(CheckWarningKind.InertTarget, "w"))
                 .ToList(),
             skipReason,
-            Dummies(grandfathered),
-            stale,
+            remaining,
+            new RatchetMeasure(stale, shrunk, uncounted),
             captured);
     }
 
+    /// <summary>
+    ///     Stand-in violations carrying no site at all, which is what makes them the right default: the site
+    ///     total prints only when it exceeds the pair count, so a rule built from these prints the line it
+    ///     printed before the measure existed and every pre-measure row keeps its pin unchanged.
+    /// </summary>
     private static IReadOnlyList<Violation> Dummies(int count)
     {
         return Enumerable.Range(0, count)
             .Select(_ => Violation.RuleError("x"))
             .ToList();
+    }
+
+    /// <summary>
+    ///     The site-carrying sibling: <paramref name="count" /> stand-ins of <paramref name="sites" /> distinct
+    ///     <c>file:line</c> sites apiece — the shape a real grandfathered pair has, and the only one that
+    ///     reaches the site total.
+    /// </summary>
+    private static IReadOnlyList<Violation> SitedDummies(int count, int sites)
+    {
+        return Enumerable.Range(0, count)
+            .Select(index => Violation.Shape(Node($"App.Subject{index}"), Sites(index, sites)))
+            .ToList();
+    }
+
+    private static IReadOnlyList<SourceLocation> Sites(int index, int sites)
+    {
+        return Enumerable.Range(1, sites)
+            .Select(line => new SourceLocation($"Subject{index}.cs", line))
+            .ToList();
+    }
+
+    // A shallow TypeNode standing in for a Shape subject: the formatter counts sites and reads nothing else
+    // off it, so the remaining scalar facts are inert placeholders.
+    private static TypeNode Node(string fullName)
+    {
+        return new TypeNode(
+            fullName, "T:" + fullName, fullName, string.Empty, TypeKind.Class, Accessibility.Public,
+            false, false, false, false, false, "TestProject", false);
     }
 }

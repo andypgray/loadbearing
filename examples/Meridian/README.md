@@ -117,13 +117,13 @@ Because the Migrate and Quarantine baselines are counted, `loadbearing status` r
 ```text
 pass layering/domain-independent
 pass naming/controllers
-pass data-access/no-inline-sql (migrate) — 12 grandfathered remaining, 0 new, 0 fixed awaiting acceptance
+pass data-access/no-inline-sql (migrate) — 12 grandfathered remaining (31 sites), 0 new, 0 fixed awaiting acceptance
 pass time/inject-clock (migrate) — 7 grandfathered remaining, 0 new, 0 fixed awaiting acceptance
 pass naming/async-suffix (migrate) — 13 grandfathered remaining, 0 new, 0 fixed awaiting acceptance
 pass di/no-buildserviceprovider
-pass clearance/engine/containment (quarantine) — 1 grandfathered remaining, 0 new, 0 fixed awaiting acceptance
+pass clearance/engine/containment (quarantine) — 1 grandfathered remaining (2 sites), 0 new, 0 fixed awaiting acceptance
 skip clearance/engine/tripwire (tripwire) — diff-aware; run 'loadbearing check --diff-base <ref>'
-Checked 8 rules: 7 passed, 0 failed, 1 skipped. Burndown: 33 grandfathered remaining, 0 fixed awaiting acceptance.
+Checked 8 rules: 7 passed, 0 failed, 1 skipped. Burndown: 33 grandfathered remaining (53 sites), 0 fixed awaiting acceptance.
 ```
 
 Move a controller onto a repository and its grandfathered count drops. When a Migrate rule reaches zero, the tool suggests promoting it to `Enforce`.

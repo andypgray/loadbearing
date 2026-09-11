@@ -423,43 +423,44 @@ Per verb class — this is grammar-level semantics, not baseline file format:
 - **Dependency verbs**: `(ruleId, source symbol ID, target symbol ID)`. A second forbidden
   reference from a grandfathered type — or the same type referencing a *different* forbidden
   target — is NEW and red, preserving the ratchet ("new code in the old pattern must be
-  red"). Multiple reference sites within one (source, target) pair ride together; this is
-  documented behavior.
+  red"). Multiple reference sites within one (source, target) pair ride together under that
+  one identity, and the entry records how many it grandfathers: more sites than it recorded is
+  NEW and red, fewer is a reduction (the site-count paragraph below).
 - **Construction verb** (`MustNotConstruct`, §4.5/§5.3): `(ruleId, source symbol ID,
   constructed symbol ID)` — the same edge-key shape as a dependency reference, the constructed
   type keying the target slot. Overload-indifferent: every constructor overload of the constructed
   type collapses to the one type-pair identity, and the `new` sites are evidence, not identity.
   A grandfathered `new Foo()` plus a *different* forbidden constructed target from the same
   source is NEW and red, exactly like the reference ratchet; multiple `new` sites within one
-  (source, constructed) pair ride together.
+  (source, constructed) pair ride together, and are counted.
 - **Injection verb** (`MustNotInject`, §4.7/§5.3): `(ruleId, source symbol ID, injected
   symbol ID)` — the same edge-key shape, the injected parameter type keying the target
   slot. Constructor-overload- and parameter-name-indifferent: every constructor parameter
   typed on the injected type collapses to the one type-pair identity, and the parameter sites
   are evidence, not identity. A grandfathered captive injection plus a *different* forbidden
   injected target from the same source is NEW and red; multiple injecting parameters within
-  one (source, injected) pair ride together.
+  one (source, injected) pair ride together, and are counted.
 - **Catch verbs** (`MustNotCatch`, `MustNotCatchUnfiltered` and `MustNotSwallow`, §4.8/§5.3):
   `(ruleId, source symbol ID, caught symbol ID)` — the same edge-key shape, the caught
   exception type keying the target slot.
   Catch sites are evidence, not identity: multiple `catch` clauses within one (source, caught)
-  pair ride together, and a grandfathered catch plus a *different* forbidden caught type from
-  the same source is NEW and red. **All three catch verbs key that same edge.** The *unfiltered*
-  sites `MustNotCatchUnfiltered` reports and the *swallowing* sites `MustNotSwallow` reports are
-  evidence too — narrowing which sites a violation
-  prints never narrows what it keys — so an entry written under one catch verb keys the
-  identical edge under the others, and adding a `when` filter or a terminal `throw` to one clause
-  of a grandfathered pair moves the evidence, not the baseline.
+  pair ride together and are counted, and a grandfathered catch plus a *different* forbidden
+  caught type from the same source is NEW and red. **All three catch verbs key that same edge.**
+  The *unfiltered* sites `MustNotCatchUnfiltered` reports and the *swallowing* sites
+  `MustNotSwallow` reports are evidence too — narrowing which sites a violation prints never
+  narrows what it keys — so an entry written under one catch verb keys the identical edge under
+  the others, and adding a `when` filter or a terminal `throw` to any clause of a grandfathered
+  pair moves the evidence, not the baseline.
 - **Throw verbs** (`MustOnlyThrow` and `MustNotThrow`, §4.8/§5.3): `(ruleId, source symbol ID,
   thrown symbol ID)` — the same shape, the thrown type keying the target slot. Throw sites
-  are evidence, not identity; a grandfathered thrown type plus a *different* thrown type the
-  rule objects to, from the same source, is NEW and red. The allow-list and the ban key edges
-  identically, so which polarity a spec chose is invisible to its baselines.
+  are evidence, not identity, and are counted; a grandfathered thrown type plus a *different*
+  thrown type the rule objects to, from the same source, is NEW and red. The allow-list and
+  the ban key edges identically, so which polarity a spec chose is invisible to its baselines.
 - **Exposure verb** (`MustNotExpose`, §4.9/§5.3): `(ruleId, source symbol ID, exposed symbol
   ID)` — the same edge-key shape, the exposed type keying the target slot. Signature
   positions are evidence, not identity: every signature position of one exposed type within a
-  source rides together, and a grandfathered exposure plus a *different* forbidden exposed
-  type from the same source is NEW and red.
+  source rides together and is counted, and a grandfathered exposure plus a *different*
+  forbidden exposed type from the same source is NEW and red.
 - **Shape/naming/inheritance/attribute/membership verbs and escape hatches**:
   `(ruleId, subject symbol ID)`. A membership verb's operands (`MustBelongTo`'s memberships,
   §5.3) are part of the rule, never of the identity: widening or narrowing the membership list
@@ -480,6 +481,28 @@ Per verb class — this is grammar-level semantics, not baseline file format:
   survive the package upgrade it exists to survive. It is also a widening, so prefer fixing such a
   pair to baselining it; the survey's shadowed-name key is where the split shows before a baseline
   is written.
+
+**The site count is a measure, not identity.** An edge entry — every shape above that keys a
+(source, target) pair — records how many distinct `file:line` sites it grandfathered when it was
+written: the same number `check --json` reports as `siteCount`. The ratchet compares the count
+it observes with the count the entry recorded. More is growth, and the violation is red with
+every site of the pair listed; the same or fewer passes, a shortfall being a reduction that
+`baseline --accept-reductions` records. An entry with no count — every file written before the
+count existed — grandfathers the whole pair, as it always did, and `status` names it as
+uncounted until `--accept-reductions` records one. Subject entries carry no count: their sites
+are declarations, and a verb like `MustHaveExactlyOneCounterpart` moves its whole site set when
+its arm flips. The count is neither identity nor annotation. It is excluded from entry equality,
+so a grown pair is one entry that grew rather than a stale entry beside a new violation, and it
+is included in the file's digest, so a hand-edited count is refused like any other edit. Three
+consequences follow from measuring evidence by line. A reformat that splits or joins two
+mentions of one target on one line moves the count; identity is unaffected, and `--add` on the
+entry re-records it. Where one symbol ID names several types (above), the recorded count covers
+the larger of the violations sharing it. And the catch and throw verbs, which key one edge but
+print different evidence, record the count *as measured by the verb that wrote it*: a rule
+switched from `MustNotCatchUnfiltered` to `MustNotCatch` sees the filtered clauses it never
+counted as growth, and the reverse switch as a reduction. Growth is accepted in one way only —
+`baseline --add` on the existing entry, which re-records the observed count under its mandatory
+`--because`.
 
 ### 4.4 Migrate defaults
 

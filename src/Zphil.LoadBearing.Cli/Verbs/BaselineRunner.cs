@@ -27,6 +27,17 @@ namespace Zphil.LoadBearing.Cli.Verbs;
 ///         attribution — growth is never silent, never bulk.
 ///     </para>
 ///     <para>
+///         <b>The site measure rides the same three verbs</b> (GRAMMAR §4.3), and the direction of each is
+///         what decides how. Every write records what it observed on the edge entries it writes, so
+///         <c>--init</c> and <c>--add</c> carry counts by construction. <c>--accept-reductions</c> may only
+///         tighten: it records a count on an entry that had none and lowers one that came in over, and it
+///         refuses a rise in the same breath it refuses a new entry — because a rise <em>is</em> new debt.
+///         <c>--add</c> is therefore the only route by which a count goes up, which is what keeps growth
+///         attributed. One arm of that follows from the format rather than the verbs:
+///         <c>--init</c> declines to write a file it captured nothing into, so it can never upgrade a
+///         legacy file's schema version while reporting it unchanged.
+///     </para>
+///     <para>
 ///         <b>What it refuses.</b> Tamper (a hand-edited digest) refuses loudly with the restore hint, the
 ///         same as <c>check</c>. A workspace-load failure refuses the whole command on <c>check</c>'s
 ///         terms — exit 2, nothing written, opt-out
@@ -114,15 +125,10 @@ internal sealed class BaselineRunner(
             return 0;
         }
 
-        // Ordinal grouping in first-appearance order, so two rules sharing a baseline file are read, spliced
-        // and written once between them. The directory is read out first because GroupBy is lazy: a lambda
+        // The directory is read out before the apply below, because the grouping in there is lazy: a lambda
         // closing over `source` would outlive the using block if the sequence were ever enumerated later.
         string solutionDirectory = source.SolutionDirectory;
-        IEnumerable<IGrouping<string, RuleResult>> fileGroups = ratchetResults
-            .GroupBy(r => BaselineStore.ResolvePath(r.Rule.BaselinePath!, solutionDirectory), StringComparer.Ordinal);
-
-        foreach (IGrouping<string, RuleResult> group in fileGroups)
-            ApplyFile(request, group, solutionDirectory);
+        ApplyFiles(request, ratchetResults, solutionDirectory);
 
         // The survey's last word: name the failing rules no baseline can capture, after the per-file lines.
         foreach (string line in RatchetSurveyNotice.Lines(report, anyRatchetedRule: true))
@@ -172,7 +178,7 @@ internal sealed class BaselineRunner(
             throw new UserErrorException(
                 $"rule '{ruleId}' is not ratcheted — only Migrate and Quarantine containment rules carry baselines.");
 
-        if (CurrentEntries(result) is null)
+        if (CurrentEntries(result) is not { } current)
             throw new UserErrorException(
                 $"cannot add to rule '{ruleId}' — the rule has an empty subject or an evaluation error.");
 
@@ -186,16 +192,21 @@ internal sealed class BaselineRunner(
             : BaselineAddMatcher.ResolveEdge(ruleId, result.Violations, request.Source!, request.Target!);
 
         BaselineEntry identity = violation.BaselineIdentity()!;
-        BaselineEntry attributed = identity.WithBecause(request.Because!);
+        // The measure comes off the folded survey rather than off the resolved violation: the matcher hands
+        // back the first candidate of an identity, and where two violations share one the allowance this
+        // valve records has to cover the larger. --add is the only route by which a count may rise, so
+        // recording the whole observed figure here is what makes growth attributable rather than silent.
+        BaselineEntry recorded = current.First(entry => entry.Equals(identity));
+        BaselineEntry attributed = recorded.WithBecause(request.Because!);
 
         var sections = new Dictionary<string, IReadOnlyList<BaselineEntry>>(StringComparer.Ordinal);
         foreach (KeyValuePair<string, IReadOnlyList<BaselineEntry>> section in existing.Sections)
             sections[section.Key] = section.Value; // co-resident foreign sections ride through untouched
 
-        if (existingEntries.Contains(identity))
+        if (existingEntries.FirstOrDefault(entry => entry.Equals(identity)) is { } stored)
         {
             sections[ruleId] = existingEntries.Select(e => e.Equals(identity) ? attributed : e).ToList();
-            output.WriteLine($"{ruleId}: entry already baselined — attribution updated.");
+            output.WriteLine($"{ruleId}: entry already baselined — {ReRecorded(stored, attributed)}");
         }
         else
         {
@@ -211,6 +222,30 @@ internal sealed class BaselineRunner(
         return 0;
     }
 
+    // The tail of the already-baselined echo. --add is the ratchet's only growth valve, so when it moves a
+    // site count it says so and names both ends of the move — an operator who meant only to restate the
+    // attribution should be able to read that the allowance went up. An entry with no measure to move keeps
+    // the plain sentence: a subject entry carries none, and neither does an edge with no sited evidence.
+    private static string ReRecorded(BaselineEntry stored, BaselineEntry attributed)
+    {
+        if (attributed.SiteCount is not { } observed) return "attribution updated.";
+
+        string from = stored.SiteCount is { } previous ? $"{previous}" : "uncounted";
+        return $"attribution updated and site count re-recorded ({from} → {observed}).";
+    }
+
+    // --init and --accept-reductions, one baseline file at a time: ordinal grouping in first-appearance order,
+    // so two rules sharing a file are read, spliced and written once between them. Internal so the fast-tier
+    // runner tests can drive both modes over an in-memory report the way they drive --add — no workspace.
+    internal void ApplyFiles(BaselineRequest request, IEnumerable<RuleResult> ratchetResults, string solutionDirectory)
+    {
+        IEnumerable<IGrouping<string, RuleResult>> fileGroups = ratchetResults
+            .GroupBy(r => BaselineStore.ResolvePath(r.Rule.BaselinePath!, solutionDirectory), StringComparer.Ordinal);
+
+        foreach (IGrouping<string, RuleResult> group in fileGroups)
+            ApplyFile(request, group, solutionDirectory);
+    }
+
     private void ApplyFile(BaselineRequest request, IGrouping<string, RuleResult> group, string solutionDirectory)
     {
         // Read + verify once (tamper throws here — --init cannot distinguish tamper from corruption).
@@ -220,83 +255,167 @@ internal sealed class BaselineRunner(
             foreach (KeyValuePair<string, IReadOnlyList<BaselineEntry>> section in existing.Sections)
                 sections[section.Key] = section.Value; // sections for rules not in this run (e.g. a removed rule) ride through untouched
 
-        foreach (RuleResult result in group) ApplyRule(request, result, sections);
+        var rewrote = false;
+        foreach (RuleResult result in group) rewrote |= ApplyRule(request, result, sections);
+
+        // --init writes nothing to a file whose every visited section was already captured. Without that arm
+        // the write still lands, and since a composed file always carries the current schema version an
+        // untouched legacy file would be upgraded in place while each section echoed "already captured —
+        // unchanged": the one word the operator reads would be the one thing that was not true. The other two
+        // modes are the upgrade path and write regardless — both have something of their own to record.
+        if (request.Init && existing is not null && !rewrote)
+        {
+            output.WriteLine(WriteReport.Line(WriteOutcome.Unchanged, solutionDirectory, group.Key));
+            return;
+        }
+
+        // A file that does not exist and gained nothing is not written either, in any mode: --init lands
+        // here only when every rule in the group was unbaselinable, --accept-reductions whenever the rule it
+        // was asked to tighten was never captured — and each has just said so on its own line. A write here
+        // would leave a section-less file in the tree under a "wrote" line contradicting that sentence.
+        if (existing is null && !rewrote) return;
 
         WriteOutcome outcome = BaselineStore.Write(group.Key, new BaselineDocument(sections));
         output.WriteLine(WriteReport.Line(outcome, solutionDirectory, group.Key));
     }
 
-    private void ApplyRule(BaselineRequest request, RuleResult result, Dictionary<string, IReadOnlyList<BaselineEntry>> sections)
+    // Whether this rule rewrote its section — what tells the caller above whether the file has anything new to say.
+    private bool ApplyRule(BaselineRequest request, RuleResult result, Dictionary<string, IReadOnlyList<BaselineEntry>> sections)
     {
         string ruleId = result.Rule.Id;
         if (CurrentEntries(result) is not { } current)
         {
             output.WriteLine($"{ruleId}: cannot capture — the rule has an empty subject or an evaluation error; skipped.");
-            return;
+            return false;
         }
 
         sections.TryGetValue(ruleId, out IReadOnlyList<BaselineEntry>? existingEntries);
-        if (request.Init)
-            InitRule(ruleId, current, existingEntries, sections);
-        else
-            AcceptReductions(ruleId, current, existingEntries, sections);
+        return request.Init
+            ? InitRule(ruleId, current, existingEntries, sections)
+            : AcceptReductions(ruleId, current, existingEntries, sections);
     }
 
     // --init: grandfather an uncaptured rule's current state (empty = zero debt); leave captured rules be.
-    private void InitRule(
+    private bool InitRule(
         string ruleId, IReadOnlyList<BaselineEntry> current,
         IReadOnlyList<BaselineEntry>? existingEntries, Dictionary<string, IReadOnlyList<BaselineEntry>> sections)
     {
         if (existingEntries is { } captured)
         {
             output.WriteLine($"{ruleId}: already captured ({captured.Count} entries) — unchanged.");
-            return;
+            return false;
         }
 
         sections[ruleId] = current;
         output.WriteLine($"{ruleId}: captured {current.Count} grandfathered {Plurals.Noun(current.Count, "violation")}.");
+        return true;
     }
 
-    // --accept-reductions: section := section ∩ current. Never adds; reports refused growth. A violation that
+    // --accept-reductions: section := section ∩ current, then each surviving entry's measure ratcheted down
+    // to what this run observed. Never adds and never raises a count; reports both refusals. A violation that
     // no longer occurs is the whole point of the mode — which is why the incomplete-model gate fires long
     // before this runs, since a project that stopped loading looks exactly like a violation that stopped.
-    private void AcceptReductions(
+    // Recording a count on an entry that had none is a tightening too, and it is the route by which a file
+    // written before the measure existed becomes a counted one.
+    private bool AcceptReductions(
         string ruleId, IReadOnlyList<BaselineEntry> current,
         IReadOnlyList<BaselineEntry>? existingEntries, Dictionary<string, IReadOnlyList<BaselineEntry>> sections)
     {
         if (existingEntries is not { } captured)
         {
             output.WriteLine($"{ruleId}: no baseline section — run 'loadbearing baseline --init' first.");
-            return;
+            return false;
         }
 
-        var currentSet = new HashSet<BaselineEntry>(current);
+        var observed = new Dictionary<BaselineEntry, BaselineEntry>();
+        foreach (BaselineEntry entry in current) observed[entry] = entry;
         var existingSet = new HashSet<BaselineEntry>(captured);
-        List<BaselineEntry> kept = captured.Where(currentSet.Contains).ToList();
+
+        var kept = new List<BaselineEntry>();
+        var lowered = 0;
+        var recorded = 0;
+        var grew = 0;
+        foreach (BaselineEntry entry in captured)
+        {
+            // Identity intersection first, exactly as before: an entry no current violation matches is the
+            // reduction being accepted, and it simply does not survive into the section.
+            if (!observed.TryGetValue(entry, out BaselineEntry? now)) continue;
+
+            if (now.SiteCount is not { } sites)
+            {
+                kept.Add(entry); // nothing to measure — a subject entry, or an edge with no sited evidence
+            }
+            else if (entry.SiteCount is not { } allowance)
+            {
+                kept.Add(entry.WithSiteCount(sites));
+                recorded++;
+            }
+            else if (sites < allowance)
+            {
+                kept.Add(entry.WithSiteCount(sites));
+                lowered++;
+            }
+            else
+            {
+                // At or above the allowance the entry is stored untouched. Above it, the mode's direction is
+                // the whole reason: raising a count is growth, and growth is attributed or it does not happen.
+                if (sites > allowance) grew++;
+                kept.Add(entry);
+            }
+        }
+
         int removed = captured.Count - kept.Count;
         int additions = current.Count(entry => !existingSet.Contains(entry));
 
         sections[ruleId] = kept;
-        output.WriteLine(removed > 0
-            ? $"{ruleId}: accepted {removed} {Plurals.Noun(removed, "reduction")}."
-            : $"{ruleId}: nothing to accept.");
+        // "nothing to accept" is the whole mode's verdict, so every kind of acceptance clears it: a run that
+        // lowered or first recorded a count tightened the baseline as surely as one that removed an entry.
+        if (removed + lowered + recorded == 0) output.WriteLine($"{ruleId}: nothing to accept.");
+        if (removed > 0)
+            output.WriteLine($"{ruleId}: accepted {removed} {Plurals.Noun(removed, "reduction")}.");
+        if (lowered > 0)
+            output.WriteLine($"{ruleId}: lowered the site count on {lowered} {Plurals.Noun(lowered, "entry")}.");
+        if (recorded > 0)
+            output.WriteLine($"{ruleId}: recorded the site count on {recorded} {Plurals.Noun(recorded, "entry")}.");
         if (additions > 0)
             output.WriteLine(
                 $"{ruleId}: refused {additions} {Plurals.Noun(additions, "addition")} — a captured baseline grows only via 'loadbearing baseline --add', one attributed entry at a time.");
+        if (grew > 0)
+            output.WriteLine(
+                $"{ruleId}: refused site growth on {grew} {Plurals.Noun(grew, "entry")} — a grandfathered pair grows only via 'loadbearing baseline --add', one attributed entry at a time.");
+
+        return true;
     }
 
     // A ratcheted rule's current baseline entries (from an empty-baseline check), or null when the rule is
     // unbaselinable: any EmptySubject/RuleError violation makes the whole rule so (its identity is not stable).
+    // Each edge entry records the sites observed under its identity, max-folded across duplicates: a symbol ID
+    // names a name rather than a node (GRAMMAR §4.3), so two violations can share one identity, and the
+    // allowance a write records has to cover the larger of them. Folding is also what collapses those
+    // duplicates to the single line the file has always meant them to be.
     private static IReadOnlyList<BaselineEntry>? CurrentEntries(RuleResult result)
     {
-        var entries = new List<BaselineEntry>();
+        var observed = new Dictionary<BaselineEntry, int>();
+        var order = new List<BaselineEntry>();
+
         foreach (Violation violation in result.Violations)
         {
-            BaselineEntry? entry = violation.BaselineIdentity();
-            if (entry is null) return null;
-            entries.Add(entry);
+            BaselineEntry? identity = violation.BaselineIdentity();
+            if (identity is null) return null;
+
+            if (!observed.TryGetValue(identity, out int sites)) order.Add(identity);
+            observed[identity] = Math.Max(sites, violation.Sites.Count);
         }
 
-        return entries;
+        return order.Select(identity => Counted(identity, observed[identity])).ToList();
+    }
+
+    // The entry as a write records it: an edge entry carrying the sites observed under its identity, or the
+    // bare identity where there is no measure to take. A subject entry never carries one — its sites are
+    // declarations (GRAMMAR §4.3) — and neither does an edge whose evidence carries no file:line at all,
+    // which is the same state as an entry written before the measure existed: grandfathered at pair grain.
+    private static BaselineEntry Counted(BaselineEntry identity, int sites)
+    {
+        return identity.IsEdge && sites > 0 ? identity.WithSiteCount(sites) : identity;
     }
 }

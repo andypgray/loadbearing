@@ -1,11 +1,11 @@
 {
-  "schemaVersion": 1,
-  "digest": "50c1b87adbff11114d186c075643b4ed0db69e8550d4cdd5a98c36ca19190893",
+  "schemaVersion": 2,
+  "digest": "402ca3645935c3de630bbc3d8f0edc3c7e0311f621ecb44d4d7dd2b4e95a89a9",
   "rules": {
     "mcp/env-through-seam": {
       "entries": [
-        { "source": "T:Zphil.LoadBearing.Cli.Mcp.Infrastructure.SerilogConfiguration", "target": "T:System.Environment" },
-        { "source": "T:Zphil.LoadBearing.Cli.Mcp.Infrastructure.ServerShutdown", "target": "T:System.Environment" }
+        { "source": "T:Zphil.LoadBearing.Cli.Mcp.Infrastructure.SerilogConfiguration", "target": "T:System.Environment", "siteCount": 1 },
+        { "source": "T:Zphil.LoadBearing.Cli.Mcp.Infrastructure.ServerShutdown", "target": "T:System.Environment", "siteCount": 1 }
       ]
     }
   }

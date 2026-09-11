@@ -105,7 +105,7 @@ Dragons: Demurrage engine: it counts free-time then billable days between discha
 One legacy reach into the engine already exists: the invoicing reconciler needs the per-day breakdown that `IDemurrageCalculator` does not expose, so it constructs `FreeTimeCalendar` from inside Invoicing. That edge is grandfathered by symbol ID on the quarantine baseline, and every new reach is red. `loadbearing status` prints the burndown:
 
 ```text
-pass demurrage/engine/containment (quarantine) — 1 grandfathered remaining, 0 new, 0 fixed awaiting acceptance
+pass demurrage/engine/containment (quarantine) — 1 grandfathered remaining (2 sites), 0 new, 0 fixed awaiting acceptance
 ```
 
 `modules/invoicing/outbound` allows the entire Demurrage layer, internals included, so the quarantine alone owns facade discipline. The quarantine can baseline that one edge; an `Enforce` rule cannot carry a baseline, so if the outbound rule named only the facade, the reconciler's reach would have nowhere to be grandfathered and would fail as new. One edge, one owner.

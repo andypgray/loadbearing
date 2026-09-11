@@ -10,9 +10,13 @@ namespace Zphil.LoadBearing.Checking;
 /// </remarks>
 public sealed class RuleResult
 {
-    // The subject coverage arrives whole rather than as a pair of ints, and that is a correctness matter
-    // rather than a tidiness one: it lands beside the ratchet's own count, and same-typed positionals in a
-    // row are a transposition no compiler can catch. The two properties below stay ints, because that is
+    private static readonly IReadOnlyDictionary<Violation, BaselineEntry> NothingGrown =
+        new Dictionary<Violation, BaselineEntry>();
+
+    // Both the subject coverage and the ratchet measure arrive whole rather than as loose ints, and that
+    // is a correctness matter rather than a tidiness one: they land next to each other, and same-typed
+    // positionals in a row are a transposition no compiler can catch. Folding the ratchet's three is the
+    // cure this comment named when there was one of them. The properties below stay ints, because that is
     // what every renderer reads.
     internal RuleResult(
         ArchRule rule,
@@ -21,10 +25,11 @@ public sealed class RuleResult
         IReadOnlyList<CheckWarning>? warnings = null,
         string? skipReason = null,
         IReadOnlyList<Violation>? grandfathered = null,
-        int staleBaselineEntries = 0,
+        RatchetMeasure ratchet = default,
         bool baselineCaptured = false,
         IReadOnlyList<BaselineEntry>? grandfatheredEntries = null,
-        SubjectCoverage coverage = default)
+        SubjectCoverage coverage = default,
+        IReadOnlyDictionary<Violation, BaselineEntry>? grownEntries = null)
     {
         Rule = rule;
         Status = status;
@@ -32,11 +37,14 @@ public sealed class RuleResult
         Warnings = warnings ?? Array.Empty<CheckWarning>();
         SkipReason = skipReason;
         Grandfathered = grandfathered ?? Array.Empty<Violation>();
-        StaleBaselineEntries = staleBaselineEntries;
+        StaleBaselineEntries = ratchet.Stale;
+        ShrunkBaselineEntries = ratchet.Shrunk;
+        UncountedBaselineEntries = ratchet.Uncounted;
         BaselineCaptured = baselineCaptured;
         GrandfatheredEntries = grandfatheredEntries ?? Array.Empty<BaselineEntry>();
         SubjectTypes = coverage.Types;
         SubjectGeneratedTypes = coverage.Generated;
+        GrownEntries = grownEntries ?? NothingGrown;
     }
 
     /// <summary>The rule that was evaluated.</summary>
@@ -67,7 +75,43 @@ public sealed class RuleResult
     ///     The count of baseline entries no current violation matched — debt that was fixed and is now
     ///     awaiting <c>loadbearing baseline --accept-reductions</c>. Zero for non-Migrate rules.
     /// </summary>
+    /// <remarks>
+    ///     Counts identity, and only identity. A grandfathered pair that grew is matched and live, so it
+    ///     is never stale — it is red, and a reduction sweep that treated it as fixed would delete the
+    ///     very entry recording the debt.
+    /// </remarks>
     public int StaleBaselineEntries { get; }
+
+    /// <summary>
+    ///     The count of matched edge entries whose observed site count came in <em>below</em> the one
+    ///     they record — a real reduction, which passes and awaits
+    ///     <c>loadbearing baseline --accept-reductions</c> to lower the recorded count.
+    /// </summary>
+    public int ShrunkBaselineEntries { get; }
+
+    /// <summary>
+    ///     The count of matched edge entries that record no site count, so they grandfather their pair at
+    ///     any size. Subject entries never count here: they carry no measure at all, so nothing an author
+    ///     could do would clear them from this total.
+    /// </summary>
+    public int UncountedBaselineEntries { get; }
+
+    /// <summary>
+    ///     The stored baseline entry behind each <em>grown</em> violation — a grandfathered pair carrying
+    ///     more sites than its entry records, which is red (it is in <see cref="Violations" />) while
+    ///     still naming the allowance it exceeded.
+    /// </summary>
+    /// <remarks>
+    ///     Keyed by the violation object itself, and reference-keyed at that: <see cref="Violation" />
+    ///     overrides neither <c>Equals</c> nor <c>GetHashCode</c>, so the default comparer is reference
+    ///     identity, which is what a lookup from a rendered violation needs. A dictionary rather than a
+    ///     list index-aligned with <see cref="Violations" />, because both render loops walk the
+    ///     violations without carrying an index — and only some of them are grown.
+    /// </remarks>
+    public IReadOnlyDictionary<Violation, BaselineEntry> GrownEntries { get; }
+
+    /// <summary>The count of grown entries — the size of <see cref="GrownEntries" />.</summary>
+    public int GrownBaselineEntries => GrownEntries.Count;
 
     /// <summary>Whether a baseline section exists for this (Migrate) rule; false when uncaptured or non-Migrate.</summary>
     public bool BaselineCaptured { get; }

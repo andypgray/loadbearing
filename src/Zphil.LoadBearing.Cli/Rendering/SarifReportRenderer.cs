@@ -20,7 +20,9 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     one result per violation <em>site</em> — a red violation as <c>error</c> / <c>baselineState: new</c>
 ///     with no suppression, a grandfathered violation as <c>note</c> / <c>baselineState: unchanged</c>
 ///     carrying an external suppression whose justification is the baseline entry's <c>because</c> (or a
-///     generic <c>grandfathered in {path}</c> fallback). EmptySubject and RuleError violations are
+///     generic <c>grandfathered in {path}</c> fallback), and a grown pair — one carrying more sites than its
+///     entry records — as <c>error</c> / <c>baselineState: updated</c>, unsuppressed, because the entry that
+///     suppressed it no longer covers what is there. EmptySubject and RuleError violations are
 ///     site-less and so contribute no results (they still gate via the CLI exit code). Every path is
 ///     solution-relative against the <c>SRCROOT</c> URI base — no absolute path is ever emitted.
 ///     Serialization is the shared <see cref="LoadBearingJson.Options" />, so the SARIF golden and the JSON
@@ -240,13 +242,19 @@ internal static class SarifReportRenderer
 
     // Results in the locked order: rules in model order → per rule, red Violations then Grandfathered (both
     // already ordered by ArchChecker.Order) → each violation's Sites in stored order (one result per site).
+    // A grown pair is red with the rest, and its state is `updated` rather than `new`: code scanning already
+    // has an alert for this pair from the run that baselined it, and `new` would ask for a second one.
+    // Unsuppressed, because the whole finding is that the suppression the entry granted no longer covers it.
     private static IReadOnlyList<SarifResult> BuildResults(CheckReport report, PathFormat.Relativizer relativizer)
     {
         var results = new List<SarifResult>();
         foreach (RuleResult result in report.Results)
         {
             foreach (Violation violation in result.Violations)
-                results.AddRange(SiteResults(result.Rule.Id, violation, ErrorLevel, "new", null, relativizer));
+            {
+                string state = result.GrownEntries.ContainsKey(violation) ? "updated" : "new";
+                results.AddRange(SiteResults(result.Rule.Id, violation, ErrorLevel, state, null, relativizer));
+            }
 
             // Grandfathered is index-aligned with GrandfatheredEntries (RuleResult invariant), so entry i
             // is the stored baseline entry that blessed violation i — its because becomes the justification.

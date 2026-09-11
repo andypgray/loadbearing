@@ -99,11 +99,12 @@ public sealed class BaselineRunnerAddTests : IDisposable
         string written = File.ReadAllText(path)
             .NormalizedLines();
         written.ShouldContain(
-            "        { \"source\": \"T:MyApp.Web.HomeController\", \"target\": \"P:System.DateTime.Now\", \"because\": \"INC-1234\" }");
+            "        { \"source\": \"T:MyApp.Web.HomeController\", \"target\": \"P:System.DateTime.Now\", \"siteCount\": 1, \"because\": \"INC-1234\" }");
         // Composer as oracle: the whole file is the canonical composition of exactly that one entry.
         written.ShouldBe(BaselineComposer.Compose(
             RuleId,
             BaselineEntry.ForEdge("T:MyApp.Web.HomeController", "P:System.DateTime.Now")
+                .WithSiteCount(1)
                 .WithBecause("INC-1234")));
     }
 
@@ -141,11 +142,12 @@ public sealed class BaselineRunnerAddTests : IDisposable
         string written = File.ReadAllText(path)
             .NormalizedLines();
         written.ShouldContain(
-            "        { \"source\": \"T:MyApp.Web.OrderController\", \"target\": \"T:MyApp.Data.Db\", \"because\": \"INC-9\" }");
+            "        { \"source\": \"T:MyApp.Web.OrderController\", \"target\": \"T:MyApp.Data.Db\", \"siteCount\": 1, \"because\": \"INC-9\" }");
         // Composer as oracle: the whole file is the canonical composition of exactly that one edge entry.
         written.ShouldBe(BaselineComposer.Compose(
             CtorRuleId,
             BaselineEntry.ForEdge("T:MyApp.Web.OrderController", "T:MyApp.Data.Db")
+                .WithSiteCount(1)
                 .WithBecause("INC-9")));
     }
 
@@ -188,6 +190,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
             .ShouldBe(BaselineComposer.Compose(
                 UnfilteredCatchRuleId,
                 BaselineEntry.ForEdge("T:App.LegacyHandler", "T:Errors.DbError")
+                    .WithSiteCount(1)
                     .WithBecause("INC-77")));
 
         // …and the ratchet holds on the bytes the valve wrote: re-checking against the file grandfathers the

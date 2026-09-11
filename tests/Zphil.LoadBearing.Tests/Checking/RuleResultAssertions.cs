@@ -103,6 +103,21 @@ internal static class RuleResultAssertions
     }
 
     /// <summary>
+    ///     Asserts the ratchet found exactly <paramref name="count" /> grown entries — grandfathered pairs
+    ///     carrying more sites than the baseline recorded for them (GRAMMAR §4.3).
+    /// </summary>
+    /// <remarks>
+    ///     Says nothing about status either, for the same reason as
+    ///     <see cref="ShouldHaveGrandfathered" /> — though growth is red by construction, the rows whose
+    ///     subject is the red violation list read it in its own right.
+    /// </remarks>
+    internal static RuleResult ShouldHaveGrown(this RuleResult result, int count)
+    {
+        result.GrownBaselineEntries.ShouldBe(count, Describe(result));
+        return result;
+    }
+
+    /// <summary>
     ///     Asserts the rule failed. Says nothing about which violations did it — for the rows whose subject is
     ///     the violation list itself, which then read it in its own right.
     /// </summary>
@@ -412,8 +427,9 @@ internal static class RuleResultAssertions
         lines.AddRange(result.Violations.Select(Describe));
         lines.Add($"  warnings ({result.Warnings.Count}):");
         lines.AddRange(result.Warnings.Select(warning => $"    {warning.Kind}: {warning.Message}"));
-        lines.Add($"  ratchet: {result.Grandfathered.Count} grandfathered, "
-                  + $"{result.StaleBaselineEntries} stale, captured: {result.BaselineCaptured}");
+        lines.Add($"  ratchet: {result.Grandfathered.Count} grandfathered, {result.StaleBaselineEntries} stale, "
+                  + $"{result.GrownBaselineEntries} grown, {result.ShrunkBaselineEntries} shrunk, "
+                  + $"{result.UncountedBaselineEntries} uncounted, captured: {result.BaselineCaptured}");
 
         return string.Join(Environment.NewLine, lines);
     }

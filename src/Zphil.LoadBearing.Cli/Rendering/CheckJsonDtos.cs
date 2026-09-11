@@ -10,7 +10,10 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 // §4.5), `subjectMember` slot (an offending member's raw symbol ID for a memberShape violation, GRAMMAR
 // §4.6) and `subjectProject`/`package` pair (an offending project and, for the per-package violations, the
 // package it declares, GRAMMAR §4.10) are null on every other kind and so omitted — the schema stays
-// version 3, byte-identical for specs without a member-target, member-subject or project-subject rule. The `modelIncomplete`, `failedProjects`,
+// version 3, byte-identical for specs without a member-target, member-subject or project-subject rule. The
+// ratchet's three measure slots are additive the same way: a baseline block's `shrunk` and `uncounted` and a
+// violation's `grandfatheredSiteCount` are omitted at zero and at absence, so a report over baselines whose
+// counts are all recorded and all still hold carries none of them. The `modelIncomplete`, `failedProjects`,
 // `restoreFailedProjects`, `uncheckedProjects`, `unsupportedProjects`, `multiTargetedProjects` and
 // `rulesFilter` slots are additive the same way: null (omitted) on every run whose workspace loaded, whose
 // NuGet packages resolved, that no solution filter narrowed, whose solution is all C# and single-framework,
@@ -209,7 +212,28 @@ internal sealed record RuleJson(
     IReadOnlyList<WarningJson> Warnings);
 
 /// <summary>A ratcheted rule's state: its baseline path and the grandfathered/stale counts.</summary>
-internal sealed record BaselineJson(string Path, int Grandfathered, int Stale);
+/// <param name="Path">The rule's baseline file, solution-relative with forward slashes.</param>
+/// <param name="Grandfathered">
+///     How many of the rule's violations the baseline blessed. Counts what passed, so a pair that carried
+///     more sites than its entry records is not here — it is red, in <c>violations</c>, carrying
+///     <see cref="ViolationJson.GrandfatheredSiteCount" />.
+/// </param>
+/// <param name="Stale">
+///     How many captured entries no current violation matched — fixed debt awaiting
+///     <c>baseline --accept-reductions</c>.
+/// </param>
+/// <param name="Shrunk">
+///     How many matched edge entries came in under the site count they record — real reductions, which pass
+///     and await <c>baseline --accept-reductions</c> to lower the recorded count — or null (omitted) when
+///     there are none.
+/// </param>
+/// <param name="Uncounted">
+///     How many matched edge entries record no site count at all, so they grandfather their pair at any
+///     size, or null (omitted) when there are none. Self-extinguishing like its neighbour: a fully counted
+///     section carries neither key, so a document from a baseline written after the measure existed is
+///     unchanged by both.
+/// </param>
+internal sealed record BaselineJson(string Path, int Grandfathered, int Stale, int? Shrunk, int? Uncounted);
 
 /// <summary>One violation; the null slots are omitted per kind.</summary>
 /// <param name="Kind">Which shape of violation this is — it decides which slots below are populated.</param>
@@ -233,6 +257,13 @@ internal sealed record BaselineJson(string Path, int Grandfathered, int Stale);
 ///     siblings included.
 /// </param>
 /// <param name="Detail">Kind-specific context, or null (omitted) when the kind carries none.</param>
+/// <param name="GrandfatheredSiteCount">
+///     How many sites this violation's baseline entry records, present only when the violation is red
+///     <em>because</em> it carries more than that — a grandfathered pair that grew. Beside
+///     <see cref="SiteCount" /> and declared ahead of it so the pair reads as allowance then measurement,
+///     and null (omitted) everywhere else, which is every violation on a report from a spec whose
+///     baselines are all still within their counts.
+/// </param>
 /// <param name="SiteCount">
 ///     How many sites the violation occurs at, at every grain — <see cref="Sites" /> is its expansion, not
 ///     its replacement, on the same reasoning as <see cref="RuleJson" />'s violation count. A coarser
@@ -255,6 +286,7 @@ internal sealed record ViolationJson(
     string? SubjectProject,
     string? Package,
     string? Detail,
+    int? GrandfatheredSiteCount,
     int SiteCount,
     IReadOnlyList<SiteJson>? Sites);
 

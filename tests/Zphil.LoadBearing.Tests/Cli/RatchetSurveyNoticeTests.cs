@@ -112,7 +112,7 @@ public sealed class RatchetSurveyNoticeTests
 
     private static RuleResult Result(ArchRule rule, RuleStatus status, int violations = 0, bool captured = false)
     {
-        return new RuleResult(rule, status, Dummies(violations), [], null, [], 0, captured);
+        return new RuleResult(rule, status, Dummies(violations), [], null, [], default, captured);
     }
 
     private static IReadOnlyList<Violation> Dummies(int count)

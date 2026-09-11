@@ -114,11 +114,13 @@ public sealed class BaselineCommandE2ETests
         using var workspace = new TempFixtureWorkspace();
         string file = workspace.PathOf(ConventionalFile);
         // Append a HomeController entry by hand without updating the digest — the tamper the ratchet refuses.
+        // Forged in the shape of the entry beside it, site count and all, so what the refusal rests on is the
+        // digest rather than anything the walk could notice about the line.
         File.WriteAllText(file, File.ReadAllText(file)
             .Replace(
-                "        { \"source\": \"T:MyApp.Web.InvoiceController\", \"target\": \"T:System.Data.DataTable\" }\n",
-                "        { \"source\": \"T:MyApp.Web.HomeController\", \"target\": \"T:System.Data.DataTable\" },\n" +
-                "        { \"source\": \"T:MyApp.Web.InvoiceController\", \"target\": \"T:System.Data.DataTable\" }\n"));
+                "        { \"source\": \"T:MyApp.Web.InvoiceController\", \"target\": \"T:System.Data.DataTable\", \"siteCount\": 2 }\n",
+                "        { \"source\": \"T:MyApp.Web.HomeController\", \"target\": \"T:System.Data.DataTable\", \"siteCount\": 2 },\n" +
+                "        { \"source\": \"T:MyApp.Web.InvoiceController\", \"target\": \"T:System.Data.DataTable\", \"siteCount\": 2 }\n"));
 
         CliResult check = await CliRunner.InvokeAsync("check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll);
         check.ShouldRefuseWith("failed its integrity check");
@@ -133,12 +135,16 @@ public sealed class BaselineCommandE2ETests
         init.ShouldRefuseWith("failed its integrity check");
     }
 
+    // Both controllers declare the DataTable twice — as a return type and as a construction, on two lines —
+    // so --init records two sites under each pair.
     private static string BothPairsComposed()
     {
         return BaselineComposer.Compose(
             InlineSqlRule,
-            BaselineEntry.ForEdge("T:MyApp.Web.HomeController", "T:System.Data.DataTable"),
-            BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:System.Data.DataTable"));
+            BaselineEntry.ForEdge("T:MyApp.Web.HomeController", "T:System.Data.DataTable")
+                .WithSiteCount(2),
+            BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:System.Data.DataTable")
+                .WithSiteCount(2));
     }
 
     private static string EmptySectionComposed()
@@ -146,12 +152,15 @@ public sealed class BaselineCommandE2ETests
         return BaselineComposer.Compose(InlineSqlRule);
     }
 
-    // The quarantine containment section captured by --init: InvoiceController's two interior references.
+    // The quarantine containment section captured by --init: InvoiceController's two interior references,
+    // over three sites between them (the calculator is declared and then constructed; the mode is read once).
     private static string ContainmentPairsComposed()
     {
         return BaselineComposer.Compose(
             "legacy/billing/containment",
-            BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:MyApp.Legacy.Billing.BillingCalculator"),
-            BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:MyApp.Legacy.Billing.RoundingMode"));
+            BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:MyApp.Legacy.Billing.BillingCalculator")
+                .WithSiteCount(2),
+            BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:MyApp.Legacy.Billing.RoundingMode")
+                .WithSiteCount(1));
     }
 }

@@ -1,10 +1,10 @@
 {
-  "schemaVersion": 1,
-  "digest": "cf94dba750394c1b00d47aecebb4a3f6b995275aae00709fcdf597c039fd8064",
+  "schemaVersion": 2,
+  "digest": "e40f85fe8928e2ae7486ea4d06e2d3d2c027deb16f24f267b0f1d0add5c9447c",
   "rules": {
     "demurrage/engine/containment": {
       "entries": [
-        { "source": "T:Meridian.Operations.Invoicing.DemurrageReconciler", "target": "T:Meridian.Operations.Demurrage.FreeTimeCalendar" }
+        { "source": "T:Meridian.Operations.Invoicing.DemurrageReconciler", "target": "T:Meridian.Operations.Demurrage.FreeTimeCalendar", "siteCount": 2 }
       ]
     }
   }

@@ -19,7 +19,8 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 ///     <c>shortDescription</c>; and a grandfathered violation suppresses as a <c>note</c> whose
 ///     justification is the baseline entry's <c>because</c> when present, else the generic
 ///     <c>grandfathered in {path}</c> fallback — the latter exercising the checker's baseline-attribution
-///     recovery. The full-report byte shape is pinned separately by the <c>violated-check.sarif</c> golden.
+///     recovery; and a grown pair emits <c>error</c> / <c>baselineState: updated</c> with no suppression at
+///     all. The full-report byte shape is pinned separately by the <c>violated-check.sarif</c> golden.
 /// </summary>
 public sealed class SarifReportRendererTests
 {
@@ -28,6 +29,20 @@ public sealed class SarifReportRendererTests
                                          namespace App.Web { public class OldController { public App.Data.Db Load() => new App.Data.Db(); } }
                                          namespace App.Data { public class Db {} }
                                          """;
+
+    // The same forbidden edge reached from two distinct lines: two sites under one identity, which is the
+    // shape a recorded site count is compared against.
+    private const string TwoSiteController = """
+                                             namespace App.Web
+                                             {
+                                                 public class OldController
+                                                 {
+                                                     public App.Data.Db A() => new App.Data.Db();
+                                                     public App.Data.Db B() => new App.Data.Db();
+                                                 }
+                                             }
+                                             namespace App.Data { public class Db {} }
+                                             """;
 
     [Fact]
     public void Serialize_RedReference_EmitsErrorLevelNewBaselineStateNoSuppressions()
@@ -295,6 +310,36 @@ public sealed class SarifReportRendererTests
         string json = report.ToSarif();
 
         ShouldSuppressEveryNoteWith(json, because);
+    }
+
+    [Fact]
+    public void Results_GrownPair_AreErrorLevelUpdatedAndUnsuppressed()
+    {
+        // A grandfathered pair carrying more sites than its entry records is red like anything else red, but
+        // not `new`: code scanning already has an alert for this pair from the run that baselined it, and
+        // `new` would ask for a second one. Unsuppressed, because the finding IS that the suppression the
+        // entry granted no longer covers what is there — a note carrying the operator's own justification
+        // would close the alert on the strength of the attribution the growth just outgrew.
+        BaselineEntry entry = BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db")
+            .WithSiteCount(1)
+            .WithBecause("Legacy Active Record; scheduled for removal in Q3.");
+        CheckReport report = Checker.Run(TwoSiteController, Checker.Baselines("data/x", entry), NoDataAccess);
+
+        string json = report.ToSarif();
+
+        IReadOnlyList<JsonElement> results = json.SarifResults();
+        results.Count.ShouldBe(2); // one per site of the grown pair, and nothing grandfathered beside them
+        foreach (JsonElement result in results)
+        {
+            result.GetProperty("level")
+                .GetString()
+                .ShouldBe("error");
+            result.GetProperty("baselineState")
+                .GetString()
+                .ShouldBe("updated");
+            result.TryGetProperty("suppressions", out _)
+                .ShouldBeFalse();
+        }
     }
 
     // The Migrate rule OneController is checked against: Web controllers must not reference the data layer. It

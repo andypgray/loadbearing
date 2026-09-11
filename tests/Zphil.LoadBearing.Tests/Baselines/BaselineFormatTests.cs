@@ -12,7 +12,8 @@ namespace Zphil.LoadBearing.Tests.Baselines;
 ///     Pins the canonical baseline file format and its digest (Spec 1): full-text canonical bytes with
 ///     a literal digest, ordinal sorting of rules and entries, the one-line empty-array form, LF/no-BOM/
 ///     trailing-newline invariants, the JSON escaper, the digest-input grammar (including the optional
-///     <c>because</c> attribution line), and a self-verifying digest computed independently inline.
+///     <c>siteCount</c> measure and <c>because</c> attribution lines), the frozen legacy grammar a
+///     stored file is still verified against, and a self-verifying digest computed independently inline.
 ///     Moving one of these is a deliberate act.
 /// </summary>
 public sealed class BaselineFormatTests
@@ -32,8 +33,8 @@ public sealed class BaselineFormatTests
 
         composed.ShouldBe(
             "{\n" +
-            "  \"schemaVersion\": 1,\n" +
-            "  \"digest\": \"5a2d44770632c921c27c338f9178d1e2d4d76b775056f17a54f39e33b8a40eaf\",\n" +
+            "  \"schemaVersion\": 2,\n" +
+            "  \"digest\": \"0f0c007efe321723b9603501e583b3e67615b1ec4ddce976b8c387392429de25\",\n" +
             "  \"rules\": {\n" +
             "    \"data-access/no-inline-sql\": {\n" +
             "      \"entries\": [\n" +
@@ -99,7 +100,7 @@ public sealed class BaselineFormatTests
     public void ComposeFile_SubjectWithNamedControlChars_EscapesBackspaceFormfeedNewlineReturnTabAndUnicode()
     {
         // The subject field reaches Quote unfiltered (ForSubject validates nothing; WithBecause would reject the
-        // newline). \b \f \n \r \t are the named JSON escapes (BaselineFormat.cs:181-191); U+001F (<0x20) falls
+        // newline). \b \f \n \r \t are the named JSON escapes (BaselineFormat.cs:236-250); U+001F (<0x20) falls
         // through to \uXXXX. Built from explicit code points to keep the source free of invisible control chars.
         string subject = "a" + (char)0x08 + (char)0x0C + (char)0x0A + (char)0x0D + (char)0x09 + (char)0x1F + "z";
         string composed = BaselineFormat.ComposeFile(Rules(("r/x", [BaselineEntry.ForSubject(subject)])));
@@ -124,9 +125,57 @@ public sealed class BaselineFormatTests
             "r/x", [BaselineEntry.ForEdge("T:A", "T:B"), BaselineEntry.ForSubject("T:C")])));
 
         input.ShouldBe(
+            "loadbearing-baseline-digest-v2\n" +
+            "rule r/x\n" +
+            "edge T:A -> T:B\n" +
+            "subject T:C\n");
+    }
+
+    [Fact]
+    public void DigestInput_CountedEdgeEntry_EmitsSiteCountLineBetweenTheEdgeAndItsBecause()
+    {
+        // The v2 grammar's whole addition, in the order it is read: the measure sits on its own line
+        // immediately after the entry it measures and before that entry's attribution. Entries still
+        // arrive in canonical order, which is why the subject — sorting ordinal before the edge's source
+        // — leads here whatever order the input named them in.
+        string input = BaselineFormat.DigestInput(Rules((
+            "data-access/no-inline-sql", [
+                BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:System.Data.DataTable")
+                    .WithSiteCount(2)
+                    .WithBecause("INC-1234"),
+                BaselineEntry.ForSubject("T:MyApp.Domain.OrderService")
+            ])));
+
+        input.ShouldBe(
+            "loadbearing-baseline-digest-v2\n" +
+            "rule data-access/no-inline-sql\n" +
+            "subject T:MyApp.Domain.OrderService\n" +
+            "edge T:MyApp.Web.InvoiceController -> T:System.Data.DataTable\n" +
+            "siteCount 2\n" +
+            "because INC-1234\n");
+    }
+
+    [Fact]
+    public void DigestInput_LegacyVersion_IsTheFrozenGrammarWithNoSiteCountLine()
+    {
+        // The v1 grammar is frozen verbatim — its own preamble, and no measure line even for an entry
+        // that carries one. That is what lets a file written before the measure existed still verify
+        // against the digest it stored, which is the whole of the transparent legacy read.
+        string input = BaselineFormat.DigestInput(
+            Rules((
+                "r/x", [
+                    BaselineEntry.ForEdge("T:A", "T:B")
+                        .WithSiteCount(2)
+                        .WithBecause("INC-1234"),
+                    BaselineEntry.ForSubject("T:C")
+                ])),
+            BaselineFormat.LegacySchemaVersion);
+
+        input.ShouldBe(
             "loadbearing-baseline-digest-v1\n" +
             "rule r/x\n" +
             "edge T:A -> T:B\n" +
+            "because INC-1234\n" +
             "subject T:C\n");
     }
 
@@ -161,6 +210,28 @@ public sealed class BaselineFormatTests
     }
 
     [Fact]
+    public void ComposeFile_CountedEdgeEntry_RendersSiteCountAfterTargetAndBeforeBecause()
+    {
+        // Both shapes on one line, in the one order the format allows: the measure closes the identity
+        // slots, the attribution closes the entry. An uncounted entry omits the key rather than writing a
+        // null, so a burndown diff of a partially upgraded file still moves one line per entry.
+        string composed = BaselineFormat.ComposeFile(Rules(("r/x",
+        [
+            BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt")
+                .WithSiteCount(2),
+            BaselineEntry.ForEdge("T:N.Src2", "T:N.Tgt")
+                .WithSiteCount(3)
+                .WithBecause("INC-1234"),
+            BaselineEntry.ForEdge("T:N.Src3", "T:N.Tgt")
+        ])));
+
+        composed.ShouldContain("        { \"source\": \"T:N.Src\", \"target\": \"T:N.Tgt\", \"siteCount\": 2 },\n");
+        composed.ShouldContain(
+            "        { \"source\": \"T:N.Src2\", \"target\": \"T:N.Tgt\", \"siteCount\": 3, \"because\": \"INC-1234\" },\n");
+        composed.ShouldContain("        { \"source\": \"T:N.Src3\", \"target\": \"T:N.Tgt\" }\n");
+    }
+
+    [Fact]
     public void DigestInput_AttributedEntries_EmitBecauseLineAfterOwnLine()
     {
         string input = BaselineFormat.DigestInput(Rules((
@@ -171,7 +242,7 @@ public sealed class BaselineFormatTests
             ])));
 
         input.ShouldBe(
-            "loadbearing-baseline-digest-v1\n" +
+            "loadbearing-baseline-digest-v2\n" +
             "rule r/x\n" +
             "edge T:A -> T:B\n" +
             "because INC-1234\n" +
@@ -198,13 +269,52 @@ public sealed class BaselineFormatTests
     }
 
     [Fact]
+    public void ComputeDigest_CountedVsUncounted_Differ()
+    {
+        // The measure is folded into the digest, which is what makes a hand-raised count tamper rather
+        // than a silently widened allowance — the one property that stops the ratchet being edited open.
+        string uncounted = BaselineFormat.ComputeDigest(Rules(("r/x", [BaselineEntry.ForEdge("T:A", "T:B")])));
+        string two = BaselineFormat.ComputeDigest(Rules((
+            "r/x", [
+                BaselineEntry.ForEdge("T:A", "T:B")
+                    .WithSiteCount(2)
+            ])));
+        string three = BaselineFormat.ComputeDigest(Rules((
+            "r/x", [
+                BaselineEntry.ForEdge("T:A", "T:B")
+                    .WithSiteCount(3)
+            ])));
+
+        two.ShouldNotBe(uncounted);
+        two.ShouldNotBe(three);
+    }
+
+    [Fact]
+    public void ComputeDigest_SameEntriesUnderEachVersion_Differ()
+    {
+        // The preamble carries the version, so one entry set hashes to two values. That is what forces the
+        // schemaVersion bump: with the count in the digest but the version unchanged, a tool that predates
+        // the measure would read a new file as *tampered* rather than as one it does not understand.
+        Dictionary<string, IReadOnlyCollection<BaselineEntry>> rules =
+            Rules(("r/x", [BaselineEntry.ForEdge("T:A", "T:B")]));
+
+        BaselineFormat.ComputeDigest(rules, BaselineFormat.SchemaVersion)
+            .ShouldNotBe(BaselineFormat.ComputeDigest(rules, BaselineFormat.LegacySchemaVersion));
+    }
+
+    [Fact]
     public void ComposeFile_FixtureBaselines_ReproduceCheckedInFiles()
     {
         // The checked-in fixture baselines are authored FROM the composer, never by hand — this keeps
         // them honest. Compared after CRLF normalization (core.autocrlf may check them out as CRLF).
+        // Each controller declares the DataTable twice, as a return type and as a construction, on two
+        // lines — so every edge entry here grandfathers two sites, and the count is part of the bytes.
         string violated = BaselineFormat.ComposeFile(Rules((
             "data-access/no-inline-sql",
-            [BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:System.Data.DataTable")])));
+            [
+                BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:System.Data.DataTable")
+                    .WithSiteCount(2)
+            ])));
         ReadFixture("arch", "baselines", "data-access", "no-inline-sql.json")
             .NormalizedLines()
             .ShouldBe(violated);
@@ -212,8 +322,10 @@ public sealed class BaselineFormatTests
         string clean = BaselineFormat.ComposeFile(Rules((
             "data-access/no-inline-sql",
             [
-                BaselineEntry.ForEdge("T:MyApp.Web.HomeController", "T:System.Data.DataTable"),
+                BaselineEntry.ForEdge("T:MyApp.Web.HomeController", "T:System.Data.DataTable")
+                    .WithSiteCount(2),
                 BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:System.Data.DataTable")
+                    .WithSiteCount(2)
             ])));
         ReadFixture("arch", "clean-baseline.json")
             .NormalizedLines()

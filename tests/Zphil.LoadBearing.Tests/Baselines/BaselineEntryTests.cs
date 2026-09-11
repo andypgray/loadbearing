@@ -11,7 +11,8 @@ namespace Zphil.LoadBearing.Tests.Baselines;
 ///     Edge and subject entries are ordinal-equal only when every slot matches, and equal entries share
 ///     a hash code (so a <see cref="HashSet{T}" /> answers membership correctly). An optional
 ///     <see cref="BaselineEntry.Because" /> attribution is excluded from equality, so an attributed entry
-///     and its unattributed twin dedupe as one.
+///     and its unattributed twin dedupe as one — and so is the <see cref="BaselineEntry.SiteCount" />
+///     measure, which the ratchet compares but identity never forks on.
 /// </summary>
 public sealed class BaselineEntryTests
 {
@@ -160,6 +161,104 @@ public sealed class BaselineEntryTests
         attributed.Subject.ShouldBeNull();
         attributed.Because.ShouldBe("keep until INC-1234");
         original.Because.ShouldBeNull();
+    }
+
+    [Fact]
+    public void WithSiteCount_SameIdentity_AreEqualAndShareHashCode()
+    {
+        // The measure is excluded from identity for the reason the attribution is, and for one more: a
+        // grown pair whose count moved would otherwise read as a stale entry beside a brand-new one, and
+        // 'baseline --accept-reductions' would then delete real debt.
+        BaselineEntry plain = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt");
+        BaselineEntry counted = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt")
+            .WithSiteCount(3);
+
+        counted.ShouldBe(plain);
+        counted.GetHashCode()
+            .ShouldBe(plain.GetHashCode());
+        new HashSet<BaselineEntry> { plain }.Contains(counted)
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public void WithSiteCount_DifferentCounts_AreStillEqual()
+    {
+        BaselineEntry two = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt")
+            .WithSiteCount(2);
+        BaselineEntry three = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt")
+            .WithSiteCount(3);
+
+        three.ShouldBe(two);
+        three.SiteCount.ShouldBe(3);
+        two.SiteCount.ShouldBe(2);
+    }
+
+    [Fact]
+    public void WithSiteCount_PreservesIdentitySlots_AndLeavesTheOriginalUncounted()
+    {
+        BaselineEntry original = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt");
+
+        BaselineEntry counted = original.WithSiteCount(2);
+
+        counted.Source.ShouldBe("T:N.Src");
+        counted.Target.ShouldBe("T:N.Tgt");
+        counted.Subject.ShouldBeNull();
+        counted.SiteCount.ShouldBe(2);
+        original.SiteCount.ShouldBeNull();
+    }
+
+    [Fact]
+    public void WithSiteCountAndWithBecause_ComposeInEitherOrder()
+    {
+        // Each copy verb preserves what the other set, so recording a count never drops the attribution
+        // that justified the entry and attributing one never drops its measure.
+        BaselineEntry countedThenAttributed = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt")
+            .WithSiteCount(2)
+            .WithBecause("INC-1234");
+        BaselineEntry attributedThenCounted = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt")
+            .WithBecause("INC-1234")
+            .WithSiteCount(2);
+
+        countedThenAttributed.ShouldSatisfyAllConditions(
+            () => countedThenAttributed.SiteCount.ShouldBe(2),
+            () => countedThenAttributed.Because.ShouldBe("INC-1234"),
+            () => attributedThenCounted.SiteCount.ShouldBe(2),
+            () => attributedThenCounted.Because.ShouldBe("INC-1234"));
+    }
+
+    [Fact]
+    public void WithSiteCount_ZeroOrNegative_Throws()
+    {
+        // An entry grandfathering nothing is a *stale* entry, which the ratchet reports for acceptance —
+        // so zero is refused rather than stored as an allowance nothing can ever satisfy.
+        BaselineEntry entry = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt");
+
+        Should.Throw<ArgumentOutOfRangeException>(() => entry.WithSiteCount(0))
+            .Message.ShouldContain("at least 1");
+        Should.Throw<ArgumentOutOfRangeException>(() => entry.WithSiteCount(-1))
+            .Message.ShouldContain("at least 1");
+    }
+
+    [Fact]
+    public void WithSiteCount_OnSubjectEntry_Throws()
+    {
+        // A subject entry's sites are declarations (GRAMMAR §4.3), so there is nothing for a count to
+        // measure — and the correspondence verb swaps its site set outright when its arm flips.
+        Should.Throw<InvalidOperationException>(() => BaselineEntry.ForSubject("T:N.Type")
+                .WithSiteCount(2))
+            .Message.ShouldContain("Only an edge entry carries a site count");
+    }
+
+    [Fact]
+    public void IsEdge_PartsEdgeEntriesFromSubjectEntries()
+    {
+        BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt")
+            .IsEdge.ShouldBeTrue();
+        BaselineEntry.ForSubject("T:N.Type")
+            .IsEdge.ShouldBeFalse();
+        BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt")
+            .WithBecause("INC-1234")
+            .IsEdge.ShouldBeTrue();
     }
 
     [Fact]

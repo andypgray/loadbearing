@@ -102,13 +102,17 @@ public sealed class BaselineAddE2ETests
             "data-access/no-inline-sql: added 1 grandfathered entry — MyApp.Web.HomeController -> System.Data.DataTable (because: INC-1234).");
         add.Out.ShouldContain("wrote");
 
-        // Composer as oracle: the new entry renders attributed (because last) AND the foreign section is byte-identical.
+        // Composer as oracle: the new entry renders measured then attributed (siteCount, then because last) AND
+        // the foreign section is byte-identical. HomeController declares the DataTable on two lines, so the valve
+        // records two sites; the pre-written InvoiceController neighbour is not the entry being added and stays
+        // uncounted, which is the mixed shape a partially upgraded file has.
         string afterText = File.ReadAllText(migratePath);
         afterText.NormalizedLines()
             .ShouldBe(BaselineComposer.Compose(
                 (MigrateRule,
                 [
                     BaselineEntry.ForEdge(HomeId, DataTableId)
+                        .WithSiteCount(2)
                         .WithBecause("INC-1234"),
                     BaselineEntry.ForEdge(InvoiceId, DataTableId)
                 ]),
@@ -162,9 +166,12 @@ public sealed class BaselineAddE2ETests
                 (ContainmentRule,
                 [
                     BaselineEntry.ForEdge(HomeId, BillingCalculatorId)
+                        .WithSiteCount(1)
                         .WithBecause("hotfix INC-42"),
-                    BaselineEntry.ForEdge(InvoiceId, BillingCalculatorId),
+                    BaselineEntry.ForEdge(InvoiceId, BillingCalculatorId)
+                        .WithSiteCount(2),
                     BaselineEntry.ForEdge(InvoiceId, RoundingModeId)
+                        .WithSiteCount(1)
                 ])));
 
         // The containment rule is now fully grandfathered — green — while overall check still fails on the
@@ -218,6 +225,7 @@ public sealed class BaselineAddE2ETests
             .ShouldBe(BaselineComposer.Compose(
                 (ClockRule, [
                     BaselineEntry.ForEdge(HomeId, NowMemberId)
+                        .WithSiteCount(1)
                         .WithBecause("INC-1234")
                 ])));
         afterText.ShouldNotBe(beforeText);
@@ -333,6 +341,7 @@ public sealed class BaselineAddE2ETests
             .ShouldBe(BaselineComposer.Compose(
                 (ConstructionRule, [
                     BaselineEntry.ForEdge(InvoiceServiceId, InvoiceCreatedHandlerId)
+                        .WithSiteCount(1)
                         .WithBecause("INC-1234")
                 ])));
         LineSet(File.ReadAllText(diPath))
@@ -393,6 +402,7 @@ public sealed class BaselineAddE2ETests
             .ShouldBe(BaselineComposer.Compose(
                 (CaptiveRule, [
                     BaselineEntry.ForEdge(ReportSchedulerId, OrderFeedInterfaceId)
+                        .WithSiteCount(1)
                         .WithBecause("INC-1234")
                 ])));
         LineSet(File.ReadAllText(captivePath))
@@ -459,6 +469,7 @@ public sealed class BaselineAddE2ETests
             .ShouldBe(BaselineComposer.Compose(
                 (CatchRule, [
                     BaselineEntry.ForEdge(ReportEndpointId, SystemExceptionId)
+                        .WithSiteCount(1)
                         .WithBecause("INC-1234")
                 ])));
         LineSet(File.ReadAllText(catchPath))
@@ -531,6 +542,7 @@ public sealed class BaselineAddE2ETests
             .ShouldBe(BaselineComposer.Compose(
                 (ExposeRule, [
                     BaselineEntry.ForEdge(HomeId, DataTableId)
+                        .WithSiteCount(1)
                         .WithBecause("INC-1234")
                 ])));
         LineSet(File.ReadAllText(exposePath))
@@ -571,7 +583,10 @@ public sealed class BaselineAddE2ETests
         string afterSecond = File.ReadAllText(migratePath);
 
         first.Out.ShouldContain("added 1 grandfathered entry");
-        second.ShouldSucceed("data-access/no-inline-sql: entry already baselined — attribution updated.");
+        // The echo names the measure as well as the attribution, and names both ends of it even where the two
+        // agree: --add is the only verb that may raise a site count, so what it recorded is never left implied.
+        second.ShouldSucceed(
+            "data-access/no-inline-sql: entry already baselined — attribution updated and site count re-recorded (2 → 2).");
         second.Out.ShouldContain("wrote");
         // No second entry — the count is unchanged and only the attribution (and its digest) moved.
         afterSecond.NormalizedLines()
@@ -579,8 +594,10 @@ public sealed class BaselineAddE2ETests
                 (MigrateRule,
                 [
                     BaselineEntry.ForEdge(HomeId, DataTableId)
+                        .WithSiteCount(2)
                         .WithBecause("second"),
                     BaselineEntry.ForEdge(InvoiceId, DataTableId)
+                        .WithSiteCount(2)
                 ])));
         afterSecond.ShouldNotBe(afterFirst);
     }

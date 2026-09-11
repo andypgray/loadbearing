@@ -27,6 +27,7 @@
         "baselinePath": "arch/baselines/data-access/no-inline-sql.json",
         "captured": true,
         "remaining": 1,
+        "remainingSites": 2,
         "newViolations": 1,
         "stale": 0,
         "promotable": false
@@ -42,6 +43,7 @@
         "baselinePath": "arch/baselines/time/inject-clock.json",
         "captured": false,
         "remaining": 0,
+        "remainingSites": 0,
         "newViolations": 2,
         "stale": 0,
         "promotable": false
@@ -57,6 +59,7 @@
         "baselinePath": "arch/baselines/naming/async-suffix.json",
         "captured": false,
         "remaining": 0,
+        "remainingSites": 0,
         "newViolations": 2,
         "stale": 0,
         "promotable": false
@@ -72,6 +75,7 @@
         "baselinePath": "arch/baselines/di/handlers-via-registry.json",
         "captured": false,
         "remaining": 0,
+        "remainingSites": 0,
         "newViolations": 1,
         "stale": 0,
         "promotable": false
@@ -87,6 +91,7 @@
         "baselinePath": "arch/baselines/di/no-captive-dependencies.json",
         "captured": false,
         "remaining": 0,
+        "remainingSites": 0,
         "newViolations": 2,
         "stale": 0,
         "promotable": false
@@ -116,6 +121,7 @@
         "baselinePath": "arch/violated-quarantine-baseline.json",
         "captured": false,
         "remaining": 0,
+        "remainingSites": 0,
         "newViolations": 2,
         "stale": 0
       }
@@ -137,6 +143,7 @@
         "baselinePath": "arch/baselines/exceptions/no-general-catch.json",
         "captured": false,
         "remaining": 0,
+        "remainingSites": 0,
         "newViolations": 2,
         "stale": 0,
         "promotable": false
@@ -166,6 +173,7 @@
         "baselinePath": "arch/baselines/api/return-dtos.json",
         "captured": false,
         "remaining": 0,
+        "remainingSites": 0,
         "newViolations": 2,
         "stale": 0,
         "promotable": false
@@ -209,6 +217,7 @@
         "baselinePath": "arch/baselines/layering/services-behind-contracts.json",
         "captured": true,
         "remaining": 1,
+        "remainingSites": 1,
         "newViolations": 1,
         "stale": 0,
         "promotable": false
@@ -277,6 +286,7 @@
     "rulesFailed": 25,
     "rulesSkipped": 1,
     "grandfatheredRemaining": 2,
+    "grandfatheredSites": 3,
     "fixedAwaitingAcceptance": 0
   }
 }

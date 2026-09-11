@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn.Diagnostics;
@@ -114,17 +115,26 @@ internal static class JsonReportRenderer
             result.Violations.Count,
             elideViolations
                 ? null
-                : result.Violations.Select(v => ToViolation(v, relativizer, grain)).ToList(),
+                : result.Violations.Select(v => ToViolation(v, result, relativizer, grain)).ToList(),
             result.Warnings.Select(w => new WarningJson(w.Kind, w.Message)).ToList());
     }
 
     // The baseline block is present for any ratcheted rule (Migrate or Quarantine containment); the model's
-    // relative path string rides through verbatim.
+    // relative path string rides through verbatim. The two measure counts are omitted at zero rather than
+    // written as 0, so a section whose entries all record a count they still hold reads exactly as it did
+    // before the measure existed.
     private static BaselineJson? ToBaseline(RuleResult result)
     {
-        return result.Rule.BaselinePath is { } path
-            ? new BaselineJson(path, result.Grandfathered.Count, result.StaleBaselineEntries)
-            : null;
+        if (result.Rule.BaselinePath is not { } path) return null;
+
+        int shrunk = result.ShrunkBaselineEntries;
+        int uncounted = result.UncountedBaselineEntries;
+        return new BaselineJson(
+            path,
+            result.Grandfathered.Count,
+            result.StaleBaselineEntries,
+            shrunk > 0 ? shrunk : null,
+            uncounted > 0 ? uncounted : null);
     }
 
     // A memberUse violation carries Source (the using type, as Reference does) and the banned member's raw
@@ -132,14 +142,19 @@ internal static class JsonReportRenderer
     // subjectMember (Subject/Target stay null); a projectShape violation carries the project's name in
     // subjectProject and, when it is one of the per-package ones, the package's name beside it. Every slot
     // is null-omitted, so a report from a spec with no member or project rule carries none of those keys.
+    // The rule comes in whole for the one slot that is a fact about this violation's relationship to the
+    // baseline rather than about the violation itself: what its entry allowed, when it is red for exceeding it.
     private static ViolationJson ToViolation(
-        Violation violation, PathFormat.Relativizer relativizer, DocumentGrain grain)
+        Violation violation, RuleResult result, PathFormat.Relativizer relativizer, DocumentGrain grain)
     {
         // The first and largest elision: sites are the one array with no ceiling — a legacy migration
         // burndown carries thousands of them under one rule — so this is the rung that actually compresses.
         // Eliding them skips the relativizer walk too, which is why a coarser render is cheaper as well as
         // smaller.
         bool elideSites = grain >= DocumentGrain.Overview;
+        int? grandfatheredSiteCount = result.GrownEntries.TryGetValue(violation, out BaselineEntry? grown)
+            ? grown.SiteCount
+            : null;
 
         return new ViolationJson(
             violation.Kind,
@@ -151,6 +166,7 @@ internal static class JsonReportRenderer
             violation.SubjectProject?.Name,
             violation.Package?.Name,
             violation.Detail,
+            grandfatheredSiteCount,
             violation.Sites.Count,
             elideSites
                 ? null

@@ -51,6 +51,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The ratchet now measures sites.** A baseline entry records how many sites it grandfathers,
+  and a grandfathered pair that gains a site is red — every site of the pair listed, with a
+  `grown:` trailer naming the count it exceeded. Before, an entry keyed a (source, target) pair
+  and every site of the pair rode under it, so a second old-pattern site written inside an
+  already-grandfathered type passed: new code in the old pattern was red only where the
+  surrounding type was clean. The count is a measure beside the identity — `siteCount` on edge
+  entries, out of entry equality (a grown pair is one entry that grew, not a stale entry beside
+  a new violation) and in the digest (a hand-edited count is refused like any other edit);
+  subject entries carry none. The file format is v2 (`"schemaVersion": 2`, digest preamble
+  `loadbearing-baseline-digest-v2`) and every write composes it. v1 files are read exactly as
+  before, their entries grandfathering the whole pair as they always did, and
+  `loadbearing status` names them uncounted until `baseline --accept-reductions` records the
+  counts — the same run that lowers a count whose sites have gone. Growth is accepted one way
+  only: `baseline --add` on the existing entry re-records the observed count under its
+  mandatory `--because`. `status` reports remaining sites beside remaining pairs, `check --json`
+  carries `grandfatheredSiteCount` on a grown violation and `shrunk` / `uncounted` on the
+  baseline, `status --json` gains `remainingSites`, and SARIF reports a grown pair's sites at
+  error level as `updated`. GRAMMAR §4.3 states the measure.
+
 - **`MustOnlyReference` and `MustOnlyBeReferencedBy` allow the rule's own subject.**
   `application.MustOnlyReference(domain)` permits an Application-to-Application reference and
   renders "must reference only the Domain layer". Saying that took
@@ -74,6 +93,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the target law, the rationale and the boy-scout policy — is unchanged, and the magnitude stays
   where it is measured, in `loadbearing status`. Re-rendering updates the root block and any layer
   card carrying a Migrate rule.
+
+### Fixed
+
+- **`baseline --accept-reductions` and `--init` no longer write a file they put nothing into.** For a
+  rule with no captured section, `--accept-reductions` says to run `--init` first and then wrote an
+  empty, section-less baseline file in the same breath: noise in the tree, under a "wrote" line that
+  contradicted the sentence above it. `--init` did the same for a rule it could not capture at all.
 
 ## [0.7.0] - 2026-08-26
 

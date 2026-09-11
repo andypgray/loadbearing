@@ -11,12 +11,17 @@ namespace Zphil.LoadBearing.Roslyn.Baselines;
 ///     The baseline I/O boundary of the host layer (Core owns the format and digest; this owns the disk).
 /// </summary>
 /// <remarks>
-///     Reads a baseline file with a strict JSON walk (exact properties, <c>schemaVersion == 1</c>,
-///     well-formed entries, each optionally attributed with a <c>because</c>), then <em>recanonicalizes</em>
+///     Reads a baseline file with a strict JSON walk (exact properties, a <c>schemaVersion</c>
+///     <see cref="BaselineFormat.IsSupported" /> accepts, well-formed entries, each optionally carrying a
+///     <c>siteCount</c> measure and a <c>because</c> attribution), then <em>recanonicalizes</em>
 ///     the parsed entries and re-derives the digest — a mismatch is loud tamper. A missing file
 ///     or missing rule section is uncaptured, not an error. Writes are canonical (fresh digest, unknown
 ///     sections preserved), UTF-8 no BOM, LF, and report wrote/unchanged on a CRLF-normalized compare so
 ///     an autocrlf checkout is a true zero-diff.
+///     The file's own version governs the whole read and must reach both ends of it: the walk, because
+///     <c>siteCount</c> is a stranger in a legacy file rather than an optional key, and the
+///     recanonicalization, because a legacy file's stored digest was computed in the grammar of its day.
+///     A write always composes the current version, so any write is also the upgrade.
 ///     Lives in the Roslyn host project so both the CLI and the xUnit adapter share it.
 /// </remarks>
 internal static class BaselineStore
@@ -78,15 +83,19 @@ internal static class BaselineStore
             RequireExactProperties(absolutePath, root, "schemaVersion", "digest", "rules");
 
             int schemaVersion = ReadSchemaVersion(absolutePath, root);
-            if (schemaVersion != BaselineFormat.SchemaVersion)
-                throw Malformed(absolutePath, $"unsupported schemaVersion {schemaVersion} (expected {BaselineFormat.SchemaVersion}).");
+            if (!BaselineFormat.IsSupported(schemaVersion))
+                throw Malformed(
+                    absolutePath,
+                    $"unsupported schemaVersion {schemaVersion} "
+                    + $"(expected {BaselineFormat.LegacySchemaVersion} or {BaselineFormat.SchemaVersion}).");
 
             string digest = ReadDigest(absolutePath, root);
-            Dictionary<string, IReadOnlyList<BaselineEntry>> sections = ReadSections(absolutePath, root);
+            Dictionary<string, IReadOnlyList<BaselineEntry>> sections = ReadSections(absolutePath, root, schemaVersion);
 
-            // Recanonicalize + verify: rebuild the digest from the parsed entries. Formatting/order/CRLF
-            // changes are invisible; any entry change is not — so a mismatch is a hand edit (tamper).
-            string recomputed = BaselineFormat.ComputeDigest(ToComposeInput(sections));
+            // Recanonicalize + verify: rebuild the digest from the parsed entries, in the grammar of the
+            // version the file declares. Formatting/order/CRLF changes are invisible; any entry change is
+            // not — so a mismatch is a hand edit (tamper).
+            string recomputed = BaselineFormat.ComputeDigest(ToComposeInput(sections), schemaVersion);
             if (!string.Equals(recomputed, digest, StringComparison.Ordinal)) throw Tampered(absolutePath);
 
             return new BaselineDocument(sections);
@@ -120,7 +129,8 @@ internal static class BaselineStore
         return Path.GetFullPath(baselinePath, solutionDirectory);
     }
 
-    private static Dictionary<string, IReadOnlyList<BaselineEntry>> ReadSections(string path, JsonElement root)
+    private static Dictionary<string, IReadOnlyList<BaselineEntry>> ReadSections(
+        string path, JsonElement root, int schemaVersion)
     {
         var sections = new Dictionary<string, IReadOnlyList<BaselineEntry>>(StringComparer.Ordinal);
         JsonElement rules = root.GetProperty("rules");
@@ -137,27 +147,32 @@ internal static class BaselineStore
 
             var entries = new List<BaselineEntry>();
             foreach (JsonElement entryElement in entriesElement.EnumerateArray())
-                entries.Add(ReadEntry(path, ruleProperty.Name, entryElement));
+                entries.Add(ReadEntry(path, ruleProperty.Name, entryElement, schemaVersion));
             sections[ruleProperty.Name] = entries;
         }
 
         return sections;
     }
 
-    private static BaselineEntry ReadEntry(string path, string ruleId, JsonElement entry)
+    private static BaselineEntry ReadEntry(string path, string ruleId, JsonElement entry, int schemaVersion)
     {
         if (entry.ValueKind != JsonValueKind.Object) throw Malformed(path, $"rule '{ruleId}' has a non-object entry.");
 
-        // One pass over the properties answers the whole four-way shape question — {subject}, {subject,
-        // because}, {source, target}, {source, target, because} — and this runs per entry, per baseline file,
-        // on every check and status: materializing the names and set-comparing them four times was work
-        // proportional to a team's whole debt ledger for a fixed question about four words.
+        // One pass over the properties answers the whole six-way shape question — {subject}, {source,
+        // target}, and either of those plus a because, plus the two an edge's siteCount adds — and this runs
+        // per entry, per baseline file, on every check and status: materializing the names and set-comparing
+        // them six times was work proportional to a team's whole debt ledger for a fixed question about
+        // five words.
         var hasSubject = false;
         var hasSource = false;
         var hasTarget = false;
         var hasBecause = false;
+        var hasSiteCount = false;
         var hasStranger = false;
         var propertyCount = 0;
+        // A legacy file has no measure, so 'siteCount' there is a stranger rather than an optional key:
+        // a v1 file carrying one was hand-edited, and its digest was computed without it.
+        bool measured = schemaVersion != BaselineFormat.LegacySchemaVersion;
 
         foreach (JsonProperty property in entry.EnumerateObject())
         {
@@ -176,6 +191,9 @@ internal static class BaselineStore
                 case "because":
                     hasBecause = true;
                     break;
+                case "siteCount" when measured:
+                    hasSiteCount = true;
+                    break;
                 default:
                     hasStranger = true;
                     break;
@@ -184,7 +202,8 @@ internal static class BaselineStore
 
         // Counting the distinct names back against the properties read is what rejects a repeated key: a
         // second 'subject' is a hand edit whose second value would silently never be read.
-        int distinctNames = (hasSubject ? 1 : 0) + (hasSource ? 1 : 0) + (hasTarget ? 1 : 0) + (hasBecause ? 1 : 0);
+        int distinctNames = (hasSubject ? 1 : 0) + (hasSource ? 1 : 0) + (hasTarget ? 1 : 0)
+                            + (hasBecause ? 1 : 0) + (hasSiteCount ? 1 : 0);
         bool exactlyNamed = !hasStranger && propertyCount == distinctNames;
 
         bool isSubject = exactlyNamed && hasSubject && !hasSource && !hasTarget;
@@ -192,16 +211,30 @@ internal static class BaselineStore
         if (!isSubject && !isEdge)
             throw Malformed(path, $"rule '{ruleId}' has an entry that is neither {{source, target}} nor {{subject}}.");
 
+        if (isSubject && hasSiteCount)
+            throw Malformed(path, $"rule '{ruleId}' has a 'siteCount' on a subject entry — only edge entries carry one.");
+
         BaselineEntry parsed = isSubject
             ? BaselineEntry.ForSubject(RequireNonEmptyString(path, ruleId, "subject", entry.GetProperty("subject")))
             : BaselineEntry.ForEdge(
                 RequireNonEmptyString(path, ruleId, "source", entry.GetProperty("source")),
                 RequireNonEmptyString(path, ruleId, "target", entry.GetProperty("target")));
 
+        if (hasSiteCount)
+            parsed = parsed.WithSiteCount(ReadSiteCount(path, ruleId, entry.GetProperty("siteCount")));
+
         if (!entry.TryGetProperty("because", out JsonElement because)) return parsed;
 
         string attribution = ReadBecause(path, ruleId, because);
         return parsed.WithBecause(attribution);
+    }
+
+    private static int ReadSiteCount(string path, string ruleId, JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt32(out int siteCount) || siteCount < 1)
+            throw Malformed(path, $"rule '{ruleId}' has a 'siteCount' that is not an integer of at least 1.");
+
+        return siteCount;
     }
 
     private static string ReadBecause(string path, string ruleId, JsonElement value)

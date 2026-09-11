@@ -10,7 +10,10 @@ namespace Zphil.LoadBearing.Tests.Checking;
 ///     The Migrate ratchet: a Migrate rule evaluates like Enforce, then its
 ///     violations are partitioned against a baseline keyed by stable symbol IDs (GRAMMAR §4.3). In the
 ///     baseline = grandfathered (pass); not in it — including new code in the old pattern and a new
-///     forbidden target from a grandfathered source — = red. <c>EmptySubject</c>/<c>RuleError</c> are
+///     forbidden target from a grandfathered source — = red. An edge entry may also record how many
+///     sites it grandfathers, and then the count decides too: more is growth and red, fewer is a
+///     reduction that passes, and an entry recording nothing holds its pair at any size.
+///     <c>EmptySubject</c>/<c>RuleError</c> are
 ///     never baselinable; an inert target still warns-and-passes; the two-arg overload sees no baselines;
 ///     an Enforce rule ignores the index entirely.
 /// </summary>
@@ -21,6 +24,41 @@ public sealed class MigrateRatchetTests
                                          namespace App.Web { public class OldController { public App.Data.Db Load() => new App.Data.Db(); } }
                                          namespace App.Data { public class Db {} }
                                          """;
+
+    // The same forbidden edge (OldController -> App.Data.Db) reached from two distinct lines. Sites are
+    // deduped per file:line, so this is two sites under one identity — the shape the measure counts.
+    private const string TwoSiteController = """
+                                             namespace App.Web
+                                             {
+                                                 public class OldController
+                                                 {
+                                                     public App.Data.Db A() => new App.Data.Db();
+                                                     public App.Data.Db B() => new App.Data.Db();
+                                                 }
+                                             }
+                                             namespace App.Data { public class Db {} }
+                                             """;
+
+    // One (source, caught) edge caught three times in one type: unfiltered once and behind a `when` filter
+    // twice. MustNotCatch reports all three sites as evidence; MustNotCatchUnfiltered reports the one.
+    private const string ThreeCatchHandler = """
+                                             namespace Errors { public class DbError : System.Exception {} }
+                                             namespace App
+                                             {
+                                                 public class Handler
+                                                 {
+                                                     public void Run(bool flag)
+                                                     {
+                                                         try { }
+                                                         catch (Errors.DbError) { }
+                                                         try { }
+                                                         catch (Errors.DbError) when (flag) { }
+                                                         try { }
+                                                         catch (Errors.DbError) when (!flag) { }
+                                                     }
+                                                 }
+                                             }
+                                             """;
 
     // A stand-in for the reason a filtered run composes; its wording is pinned where it is minted.
     private const string NarrowingSkipReason = "'BillingOnly.slnf' narrowed this run: 2 projects were not checked.";
@@ -124,6 +162,162 @@ public sealed class MigrateRatchetTests
         result.ShouldHavePassed();
         result.ShouldHaveGrandfathered(1);
         result.Violations.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Check_MoreSitesThanTheEntryRecords_IsRedAsGrowth()
+    {
+        // The hole the measure closes: a second old-pattern site inside an already-grandfathered pair used
+        // to ride in free, which is precisely where new code in the old pattern gets written — inside a
+        // type whose surrounding code already does it.
+        BaselineIndex index = Checker.Baselines(
+            "data/x",
+            BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db")
+                .WithSiteCount(1));
+
+        RuleResult result = Checker.Run(TwoSiteController, index, NoDataAccess)
+            .Single();
+
+        result.ShouldHaveFailedWithEdges(ViolationKind.Reference, ["App.Web.OldController -> App.Data.Db"]);
+        result.ShouldHaveGrown(1);
+        result.ShouldHaveGrandfathered(0);
+        // Red with ALL its sites, not just the new one: which site is new is a diff question, and the count
+        // is deliberately lossy — that lossiness is what buys immunity to line churn.
+        result.Violations.ShouldHaveSingleItem()
+            .Sites.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public void Check_SitesWithinTheRecordedCount_PassesGrandfathered()
+    {
+        BaselineIndex index = Checker.Baselines(
+            "data/x",
+            BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db")
+                .WithSiteCount(2));
+
+        RuleResult result = Checker.Run(TwoSiteController, index, NoDataAccess)
+            .Single();
+
+        result.ShouldHavePassed();
+        result.ShouldHaveGrandfathered(1);
+        result.ShouldHaveGrown(0);
+        result.ShrunkBaselineEntries.ShouldBe(0);
+        result.UncountedBaselineEntries.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Check_FewerSitesThanTheEntryRecords_PassesAndCountsShrunk()
+    {
+        // A reduction is never red — tightening is the direction the ratchet wants — but it is reported, so
+        // 'baseline --accept-reductions' has something to lower the recorded count to.
+        BaselineIndex index = Checker.Baselines(
+            "data/x",
+            BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db")
+                .WithSiteCount(3));
+
+        RuleResult result = Checker.Run(OneController, index, NoDataAccess)
+            .Single();
+
+        result.ShouldHavePassed();
+        result.ShouldHaveGrandfathered(1);
+        result.ShouldHaveGrown(0);
+        result.ShrunkBaselineEntries.ShouldBe(1);
+        result.StaleBaselineEntries.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Check_UncountedEntry_GrandfathersAtPairGrainAndCountsUncounted()
+    {
+        // An entry recording no count holds its pair at any size, exactly as every entry did before the
+        // measure existed. That is what keeps a partially upgraded or foreign baseline section valid — and
+        // it is reported, because it is the state a write can clear.
+        BaselineIndex index = Checker.Baselines(
+            "data/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
+
+        RuleResult result = Checker.Run(TwoSiteController, index, NoDataAccess)
+            .Single();
+
+        result.ShouldHavePassed();
+        result.ShouldHaveGrandfathered(1);
+        result.ShouldHaveGrown(0);
+        result.UncountedBaselineEntries.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Check_SubjectEntry_IsNeitherGrownNorUncounted()
+    {
+        // A subject entry's sites are declarations, so there is no measure to record and nothing to report:
+        // counting it as uncounted would leave a naming rule's whole section nagging forever with nothing
+        // an author could do about it.
+        const string source = "namespace App { public class GoodHandler {} public class BadThing {} }";
+        BaselineIndex index = Checker.Baselines("naming/x", BaselineEntry.ForSubject("T:App.BadThing"));
+
+        RuleResult result = Checker.Run(source, index, arch =>
+                arch.Rule("naming/x")
+                    .Migrate("Types are inconsistently named.", arch.Namespace("App.*").MustHaveSuffix("Handler"))
+                    .Because("Handler discovery is convention-based."))
+            .Single();
+
+        result.ShouldHavePassed();
+        result.ShouldHaveGrandfathered(1);
+        result.ShouldHaveGrown(0);
+        result.UncountedBaselineEntries.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Check_GrownPair_IsNotStaleAndCarriesItsStoredEntry()
+    {
+        // Matching is by identity, and a grown pair matched — so it is live debt that grew, never debt that
+        // was fixed. Reading it as stale would offer it to 'baseline --accept-reductions', which would then
+        // delete the entry recording the very debt that just got worse.
+        BaselineIndex index = Checker.Baselines(
+            "data/x",
+            BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db")
+                .WithSiteCount(1)
+                .WithBecause("INC-1234"));
+
+        RuleResult result = Checker.Run(TwoSiteController, index, NoDataAccess)
+            .Single();
+
+        result.ShouldHaveFailed();
+        result.StaleBaselineEntries.ShouldBe(0);
+        Violation grown = result.Violations.ShouldHaveSingleItem();
+        BaselineEntry stored = result.GrownEntries[grown];
+        stored.SiteCount.ShouldBe(1);
+        stored.Because.ShouldBe("INC-1234");
+    }
+
+    [Fact]
+    public void Check_SameEdgeUnderANarrowerCatchVerb_MeasuresOnlyThatVerbsSites()
+    {
+        // All three catch verbs key the identical edge (GRAMMAR §4.3), but each reports its own sites — so
+        // the count is as measured by the verb that recorded it. An entry recorded under
+        // MustNotCatchUnfiltered holds under that verb and reds under MustNotCatch, whose evidence is wider.
+        // Inherent to counting evidence, and the remedy is 'baseline --add' re-recording the entry.
+        BaselineIndex index = Checker.Baselines(
+            "ex/x",
+            BaselineEntry.ForEdge("T:App.Handler", "T:Errors.DbError")
+                .WithSiteCount(1));
+
+        RuleResult unfiltered = Checker.Run(ThreeCatchHandler, index, arch =>
+                arch.Rule("ex/x")
+                    .Migrate("Handlers catch the domain error blind.",
+                        arch.Namespace("App.*").MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
+                    .Because("A blind catch hides a failing dependency."))
+            .Single();
+        RuleResult broad = Checker.Run(ThreeCatchHandler, index, arch =>
+                arch.Rule("ex/x")
+                    .Migrate("Handlers catch the domain error at all.",
+                        arch.Namespace("App.*").MustNotCatch(arch.Namespace("Errors.*")))
+                    .Because("A blind catch hides a failing dependency."))
+            .Single();
+
+        unfiltered.ShouldHavePassed();
+        unfiltered.ShouldHaveGrandfathered(1);
+        unfiltered.ShouldHaveGrown(0);
+
+        broad.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["App.Handler -> Errors.DbError"]);
+        broad.ShouldHaveGrown(1);
     }
 
     [Fact]

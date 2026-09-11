@@ -6,7 +6,10 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 // `check --json`. Serialized camelCase, indented, nulls omitted. The six workspace slots below are
 // additive and null (omitted) on every run whose workspace loaded, whose NuGet packages resolved, whose
 // solution is all C# and that no solution filter narrowed, so the schema stays version 2 and a clean
-// document is byte-identical.
+// document is byte-identical. The ratchet's two measure counts are additive the same way, on both the
+// per-rule block and the summary. The two site totals beside them are not: a burndown unit that appears
+// only sometimes is worse than one more integer, so they are written whatever they read, and the schema
+// stays at 2 because a consumer that never asked for them is unaffected by two more keys.
 
 /// <summary>The root <c>status --json</c> document.</summary>
 /// <param name="SchemaVersion">The burndown document's schema version — 2.</param>
@@ -85,19 +88,57 @@ internal sealed record StatusRuleJson(
 ///     A ratcheted rule's state: the baseline path, capture flag, and burndown counts. <see cref="Promotable" />
 ///     is populated for Migrate only (omitted for Quarantine containment — its promotion is a human decision).
 /// </summary>
+/// <param name="BaselinePath">The rule's baseline file, solution-relative with forward slashes.</param>
+/// <param name="Captured">Whether a baseline section exists for the rule at all.</param>
+/// <param name="Remaining">How many violations the baseline currently blesses — the burndown, in pairs.</param>
+/// <param name="RemainingSites">
+///     How many <em>sites</em> those pairs cover — the burndown at the grain the ratchet measures, and the
+///     unit a team actually works off. Unconditional rather than omitted where it equals
+///     <see cref="Remaining" />: a burndown figure that vanishes when it happens to agree with its
+///     neighbour is one a consumer has to reconstruct, and it is computable whether or not any entry has
+///     recorded a count yet.
+/// </param>
+/// <param name="NewViolations">How many violations are red — new code in the old pattern, growth included.</param>
+/// <param name="Stale">How many captured entries no current violation matched.</param>
+/// <param name="Shrunk">
+///     How many matched edge entries came in under the count they record, or null (omitted) when none did.
+/// </param>
+/// <param name="Uncounted">
+///     How many matched edge entries record no count at all, or null (omitted) when none. Both measures are
+///     omitted at zero, so a rule whose section is fully counted and still holding carries neither key.
+/// </param>
+/// <param name="Promotable">Whether the Migrate ratchet has burned to zero; omitted for Quarantine.</param>
 internal sealed record RatchetStatusJson(
     string BaselinePath,
     bool Captured,
     int Remaining,
+    int RemainingSites,
     int NewViolations,
     int Stale,
+    int? Shrunk,
+    int? Uncounted,
     bool? Promotable);
 
 /// <summary>The roll-up: rule counts plus the ratchet burndown totals.</summary>
+/// <param name="RulesChecked">How many rules the run evaluated.</param>
+/// <param name="RulesPassed">How many of them passed.</param>
+/// <param name="RulesFailed">How many of them failed.</param>
+/// <param name="RulesSkipped">How many reached no verdict.</param>
+/// <param name="GrandfatheredRemaining">The whole solution's burndown, in pairs.</param>
+/// <param name="GrandfatheredSites">
+///     The same burndown in sites — <see cref="RatchetStatusJson.RemainingSites" /> totalled, and
+///     unconditional for its reason.
+/// </param>
+/// <param name="FixedAwaitingAcceptance">Stale entries across every rule.</param>
+/// <param name="Shrunk">Shrunk entries across every rule, or null (omitted) when there are none.</param>
+/// <param name="Uncounted">Uncounted entries across every rule, or null (omitted) when there are none.</param>
 internal sealed record StatusSummaryJson(
     int RulesChecked,
     int RulesPassed,
     int RulesFailed,
     int RulesSkipped,
     int GrandfatheredRemaining,
-    int FixedAwaitingAcceptance);
+    int GrandfatheredSites,
+    int FixedAwaitingAcceptance,
+    int? Shrunk,
+    int? Uncounted);

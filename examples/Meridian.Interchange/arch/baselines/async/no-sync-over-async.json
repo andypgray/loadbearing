@@ -1,13 +1,13 @@
 {
-  "schemaVersion": 1,
-  "digest": "b06dc266725fe0fe06764c1ebc37485f256677d4f7327d32acd3133d3ad435f9",
+  "schemaVersion": 2,
+  "digest": "efe45dc856acd9ed806ac1325dd70b877ba48dc5844763543a99d02c88143363",
   "rules": {
     "async/no-sync-over-async": {
       "entries": [
-        { "source": "T:Meridian.Interchange.Partners.LegacyManifestClient", "target": "M:System.Runtime.CompilerServices.TaskAwaiter`1.GetResult" },
-        { "source": "T:Meridian.Interchange.Partners.LegacyManifestClient", "target": "M:System.Threading.Tasks.Task.Wait(System.Threading.CancellationToken)" },
-        { "source": "T:Meridian.Interchange.Partners.LegacyManifestClient", "target": "M:System.Threading.Tasks.Task`1.GetAwaiter" },
-        { "source": "T:Meridian.Interchange.Partners.LegacyManifestClient", "target": "P:System.Threading.Tasks.Task`1.Result" }
+        { "source": "T:Meridian.Interchange.Partners.LegacyManifestClient", "target": "M:System.Runtime.CompilerServices.TaskAwaiter`1.GetResult", "siteCount": 1 },
+        { "source": "T:Meridian.Interchange.Partners.LegacyManifestClient", "target": "M:System.Threading.Tasks.Task.Wait(System.Threading.CancellationToken)", "siteCount": 1 },
+        { "source": "T:Meridian.Interchange.Partners.LegacyManifestClient", "target": "M:System.Threading.Tasks.Task`1.GetAwaiter", "siteCount": 1 },
+        { "source": "T:Meridian.Interchange.Partners.LegacyManifestClient", "target": "P:System.Threading.Tasks.Task`1.Result", "siteCount": 1 }
       ]
     }
   }

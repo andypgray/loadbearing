@@ -88,15 +88,37 @@ public static class HumanReportRenderer
     }
 
     // The ratchet's human lines (Migrate and Quarantine containment). Baselined violations pass, so they
-    // are never listed as red sites; the grandfathered count is the only place a reader sees them.
+    // are never listed as red sites; the grandfathered count is the only place a reader sees them. A grown
+    // pair is red and so already listed above, and the grandfathered count deliberately leaves it out:
+    // it counts what passed, and a pair that exceeded its allowance did not.
     private static void RenderRatchetLines(TextWriter output, RuleResult result)
     {
         if (result.Grandfathered.Count > 0)
             output.WriteLine($"  grandfathered: {result.Grandfathered.Count} (baselined; run 'loadbearing status' for burndown)");
 
+        RenderGrownLine(output, result);
+
         if (result is { Status: RuleStatus.Failed, BaselineCaptured: false })
             output.WriteLine(
                 "  hint: no baseline captured for this rule; run 'loadbearing baseline --init' to grandfather existing violations");
+    }
+
+    // Why a red site sits on a pair the baseline names. Without this line a reader who looks the pair up
+    // finds it captured and reads the report as wrong; with it, the allowance and what the run measured
+    // against it are both on the page. The two numbers are sums over the grown pairs, so one line covers
+    // however many grew — and it never says which site is the new one, because the count does not know:
+    // that lossiness is what buys the measure its immunity to line churn.
+    private static void RenderGrownLine(TextWriter output, RuleResult result)
+    {
+        int grown = result.GrownEntries.Count;
+        if (grown == 0) return;
+
+        int baselined = result.GrownEntries.Values.Sum(entry => entry.SiteCount ?? 0);
+        int observed = result.GrownEntries.Keys.Sum(violation => violation.Sites.Count);
+        string pairs = Plurals.Noun(grown, "pair");
+        output.WriteLine(
+            $"  grown: {grown} grandfathered {pairs} exceeded the baseline site count "
+            + $"({baselined} baselined, {observed} observed)");
     }
 
     private static IEnumerable<string> ViolationLines(RuleResult result, PathFormat.Relativizer relativizer)

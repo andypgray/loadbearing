@@ -36,6 +36,30 @@ public sealed class GrandfatheredCountsTests
         count.Stale.ShouldBe(2);
     }
 
+    [Fact]
+    public void Extract_StatusRatchetLineCarryingTheMeasureClauses_StillCapturesBothCounters()
+    {
+        // Arrange: the same line with every clause the measure added — the site total behind the remaining
+        // pairs, and the two states a write clears. None of them moves the entry count, so all three have to
+        // be optional in the pattern: unrecognized, the line stops matching and the gate holds nothing at
+        // all, which reads as green rather than as a failure.
+        string doc = string.Join(
+            "\n",
+            "```text",
+            $"pass time/inject-clock (migrate) {EmDash} 7 grandfathered remaining (19 sites), 0 new, "
+            + "2 fixed awaiting acceptance, 1 shrunk, 3 uncounted",
+            "```");
+
+        // Act
+        IReadOnlyList<GrandfatheredCount> counts = GrandfatheredCounts.Extract("d.md", doc);
+
+        // Assert
+        GrandfatheredCount count = counts.ShouldHaveSingleItem();
+        count.RuleId.ShouldBe("time/inject-clock");
+        count.Count.ShouldBe(7);
+        count.Stale.ShouldBe(2);
+    }
+
     [Theory]
     [InlineData("data-access/no-inline-sql: captured 12 grandfathered violations.", "data-access/no-inline-sql", 12)]
     [InlineData("clearance/engine/containment: captured 1 grandfathered violation.", "clearance/engine/containment", 1)]
@@ -62,6 +86,29 @@ public sealed class GrandfatheredCountsTests
             "\n",
             "```text",
             "Checked 8 rules: 7 passed, 0 failed, 1 skipped. Burndown: 33 grandfathered remaining, 0 fixed awaiting acceptance.",
+            "```");
+
+        // Act
+        IReadOnlyList<GrandfatheredCount> counts = GrandfatheredCounts.Extract("d.md", doc);
+
+        // Assert
+        GrandfatheredCount count = counts.ShouldHaveSingleItem();
+        count.RuleId.ShouldBe(GrandfatheredCounts.RootTotal);
+        count.Count.ShouldBe(33);
+        count.Stale.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Extract_BurndownSummaryCarryingSitesAndTheRecordNudge_StillCapturesBothCounters()
+    {
+        // Arrange: the summary's own two clauses. The uncounted one ends in the nudge to record the counts,
+        // which moves the sentence's full stop past it — so the pattern has to reach the period through the
+        // advice rather than expecting it after "acceptance".
+        string doc = string.Join(
+            "\n",
+            "```text",
+            "Checked 8 rules: 7 passed, 0 failed, 1 skipped. Burndown: 33 grandfathered remaining (53 sites), "
+            + "0 fixed awaiting acceptance, 33 uncounted; run 'loadbearing baseline --accept-reductions' to record site counts.",
             "```");
 
         // Act

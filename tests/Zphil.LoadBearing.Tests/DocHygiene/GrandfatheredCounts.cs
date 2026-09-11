@@ -17,13 +17,23 @@ namespace Zphil.LoadBearing.Tests.DocHygiene;
 /// <remarks>
 ///     <para>
 ///         <b>Why <c>entries</c> is the right truth.</b> A report's grandfathered count is the number of
-///         baseline entries that matched a violation on that run, and its stale count ("fixed awaiting
-///         acceptance") is the number that matched nothing —
-///         <c>entries = grandfathered + stale</c>, exactly. Two of the four fenced shapes carry the stale
-///         count on the line, so for them the identity is checked whole. The other two do not, and are
-///         pinned as <c>entries = grandfathered</c>: the same identity with a stale term the quoted run
-///         reports as zero elsewhere in its own capture. Every committed baseline here is at zero stale,
-///         and the day one is not, the capture it was quoted from is stale too.
+///         baseline entries that matched a violation and blessed it on that run; its stale count ("fixed
+///         awaiting acceptance") is the number that matched nothing; and a matched entry whose pair now
+///         carries more sites than it records is neither of those — it is <em>grown</em>, and red. The
+///         identity is therefore <c>entries = grandfathered + stale + grown</c>.
+///     </para>
+///     <para>
+///         <b>The two-term form still holds here.</b> This gate checks
+///         <c>entries = grandfathered + stale</c>, which is that identity with a grown term of zero — and
+///         zero is what every capture a doc can carry reports, because a run with anything grown is a
+///         failing run. A doc quoting growth would be quoting a red <c>check</c> or a <c>status</c> whose
+///         <c>new</c> count is not zero, and the captures under gate are all of green ones; quote a grown
+///         run and the count no longer reconciles, which is a drift report rather than a silence. Two of
+///         the four fenced shapes carry the stale count on the line, so for them the identity is checked
+///         whole. The other two do not, and are pinned as <c>entries = grandfathered</c>: the same
+///         identity with a stale term the quoted run reports as zero elsewhere in its own capture. Every
+///         committed baseline here is at zero stale, and the day one is not, the capture it was quoted
+///         from is stale too.
 ///     </para>
 ///     <para>
 ///         <b>Prose is composed, not parsed.</b> A sentence saying "twelve inline-SQL references" is
@@ -93,9 +103,21 @@ internal static class GrandfatheredCounts
 
     private const string RuleIdPattern = "[a-z][a-z0-9.-]*(?:/[a-z0-9-]+)+";
 
+    // The site total the remaining term carries whenever its pairs cover more than one site each. Optional
+    // because the line prints it only then, and ungrouped because sites are a different number against a
+    // different truth: this gate reconciles entry counts, and an entry says nothing about how many sites it
+    // covers until it has recorded one. Absent from the pattern entirely, a status line that grew it would
+    // stop matching — and a shape this file no longer recognizes is not a red, it is a gate holding nothing.
+    private const string SitesClause = @"(?: \(\d+ sites\))?";
+
+    // The two measure states a write clears, each printed only when non-zero and neither moving the entry
+    // count: an entry that came in under its recorded count, or records none, is matched and grandfathered
+    // like any other. Optional for the reason above.
+    private const string MeasureClauses = @"(?:, \d+ shrunk)?(?:, \d+ uncounted)?";
+
     /// <summary>A <c>status</c> ratchet line: the rule, its posture, then the three counters.</summary>
     private static readonly Regex StatusLine =
-        new($@"^\s*(?:pass|FAIL|warn|skip) (?<id>{RuleIdPattern}) \([a-z]+\) {EmDash} (?<count>\d+) grandfathered remaining, \d+ new, (?<stale>\d+) fixed awaiting acceptance\s*$",
+        new($@"^\s*(?:pass|FAIL|warn|skip) (?<id>{RuleIdPattern}) \([a-z]+\) {EmDash} (?<count>\d+) grandfathered remaining{SitesClause}, \d+ new, (?<stale>\d+) fixed awaiting acceptance{MeasureClauses}\s*$",
             RegexOptions.CultureInvariant);
 
     /// <summary>A <c>baseline --init</c> capture line, singular or plural.</summary>
@@ -103,9 +125,13 @@ internal static class GrandfatheredCounts
         new($@"^\s*(?<id>{RuleIdPattern}): captured (?<count>\d+) grandfathered violations?\.\s*$",
             RegexOptions.CultureInvariant);
 
-    /// <summary>The <c>Burndown:</c> tail of a <c>status</c> summary, which totals every baseline.</summary>
+    /// <summary>
+    ///     The <c>Burndown:</c> tail of a <c>status</c> summary, which totals every baseline. Its uncounted
+    ///     clause is the one that carries the nudge to record the counts, so it is spelled out here rather
+    ///     than shared with <see cref="MeasureClauses" />.
+    /// </summary>
     private static readonly Regex BurndownLine =
-        new(@"\bBurndown: (?<count>\d+) grandfathered remaining, (?<stale>\d+) fixed awaiting acceptance\.",
+        new($@"\bBurndown: (?<count>\d+) grandfathered remaining{SitesClause}, (?<stale>\d+) fixed awaiting acceptance(?:, \d+ shrunk)?(?:, \d+ uncounted; run '[^']*' to record site counts)?\.",
             RegexOptions.CultureInvariant);
 
     /// <summary>

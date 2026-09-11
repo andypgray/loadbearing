@@ -404,7 +404,8 @@ not this document's), camelCase and exact like the step-1 key map:
 
 - `violations[]` with `sites[]` — the real edges, each with `file:line`. One violation per
   offending type pair; multiple reference sites between the same pair ride together in
-  `sites[]`. This is your edge summary at rule precision. Beside them, `violationCount` and
+  `sites[]` — and the baseline records how many, so a grandfathered pair that grows is red.
+  This is your edge summary at rule precision. Beside them, `violationCount` and
   `siteCount` are present at every grain — script against the counts (step 5 reads the
   violation count); the arrays are their expansion and are elided at coarser grain.
 - A violation of kind `emptySubject` ("The subject selection matched no solution-declared
