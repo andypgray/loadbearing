@@ -270,7 +270,8 @@ FAIL time/inject-clock — The Web layer must not use `DateTime.Now` or `DateTim
   src/Meridian.Web/Controllers/ShipmentsController.cs:15 — Meridian.Web.Controllers.ShipmentsController uses System.DateTime.UtcNow
   src/Meridian.Web/Data/SystemClock.cs:7 — Meridian.Web.Data.SystemClock uses System.DateTime.UtcNow
 FAIL naming/async-suffix — Methods of the Domain or Web layers returning `Task` or `Task<TResult>` must be named `*Async`.
-  because: Task-returning methods carry the Async suffix so callers see at the call site that a method must be awaited — https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap
+  because: Task-returning methods carry the Async suffix so callers see at the call site that a method must be awaited.
+  citation: https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap
   fix: Rename the method to end in Async.
   src/Meridian.Domain/IBookingRepository.cs:5 — Meridian.Domain.IBookingRepository.Add()
   src/Meridian.Domain/IBookingRepository.cs:7 — Meridian.Domain.IBookingRepository.Get()

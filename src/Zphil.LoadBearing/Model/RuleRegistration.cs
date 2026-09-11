@@ -29,6 +29,9 @@ internal sealed class RuleRegistration(string id) : Registration(id)
     /// <summary>Every <c>Fix</c> supplied (at most one is valid).</summary>
     internal List<string> Fixes { get; } = [];
 
+    /// <summary>Every <c>Citation</c> supplied (at most one, and it must be an absolute http(s) URL).</summary>
+    internal List<string> Citations { get; } = [];
+
     /// <summary>Every <c>Baseline</c> supplied (Migrate only; at most one is valid).</summary>
     internal List<string> Baselines { get; } = [];
 

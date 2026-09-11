@@ -328,7 +328,7 @@ public static class AgentContextRenderer
     {
         return rule.Posture == Posture.Migrate
             ? MigrationBullet(rule, counts)
-            : $"- {ProseFormat.Backtick(rule.Id)} — {rule.Sentence} {rule.Because}";
+            : $"- {ProseFormat.Backtick(rule.Id)} — {rule.Sentence} {rule.Because}{CitationClause(rule)}";
     }
 
     private static string MigrationBullet(ArchRule rule, Func<ArchRule, int?>? counts)
@@ -336,11 +336,21 @@ public static class AgentContextRenderer
         MigrateData migrate = rule.Migrate!;
         string bullet = $"- {ProseFormat.Backtick(rule.Id)} — Some existing code here still follows the OLD pattern: " +
                         $"{migrate.From} That is grandfathered debt, not house style. New code must follow: " +
-                        $"{migrate.ToSentence} {rule.Because} {PolicySentence(migrate.Policy)}";
+                        $"{migrate.ToSentence} {rule.Because}{CitationClause(rule)} {PolicySentence(migrate.Policy)}";
 
         if (counts?.Invoke(rule) is { } remaining) bullet += $" Grandfathered sites remaining: {remaining}.";
 
         return bullet;
+    }
+
+    // The rule's citation, as a sentence of its own after the reason: a CommonMark angle-bracket autolink,
+    // which is what keeps the following period out of the link target. It sits inside the bullet rather
+    // than behind `explain` because the provenance of a quoted guidance rule is the claim the bullet makes,
+    // and it is written leading-space-first so a rule with no citation renders the bullet byte for byte as
+    // it did before the trailer existed.
+    private static string CitationClause(ArchRule rule)
+    {
+        return rule.Citation is { } citation ? $" See <{citation}>." : string.Empty;
     }
 
     // The Quarantine containment section (GRAMMAR §7): one bullet per quarantined scope stating the

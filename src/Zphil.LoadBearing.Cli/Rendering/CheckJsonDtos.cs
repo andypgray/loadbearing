@@ -200,6 +200,11 @@ internal sealed record CheckJson(
 ///     is partly about code nobody wrote.
 /// </param>
 /// <param name="Warnings">The rule's non-fatal warnings; empty when there are none.</param>
+/// <param name="Citation">
+///     The canonical page the rule's reason rests on, or null (omitted) when the rule cites none and at
+///     index grain, where it is elided with the rest of the prose. Written after <see cref="Fix" /> rather
+///     than beside <see cref="Because" /> so a reader keeps the key order it already scripts against.
+/// </param>
 internal sealed record RuleJson(
     string Id,
     Posture Posture,
@@ -207,6 +212,7 @@ internal sealed record RuleJson(
     string? Sentence,
     string? Because,
     string? Fix,
+    string? Citation,
     string? SkipReason,
     BaselineJson? Baseline,
     int? SubjectTypes,

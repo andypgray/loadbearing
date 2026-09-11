@@ -47,9 +47,11 @@ as part of the change (house test culture).
    descriptions do not compile. The rendered block carries two kinds of prose, and the claim is
    exact for one of them: a generated sentence (the law, a module-map row's name and globs, a
    sanctioned surface) is *true of the code* whenever the checker is green; authored prose
-   (`Because`, `Fix`, a Migrate's `from:`, `Dragons`, a layer's `Purpose`) is *current with the
-   spec*, rendered verbatim beside the sentence or definition it glosses, re-rendered with it,
-   and checked by nothing.
+   (`Because`, `Fix`, a Migrate's `from:`, `Dragons`, a layer's `Purpose`, a rule's `Citation`)
+   is *current with the spec*, rendered verbatim beside the sentence or definition it glosses,
+   re-rendered with it, and checked by nothing. A `Citation` is the one authored field the spec
+   build looks inside, and only far enough to know it is a URL (§8 item 30); whether the page
+   still says what the rule claims is not a thing this grammar can know.
 
 ## 3. The grammar
 
@@ -84,7 +86,7 @@ member       :=  arch.Member(typeof(X), nameof(X.M))        — a leaf value, NO
 quarantine-clause :=  BoundaryOnlyVia(selections...) | BoundaryOnlyVia(types...)
              |   Dragons(prose) | DragonsDoc(path) | Baseline(path)
 caution-clause :=  Dragons(prose) | DragonsDoc(path)
-trailer      :=  Because(prose) | Fix(prose)
+trailer      :=  Because(prose) | Fix(prose) | Citation(uri)
 ```
 
 Modal-verb targets are selections for the dependency verbs (§3.3) and members for the
@@ -156,8 +158,8 @@ ProjectSelection — project adjectives (.Named / .Matching / .Packable / .Excep
                MustReferenceNoPackages / MustLockPackages / MustNotBePackable / .Must)
                → Constraint (terminal; §4.10, §5.8)
 IRuleBuilder — ONLY .Enforce(Constraint) → IEnforceRule | .Migrate(from:, to:) → IMigrateRule
-IEnforceRule — .Because / .Fix
-IMigrateRule — .Because / .Fix / .Baseline(path) / .WhileYoureThere(MigrationPolicy)
+IEnforceRule — .Because / .Fix / .Citation
+IMigrateRule — .Because / .Fix / .Citation / .Baseline(path) / .WhileYoureThere(MigrationPolicy)
 IScopeBuilder — ONLY .Quarantine(Selection) → IQuarantinedScope | .Caution(Selection) → ICautionedScope
 IQuarantinedScope — .BoundaryOnlyVia(Selection first, params Selection[]) / .BoundaryOnlyVia(params Type[])
                / .Dragons(prose) / .DragonsDoc(path) / .Baseline(path) / .Because
@@ -1324,6 +1326,7 @@ no-reference string, and the generic sugar (§10).
 | `.Because(prose)` | **required** on every rule and scope (§8 item 3) |
 | `.Fix(prose)` | optional; for Quarantine containment it is auto-derived from `BoundaryOnlyVia` ("use `IBillingFacade`") and deliberately not author-overridable — `IQuarantinedScope` carries no `.Fix`, and neither does `ICautionedScope`: a caution's "what to do instead" is the sanctioned-interaction clause its dragons prose already carries |
 | `.Purpose(prose)` | optional; `Layer` only: the one trailer on a definition (§3.2). Renders verbatim after the definition fragment in the module-map row (§5.1) and after the first sentence of the layer card's lede ("This directory holds the `Host` layer. {purpose} Its architecture rules:"); never places a card of its own — a layer earns a card only through an anchored Enforce/Migrate rule. Blank or multi-line is §8 item 5 and a second call item 6, both spec-wide and named by layer. |
+| `.Citation(uri)` | optional; `Enforce` and `Migrate` rules only — a scope documents itself through `Dragons`/`DragonsDoc`. The canonical page the rationale rests on, as an absolute `http`/`https` URL (§8 item 30; blank or multi-line is item 5, a second call item 6). Renders as a sentence of its own, `See <{url}>.`, after the reason in the rule's context bullet — and for a Migrate rule between the reason and the boy-scout policy, so the policy still ends the paragraph. `explain` and a failed rule's `check` block print it as a `citation:` line after `because:`; `check --json` carries it as `citation` after `fix`, elided at index grain with the rest of the prose; SARIF publishes it as the descriptor's `helpUri` and, joined to the `Fix`, inside `help.text`/`help.markdown`. |
 
 ### 5.6 Escape hatches
 
@@ -1696,11 +1699,13 @@ carries its sugar overload too, or the verb silently stops compiling after the s
 4. Missing both `Dragons` and `DragonsDoc` on a scope, quarantined or cautioned; the message names
    the posture.
 5. Blank/whitespace prose anywhere; prose fields are single-line (no `\r`/`\n`, no leading
-   markdown-structural characters — long-form prose links out via `DragonsDoc`). A layer's
-   `Purpose` is prose like any other and is reported on the layer's spec-wide terms, named by
-   layer and with no location: `Blank purpose on layer 'Core'.`
-6. Repeated trailer/option (`Because` twice, two `Baseline`s, a layer's `Purpose` twice, …); the
-   `Purpose` case is spec-wide and named by layer, like item 5.
+   markdown-structural characters — long-form prose links out via `DragonsDoc`). The walk covers
+   a rule's `Because`, `Fix` and `Citation`, a Migrate's `from:`, a scope's `Dragons` and
+   `DragonsDoc`, and every escape-hatch description. A layer's `Purpose` is prose like any other
+   and is reported on the layer's spec-wide terms, named by layer and with no location:
+   `Blank purpose on layer 'Core'.`
+6. Repeated trailer/option (`Because` twice, two `Baseline`s, two `Citation`s, a layer's
+   `Purpose` twice, …); the `Purpose` case is spec-wide and named by layer, like item 5.
 7. Malformed ID — must match `^[a-z0-9-]+(/[a-z0-9-]+)*$` (convention: `area/rule-name`).
 8. `BoundaryOnlyVia()` with zero types (omit the call for a hermetic quarantine) — reachable
    through the `Type` overload alone; the `Selection` form takes `(first, more)`.
@@ -1856,6 +1861,13 @@ carries its sugar overload too, or the verb silently stops compiling after the s
     refuses circular project references, and a rule that cannot go red is a promise the checker
     never keeps.
 
+30. A `Citation` that is not an absolute `http`/`https` URL (`` Malformed citation on
+    '{id}': '{value}' is not an absolute http(s) URL. ``) — a pasted page title, a repository
+    path, or a URI on another scheme. Every consuming surface treats the value as a link and
+    hands it on unread: the context bullet autolinks it, SARIF publishes it as `helpUri`. Only a
+    non-blank, single-line value reaches this check, so a whitespace citation reports once, as
+    item 5.
+
 Item 5 also reaches the member escape-hatch descriptions: a blank or multi-line member `Where`
 (`Func<IMemberInfo,bool>`) or member `Must` description is caught by the same prose walk,
 which descends through a member constraint's subject and verb (§4.6) — and the
@@ -1988,7 +2000,7 @@ agent fixing a spec sees every problem in one pass.
   (`Baseline`) or deliberate idiom (`WhileYoureThere` — it names the boy-scout rule). Its policies
   each answer the question the option asks, as imperatives (`MigrateIfSmall`, `AlwaysMigrate`,
   `NeverMigrate`); a policy is never named for what every policy shares.
-  **Trailers**: conjunctions (`Because`) / nouns (`Fix`, `Purpose`).
+  **Trailers**: conjunctions (`Because`) / nouns (`Fix`, `Purpose`, `Citation`).
 - `(first, params more)` signatures wherever an empty list would be meaningless.
   Where a verb requires a fact rather than bounding it (a `MustOnly*` list is a bound, and the
   word "only" fixes its reading), a list is licensed only where the fact admits one value per
@@ -2273,11 +2285,12 @@ keeps it and `Migrate`, against its own baseline, in one that does not. A pack t
 posture would be asserting a fact about code it has never seen. Baseline paths stay conventional
 (§4.4), so a pack never names a path either.
 
-**The pack owns `Because`; the consumer may override `Fix`.** The reason a rule exists is the same
-everywhere, so it ships with the rule. Remediation names local types, so it does not. The
-override is a parameter rather than a trailer: a pack method returns `void`, which makes exactly
-one `Because` and one `Fix` reach the rule and a second trailer uncompilable rather than a
-repeated-trailer error (§8 item 6).
+**The pack owns `Because` and its `Citation`; the consumer may override `Fix`.** The reason a rule
+exists — and the canonical page that reason rests on — is the same everywhere, so both ship with
+the rule. Remediation names local types, so it does not. The override is a parameter rather than a
+trailer: a pack method returns `void`, which makes exactly one `Because`, one `Citation` and one
+`Fix` reach the rule and a second trailer uncompilable rather than a repeated-trailer error
+(§8 item 6).
 
 **Anchor doctrine for a self-hosting pack.** A pack that ships inside a codebase it governs writes
 its member anchors as `arch.Member(typeof(X), nameof(X.M))`, never the expression form. An

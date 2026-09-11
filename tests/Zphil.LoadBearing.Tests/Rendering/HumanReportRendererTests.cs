@@ -96,6 +96,32 @@ public sealed class HumanReportRendererTests
     }
 
     [Fact]
+    public void RuleBlock_RuleWithCitation_RendersCitationLineBetweenBecauseAndFix()
+    {
+        // The failing rule's framing, in the order a reader needs it: the reason, the page it rests on, then
+        // what to do about it. A rule citing nothing renders the block it always did.
+        var cited = new ArchRule(
+            "http/reuse-httpclient", Posture.Enforce, "A new client per call exhausts sockets.",
+            "Inject IHttpClientFactory.", "s", null, null, null,
+            "https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines");
+        var result = new RuleResult(
+            cited, RuleStatus.Failed, [Violation.Shape(SyntheticNodes.Type("App.Orphan"), [])], [], null, []);
+
+        string block = result.HumanBlock();
+
+        block.ShouldContain(
+            "  because: A new client per call exhausts sockets.\n"
+            + "  citation: https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines\n"
+            + "  fix: Inject IHttpClientFactory.");
+
+        var uncited = new RuleResult(
+            EnforceRule("shape/x"), RuleStatus.Failed, [Violation.Shape(SyntheticNodes.Type("App.Orphan"), [])],
+            [], null, []);
+        uncited.HumanBlock()
+            .ShouldNotContain("citation:");
+    }
+
+    [Fact]
     public void RuleBlock_ConstructionViolation_RendersConstructsLineAtNewSite()
     {
         // ViolationLines has no default arm, so a missing Construction case would render nothing and a red

@@ -59,9 +59,9 @@ posture, string? fix = null)`; three of them take one extra `Selection` naming a
 
 ## What the pack owns, and what you own
 
-The pack owns `Because`. The reason to reuse an `HttpClient` is the same in every codebase, so
-it ships with the rule, citation URL and all, and you cannot override it. If a rule's rationale is
-genuinely different for you, that is a signal the rule is yours to write rather than take.
+The pack owns `Because` and `Citation`. The reason to reuse an `HttpClient` is the same in every
+codebase, and so is the page that says so. Both ship with the rule, and you can override neither. If a rule's rationale is genuinely different for you, that is a signal the rule is yours
+to write rather than take.
 
 You own the posture. `PackPosture.Enforce` for law, `PackPosture.Migrate("<what the code does
 today>")` for a ratchet against a baseline. The same rule is `Enforce` in a codebase that already

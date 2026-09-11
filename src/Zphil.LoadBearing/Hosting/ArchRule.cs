@@ -1,7 +1,7 @@
 namespace Zphil.LoadBearing.Hosting;
 
 /// <summary>
-///     One reified rule: a stable ID, a posture, rationale, an optional fix, the
+///     One reified rule: a stable ID, a posture, rationale, an optional fix, an optional citation, the
 ///     deterministic law <see cref="Sentence" />, and the posture-specific payload. Scopes desugar into
 ///     <see cref="Posture.Quarantine" />/<see cref="Posture.Caution" /> rules carrying
 ///     <see cref="Scope" /> (GRAMMAR §7).
@@ -16,7 +16,8 @@ public sealed class ArchRule
         string sentence,
         Constraint? constraint,
         MigrateData? migrate,
-        ScopeData? scope)
+        ScopeData? scope,
+        string? citation = null)
     {
         Id = id;
         Posture = posture;
@@ -26,6 +27,7 @@ public sealed class ArchRule
         Constraint = constraint;
         Migrate = migrate;
         Scope = scope;
+        Citation = citation;
     }
 
     /// <summary>The stable rule ID (baseline key, message citation, <c>arch_explain</c> handle).</summary>
@@ -39,6 +41,12 @@ public sealed class ArchRule
 
     /// <summary>The remediation hint, or null when none was supplied.</summary>
     public string? Fix { get; }
+
+    /// <summary>
+    ///     The canonical page the rationale rests on — an absolute http(s) URL — or null when none was
+    ///     supplied. Enforce and Migrate rules only; a desugared scope rule never carries one.
+    /// </summary>
+    public string? Citation { get; }
 
     /// <summary>
     ///     The rendered law sentence (GRAMMAR §6). Empty for a scope tripwire, which carries no

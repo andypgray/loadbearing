@@ -36,6 +36,21 @@ public class ModelReificationTests
             .DragonsDoc("arch/utilities-dragons.md")
             .Because("The helpers are public API for the whole solution."));
 
+    // One Enforce rule and one Migrate rule that cite their page — the two stage types the trailer sits on.
+    private static readonly IArchitectureSpec CitedRuleSpec = new InlineSpec(arch =>
+    {
+        arch.Rule("http/reuse-httpclient")
+            .Enforce(arch.Types.MustNotConstruct(typeof(SqlConnection)))
+            .Because("A new client per call exhausts sockets.")
+            .Citation("https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines");
+        arch.Rule("async/no-blocking-waits")
+            .Migrate(
+                from: "Handlers block on the task.",
+                to: arch.Types.MustNotConstruct(typeof(SqlConnection)))
+            .Because("Blocking a pooled thread on an incomplete task deadlocks under load.")
+            .Citation("https://learn.microsoft.com/dotnet/csharp/asynchronous-programming/async-scenarios");
+    });
+
     // A single MustNotConstruct-rule spec, reused for the dependency-verb reification + empty-member-hook pins.
     private static readonly IArchitectureSpec CtorRuleSpec = new InlineSpec(arch =>
         arch.Rule("di/no-new-services")
@@ -123,6 +138,29 @@ public class ModelReificationTests
     {
         Rule("naming/interfaces")
             .Fix.ShouldBeNull();
+    }
+
+    [Fact]
+    public void EnforceRule_WithCitation_CarriesTheUrl()
+    {
+        ArchModelBuilder.Build(CitedRuleSpec)
+            .Rule("http/reuse-httpclient")
+            .Citation.ShouldBe("https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines");
+    }
+
+    [Fact]
+    public void MigrateRule_WithCitation_CarriesTheUrl()
+    {
+        ArchModelBuilder.Build(CitedRuleSpec)
+            .Rule("async/no-blocking-waits")
+            .Citation.ShouldBe("https://learn.microsoft.com/dotnet/csharp/asynchronous-programming/async-scenarios");
+    }
+
+    [Fact]
+    public void Rule_WithoutCitation_LeavesCitationNull()
+    {
+        Rule("naming/interfaces")
+            .Citation.ShouldBeNull();
     }
 
     [Fact]

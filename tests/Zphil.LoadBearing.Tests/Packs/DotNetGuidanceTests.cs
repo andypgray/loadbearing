@@ -32,7 +32,7 @@ public class DotNetGuidanceTests
     ];
 
     /// <summary>The nine pack rule IDs, in the order <c>ApplyAll</c> declares them.</summary>
-    public static TheoryData<string> PackRuleIds => [..CanonicalOrder];
+    public static TheoryData<string> PackRuleIds => [.. CanonicalOrder];
 
     [Theory]
     [MemberData(nameof(PackRuleIds))]
@@ -71,13 +71,33 @@ public class DotNetGuidanceTests
     }
 
     [Fact]
-    public void ApplyAll_AtEnforce_GivesEveryRuleABecauseAndAFix()
+    public void ApplyAll_AtEnforce_GivesEveryRuleABecauseAFixAndACitation()
     {
         ArchitectureModel model = Checker.Model(arch => ApplyAll(arch, PackPosture.Enforce));
 
         model.Rules.ShouldAllBe(rule => rule.Posture == Posture.Enforce);
         model.Rules.ShouldAllBe(rule => !string.IsNullOrWhiteSpace(rule.Because));
         model.Rules.ShouldAllBe(rule => !string.IsNullOrWhiteSpace(rule.Fix));
+
+        // Every rule in this pack quotes canonical Microsoft guidance, so every one of them cites the page
+        // it quotes: the provenance pillar the pack exists to carry, and now a field rather than a suffix
+        // on the reason.
+        model.Rules.ShouldAllBe(rule => rule.Citation!.StartsWith("https://learn.microsoft.com/", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void RuleProse_ReasonAndCitation_AreSeparateFields()
+    {
+        // The reason ends as a sentence and the page rides beside it. Pinned on one rule because the split
+        // is what the whole corpus migration did: before the trailer, the URL was the reason's last token
+        // and every consuming surface had to read it back out of prose.
+        ArchRule rule = Checker.Model(arch => DeclareOne(arch, "http/reuse-httpclient", PackPosture.Enforce))
+            .Rules.Single();
+
+        rule.Because.ShouldBe(
+            "A new HttpClient per call exhausts sockets under load; IHttpClientFactory pools handlers.");
+        rule.Citation.ShouldBe(
+            "https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines");
     }
 
     [Fact]
@@ -130,11 +150,14 @@ public class DotNetGuidanceTests
         migrated.Rules.Single()
             .Posture.ShouldBe(Posture.Migrate);
 
-        // Posture belongs to the consumer; the reason the rule exists belongs to the pack, so the same
-        // Because rides both.
+        // Posture belongs to the consumer; the reason the rule exists — and the page that reason rests on —
+        // belongs to the pack, so both ride either posture.
         migrated.Rules.Single()
             .Because.ShouldBe(enforced.Rules.Single()
                 .Because);
+        migrated.Rules.Single()
+            .Citation.ShouldBe(enforced.Rules.Single()
+                .Citation);
         migrated.Rules.Single()
             .Sentence.ShouldBe(enforced.Rules.Single()
                 .Sentence);

@@ -8,4 +8,11 @@ public interface IEnforceRule
 
     /// <summary>The remediation hint — optional; emitted at the point of failure.</summary>
     IEnforceRule Fix(string fix);
+
+    /// <summary>
+    ///     The canonical page the rationale rests on — optional; an absolute <c>http</c>/<c>https</c> URL.
+    ///     Renders as "See &lt;url&gt;." after the reason in the agent block, as <c>explain</c>'s and
+    ///     <c>check</c>'s <c>citation:</c> line, and as SARIF <c>helpUri</c> plus <c>help.markdown</c>.
+    /// </summary>
+    IEnforceRule Citation(string uri);
 }

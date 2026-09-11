@@ -35,12 +35,16 @@ internal sealed record SarifDriver(
     string InformationUri,
     IReadOnlyList<SarifReportingDescriptor> Rules);
 
-/// <summary>One rule's metadata (a SARIF reportingDescriptor). The null message slots are omitted.</summary>
+/// <summary>
+///     One rule's metadata (a SARIF reportingDescriptor). The null message slots are omitted, and so is
+///     <see cref="HelpUri" /> — the rule's citation, which a rule that cites nothing does not carry.
+/// </summary>
 internal sealed record SarifReportingDescriptor(
     string Id,
     SarifMessage? ShortDescription,
     SarifMessage? FullDescription,
     SarifMessage? Help,
+    string? HelpUri,
     SarifReportingConfiguration DefaultConfiguration,
     SarifRuleProperties Properties);
 
@@ -67,8 +71,12 @@ internal sealed record SarifResult(
     string BaselineState,
     IReadOnlyList<SarifSuppression>? Suppressions);
 
-/// <summary>A SARIF message string — serves both a result's <c>message</c> and a rule's descriptions.</summary>
-internal sealed record SarifMessage(string Text);
+/// <summary>
+///     A SARIF message string — serves both a result's <c>message</c> and a rule's descriptions.
+///     <see cref="Markdown" /> is the optional rendered twin: only a rule's <c>help</c> supplies one, and
+///     it is what a scanning service that ignores <c>helpUri</c> displays instead.
+/// </summary>
+internal sealed record SarifMessage(string Text, string? Markdown = null);
 
 /// <summary>One result location.</summary>
 internal sealed record SarifLocation(SarifPhysicalLocation PhysicalLocation);

@@ -12,6 +12,14 @@ public interface IMigrateRule
     /// <summary>The remediation hint — optional.</summary>
     IMigrateRule Fix(string fix);
 
+    /// <summary>
+    ///     The canonical page the rationale rests on — optional; an absolute <c>http</c>/<c>https</c> URL.
+    ///     Renders as "See &lt;url&gt;." between the reason and the boy-scout policy in the agent block, as
+    ///     <c>explain</c>'s and <c>check</c>'s <c>citation:</c> line, and as SARIF <c>helpUri</c> plus
+    ///     <c>help.markdown</c>.
+    /// </summary>
+    IMigrateRule Citation(string uri);
+
     /// <summary>The ratcheted grandfather store path (defaults conventionally when omitted).</summary>
     IMigrateRule Baseline(string path);
 

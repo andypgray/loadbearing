@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A rule can cite its source: `.Citation(uri)` on Enforce and Migrate rules.** The canonical
+  page a rationale rests on gets a field of its own, beside the `Because` that used to carry it
+  as a trailing URL. It is a noun trailer like `Fix` and `Purpose`, optional, and at most one per
+  rule; a scope has none, because a scope documents itself through `Dragons`/`DragonsDoc`. The
+  context bullet renders it as a sentence after the reason, `See <url>.`, in angle brackets so
+  the period stays out of the link, and for a Migrate rule between the reason and the boy-scout
+  policy, so the policy still ends the paragraph. `explain` and a failed rule's `check` block
+  print a `citation:` line after `because:`; `check --json` carries `citation` after `fix`,
+  elided at index grain with the rest of the prose. SARIF publishes it twice, as the descriptor's
+  `helpUri` and inside `help`: GitHub code scanning does not read `helpUri`, and `help.markdown`
+  is what it displays, so a link that rode in `helpUri` alone would be invisible where a reader
+  stands over the alert. `help` is the fix and the page joined, in both registers — plain in
+  `help.text`, angle-bracketed in `help.markdown` — which also fills the `help.text` GitHub marks
+  required for a rule carrying no fix of its own. The spec build refuses a value that is not an absolute `http`/`https` URL, so a pasted page
+  title or a repository path fails the build rather than reaching a reader as a dead link; blank
+  and multi-line values report as prose, and a second call as a repeated trailer. A rule that
+  cites nothing renders every block, dump and SARIF descriptor byte for byte as before.
+
 - **`.Returning` and `MustAcceptParameter` anchor by string, and `MustAcceptParameter<T>()`.**
   `web.Methods.Returning("Microsoft.AspNetCore.Mvc.IActionResult").MustHaveSuffix("Async")` and
   `.Methods.MustAcceptParameter("System.Threading.CancellationToken")` take the type definition's
@@ -237,6 +255,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   read.
 
 ### Changed
+
+- **Every rule in the .NET guidance pack cites its page through `Citation`, and its reason ends
+  as a sentence.** The pack's nine reasons carried the Microsoft URL as their last token, joined
+  by an em-dash, because there was nowhere else to put it. Each reason now closes with a full
+  stop and the URL rides in the rule's `Citation`, so the rendered bullet reads as prose and ends
+  in "See <url>." rather than trailing off into an address. Three rules in the Interchange example
+  moved the same way. Two of the reasons reached the URL through a second em-dash and now read as
+  one clause. `DotNetGuidance`'s methods take the page beside the reason; a consumer that
+  overrides a `Fix` is unaffected, and no rule ID, sentence or baseline path moves. Every managed
+  `AGENTS.md` block quoting these rules re-renders.
 
 - **Breaking: the third migration policy is `MigrationPolicy.NeverMigrate`.** It was
   `NeverExpand`, which named the clause every policy renders ("never grow the debt") rather than

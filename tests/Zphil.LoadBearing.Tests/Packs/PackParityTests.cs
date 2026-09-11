@@ -59,6 +59,7 @@ public class PackParityTests
         packed.Posture.ShouldBe(inline.Posture);
         packed.Sentence.ShouldBe(inline.Sentence);
         packed.Because.ShouldBe(inline.Because);
+        packed.Citation.ShouldBe(inline.Citation);
         packed.Fix.ShouldBe(inline.Fix);
         packed.BaselinePath.ShouldBe(inline.BaselinePath);
         packed.Migrate?.From.ShouldBe(inline.Migrate?.From);

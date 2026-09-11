@@ -35,7 +35,8 @@ public sealed class InterchangeArchSpec : IArchitectureSpec
         // 1 — DI guidelines: no direct instantiation of dependent classes outside the composition root.
         arch.Rule("di/construct-via-container")
             .Enforce(arch.Types.Except(host).MustNotConstruct(arch.Types.Implementing(typeof(IPartnerClient))))
-            .Because("Partner clients are wired with their pooled HttpClient and options in the composition root; constructing one elsewhere bypasses that wiring and the registered lifetime — https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines")
+            .Because("Partner clients are wired with their pooled HttpClient and options in the composition root; constructing one elsewhere bypasses that wiring and the registered lifetime.")
+            .Citation("https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines")
             .Fix("Inject IPartnerClient (or IEnumerable<IPartnerClient>); the composition root owns wiring.");
 
         // 2 — HttpClient guidelines: reuse via IHttpClientFactory; new HttpClient() exhausts sockets.
@@ -56,7 +57,8 @@ public sealed class InterchangeArchSpec : IArchitectureSpec
         // 6 — Scoped-service tutorial + Options lifetimes: a singleton BackgroundService must not capture scoped services.
         arch.Rule("di/hosted-services-scope-their-work")
             .Enforce(arch.Types.DerivedFrom<BackgroundService>().MustNotReference(typeof(IOptionsSnapshot<>), typeof(IOutboxStore)))
-            .Because("A BackgroundService is a singleton; a captured scoped IOptionsSnapshot or scoped store outlives its scope — resolve per work item from an IServiceScopeFactory scope — https://learn.microsoft.com/dotnet/core/extensions/scoped-service")
+            .Because("A BackgroundService is a singleton; a captured scoped IOptionsSnapshot or scoped store outlives its scope; resolve per work item from an IServiceScopeFactory scope.")
+            .Citation("https://learn.microsoft.com/dotnet/core/extensions/scoped-service")
             .Fix("Inject IServiceScopeFactory, create a scope per iteration, resolve scoped services inside it; see OutboxDispatcher and ScopedDispatchRunner.");
 
         // 7 — DI guidelines antipattern: a singleton must not capture a scoped or transient service (the general captive-dependency form).
@@ -83,7 +85,8 @@ public sealed class InterchangeArchSpec : IArchitectureSpec
             .Enforce(arch.Types.InNamespace("Meridian.Interchange.*")
                 .Except(arch.Namespace("Meridian.Interchange.Outbox.*"))
                 .MustNotExpose(typeof(OutboxMessage)))
-            .Because("Exposing a persisted entity on a public signature couples partner-facing code to the storage model, so a change to how a message is persisted reshapes the partner contract; hand partners a DTO made for the wire instead — https://learn.microsoft.com/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/cqrs-microservice-reads")
+            .Because("Exposing a persisted entity on a public signature couples partner-facing code to the storage model, so a change to how a message is persisted reshapes the partner contract; hand partners a DTO made for the wire instead.")
+            .Citation("https://learn.microsoft.com/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/cqrs-microservice-reads")
             .Fix("Map the message to a PartnerEnvelope at the OutboxProcessor boundary and expose that; keep OutboxMessage inside the Outbox module.");
     }
 }

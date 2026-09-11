@@ -7,7 +7,7 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     header — a scope posture carries the role, e.g. <c>(quarantine/containment)</c> or
 ///     <c>(caution/tripwire)</c> — then each
 ///     present field once under check's lowercase-label style (<c>sentence:</c> / <c>because:</c> /
-///     <c>fix:</c>) plus the posture payload. This is a data dump, not the voice templates:
+///     <c>citation:</c> / <c>fix:</c>) plus the posture payload. This is a data dump, not the voice templates:
 ///     <c>dragons:</c> and <c>from:</c> print verbatim, and <c>dragons-doc:</c> prints the linked path
 ///     only (the spec stays the index). Emitted line by line to match the check renderer.
 /// </summary>
@@ -19,6 +19,7 @@ internal static class ExplainFormatter
 
         if (rule.Sentence.Length > 0) lines.Add($"  sentence: {rule.Sentence}");
         lines.Add($"  because: {rule.Because}");
+        if (rule.Citation is { } citation) lines.Add($"  citation: {citation}");
         if (rule.Fix is { } fix) lines.Add($"  fix: {fix}");
 
         switch (rule.Posture)

@@ -173,5 +173,13 @@ public enum SpecValidationErrorCode
     ///     because projects cannot have circular references — the build forbids them — so over one the law
     ///     would hold by construction, and a rule that cannot red is a false promise.
     /// </summary>
-    CircularReferencesNeedLayerFamily
+    CircularReferencesNeedLayerFamily,
+
+    /// <summary>
+    ///     A <c>Citation</c> that is not an absolute <c>http</c>/<c>https</c> URL (§8 item 30) — a pasted
+    ///     page title, a repo-relative path, or a URI on another scheme. Every surface renders the value as
+    ///     a link and hands it on unread (the agent block autolinks it, SARIF publishes it as
+    ///     <c>helpUri</c>), so nothing downstream can report a value that is not one.
+    /// </summary>
+    MalformedCitation
 }

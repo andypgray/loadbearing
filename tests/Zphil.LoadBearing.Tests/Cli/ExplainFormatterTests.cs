@@ -34,6 +34,34 @@ public sealed class ExplainFormatterTests
     }
 
     [Fact]
+    public void Enforce_WithCitation_DumpsCitationLineAfterBecause()
+    {
+        // The canonical sample cites nothing, so the citing rule is built inline: the dump keeps the
+        // field order the check renderer uses — the reason, the page it rests on, then the remediation.
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Rule("http/reuse-httpclient")
+                .Enforce(arch.Namespace("MyApp.*").MustHaveSuffix("Client"))
+                .Because("A new client per call exhausts sockets.")
+                .Citation("https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines")
+                .Fix("Inject IHttpClientFactory."));
+
+        string.Join("\n", ExplainFormatter.Lines(model.Rule("http/reuse-httpclient")))
+            .ShouldBe(
+                "http/reuse-httpclient (enforce)\n" +
+                "  sentence: Types in `MyApp.*` must be named `*Client`.\n" +
+                "  because: A new client per call exhausts sockets.\n" +
+                "  citation: https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines\n" +
+                "  fix: Inject IHttpClientFactory.");
+    }
+
+    [Fact]
+    public void Enforce_WithoutCitation_OmitsTheCitationLine()
+    {
+        Dump("layering/domain-independent")
+            .ShouldNotContain("citation:");
+    }
+
+    [Fact]
     public void Enforce_WithoutFix_OmitsTheFixLine()
     {
         Dump("naming/interfaces")

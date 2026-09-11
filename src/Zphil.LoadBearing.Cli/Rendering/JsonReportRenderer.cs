@@ -105,6 +105,7 @@ internal static class JsonReportRenderer
             elideProse ? null : result.Rule.Sentence,
             elideProse ? null : result.Rule.Because,
             elideProse ? null : result.Rule.Fix,
+            elideProse ? null : result.Rule.Citation,
             result.SkipReason,
             ToBaseline(result),
             // Both or neither: the denominator alone says nothing worth a key, and the numerator alone is

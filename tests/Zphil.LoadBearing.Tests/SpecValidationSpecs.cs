@@ -1311,3 +1311,45 @@ internal sealed class NonsenseStringMemberTypeAnchorSpec : IArchitectureSpec
             .Because("Reason.");
     }
 }
+
+internal sealed class RepeatedCitationSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule")
+            .Enforce(arch.Types.MustHavePrefix("I"))
+            .Because("Reason.")
+            .Citation("https://learn.microsoft.com/dotnet/first")
+            .Citation("https://learn.microsoft.com/dotnet/second");
+    }
+}
+
+internal sealed class BlankCitationSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule")
+            .Enforce(arch.Types.MustHavePrefix("I"))
+            .Because("Reason.")
+            .Citation("   ");
+    }
+}
+
+internal sealed class MalformedCitationSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("citation/page-title")
+            .Enforce(arch.Types.MustHavePrefix("I"))
+            .Because("Reason.")
+            .Citation("Reuse HttpClient");
+        arch.Rule("citation/relative-path")
+            .Enforce(arch.Types.MustHavePrefix("I"))
+            .Because("Reason.")
+            .Citation("docs/httpclient.md");
+        arch.Rule("citation/other-scheme")
+            .Enforce(arch.Types.MustHavePrefix("I"))
+            .Because("Reason.")
+            .Citation("ftp://example.com/guidance.txt");
+    }
+}

@@ -59,6 +59,7 @@ public static class HumanReportRenderer
         if (result.Status == RuleStatus.Failed)
         {
             output.WriteLine($"  because: {result.Rule.Because}");
+            if (result.Rule.Citation is { } citation) output.WriteLine($"  citation: {citation}");
             if (result.Rule.Fix is { } fix) output.WriteLine($"  fix: {fix}");
         }
 

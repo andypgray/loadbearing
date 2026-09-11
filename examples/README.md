@@ -30,7 +30,7 @@ cross-reference one another as parts of one business.
   behind its facade. Its [drawings](Meridian.Operations/ARCHITECTURE.md) are a two-node survey
   beside a ten-node law, because the modules are namespaces and only the spec can see them.
 - [Microsoft guidance, enforced and cited](Meridian.Interchange/): the `Meridian.Interchange`
-  outbound worker. Every rule's `Because` ends in the learn.microsoft.com page it enforces:
+  outbound worker. Every rule cites the learn.microsoft.com page it enforces:
   canon sentence, spec excerpt, real violation. Its [drawings](Meridian.Interchange/ARCHITECTURE.md)
   are the honest-limits page: canonical guidance is almost entirely non-spatial, so eleven of the
   twelve rules are listed under the fence rather than drawn in it.

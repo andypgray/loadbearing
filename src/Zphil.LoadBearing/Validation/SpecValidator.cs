@@ -136,12 +136,14 @@ internal static class SpecValidator
 
         CheckBecause(rule.Becauses, rule.Id, rule.Location, errors);
         CheckRepeated(rule.Fixes.Count, "Fix", rule.Id, rule.Location, errors);
+        CheckRepeated(rule.Citations.Count, "Citation", rule.Id, rule.Location, errors);
         CheckRepeated(rule.Baselines.Count, "Baseline", rule.Id, rule.Location, errors);
         CheckRepeated(rule.Policies.Count, "WhileYoureThere", rule.Id, rule.Location, errors);
 
         foreach ((string label, string? value) in RuleProse(rule))
             CheckProse(value, label, rule.Id, rule.Location, errors);
 
+        CheckCitations(rule, errors);
         CheckForeign(RuleSelections(rule), rule.Id, arch, rule.Location, errors);
         CheckForeignProjects(rule, arch, errors);
         CheckProjectPatterns(rule, errors);
@@ -523,6 +525,27 @@ internal static class SpecValidator
             + "as 'I{Name}' (substitution is case-sensitive).", rule.Location));
     }
 
+    // GRAMMAR §8 item 30: a Citation must be an absolute http(s) URL. Blank and multi-line values have
+    // already reported through the prose walk (item 5) and are skipped here, so a single slip yields a
+    // single message. The scheme allow-list is what makes a pasted page title or a repo-relative path
+    // fail at spec build: every consuming surface treats the value as a link — the agent block autolinks
+    // it, SARIF hands it to a scanning service as helpUri — and none of them can report a value that is
+    // not one.
+    private static void CheckCitations(RuleRegistration rule, List<SpecValidationError> errors)
+    {
+        foreach (string citation in rule.Citations)
+        {
+            if (string.IsNullOrWhiteSpace(citation) || citation.IndexOf('\n') >= 0 || citation.IndexOf('\r') >= 0)
+                continue;
+
+            bool absolute = Uri.TryCreate(citation, UriKind.Absolute, out Uri parsed);
+            if (absolute && (parsed.Scheme == Uri.UriSchemeHttp || parsed.Scheme == Uri.UriSchemeHttps)) continue;
+
+            errors.Add(new SpecValidationError(Code.MalformedCitation, rule.Id,
+                $"Malformed citation on '{rule.Id}': '{citation}' is not an absolute http(s) URL.", rule.Location));
+        }
+    }
+
     // GRAMMAR §8 items 11–13: the member-access verb's operands. A foreign member is reported once per
     // rule and stops the pass; otherwise each member is checked for a blank name and then, when named,
     // that its anchor declares it. A member error renders at the member's own arch.Member(...) call site
@@ -775,6 +798,8 @@ internal static class SpecValidator
         foreach (string because in rule.Becauses) yield return ("Because", because);
 
         foreach (string fix in rule.Fixes) yield return ("Fix", fix);
+
+        foreach (string citation in rule.Citations) yield return ("Citation", citation);
 
         if (rule.Posture == Posture.Migrate) yield return ("Migrate from", rule.MigrateFrom);
 

@@ -298,6 +298,100 @@ public sealed class SarifReportRendererTests
     }
 
     [Fact]
+    public void Serialize_CitedRule_CarriesHelpUriAndAnAutolinkedHelpMarkdown()
+    {
+        // The citation lands twice on purpose. helpUri is where the standard puts it; help.markdown is what
+        // GitHub code scanning actually displays, and a link that appeared only in helpUri would be invisible
+        // exactly where a reader is standing over the alert. The angle brackets keep the sentence's period out
+        // of the link target; help.text carries the same sentence with no markup, which is also what fills
+        // GitHub's required help.text for a rule that has no fix of its own.
+        var report = new CheckReport(
+        [
+            new RuleResult(
+                new ArchRule(
+                    "http/reuse-httpclient", Posture.Enforce, "A new client per call exhausts sockets.",
+                    "Inject IHttpClientFactory.", "sentence", null, null, null,
+                    "https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines"),
+                RuleStatus.Passed, [], [], null, [])
+        ]);
+
+        JsonElement rule = report.ToSarif()
+            .SarifRules()
+            .ShouldHaveSingleItem();
+
+        rule.GetProperty("helpUri")
+            .GetString()
+            .ShouldBe("https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines");
+        rule.GetProperty("help")
+            .GetProperty("text")
+            .GetString()
+            .ShouldBe(
+                "Inject IHttpClientFactory. "
+                + "See https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines.");
+        rule.GetProperty("help")
+            .GetProperty("markdown")
+            .GetString()
+            .ShouldBe(
+                "Inject IHttpClientFactory. "
+                + "See <https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines>.");
+    }
+
+    [Fact]
+    public void Serialize_CitedRuleWithoutFix_MakesTheCitationTheWholeHelp()
+    {
+        // A rule with no fix used to carry no help at all, which GitHub marks as a required field. The
+        // citation fills it on its own rather than being dropped for want of a fix to join.
+        var report = new CheckReport(
+        [
+            new RuleResult(
+                new ArchRule(
+                    "http/reuse-httpclient", Posture.Enforce, "A new client per call exhausts sockets.", null,
+                    "sentence", null, null, null, "https://learn.microsoft.com/dotnet/first"),
+                RuleStatus.Passed, [], [], null, [])
+        ]);
+
+        JsonElement help = report.ToSarif()
+            .SarifRules()
+            .ShouldHaveSingleItem()
+            .GetProperty("help");
+
+        help.GetProperty("text")
+            .GetString()
+            .ShouldBe("See https://learn.microsoft.com/dotnet/first.");
+        help.GetProperty("markdown")
+            .GetString()
+            .ShouldBe("See <https://learn.microsoft.com/dotnet/first>.");
+    }
+
+    [Fact]
+    public void Serialize_UncitedRule_OmitsHelpUriAndTheMarkdownTwin()
+    {
+        // The whole reason the SARIF golden does not move: a rule that cites nothing renders the descriptor
+        // it always rendered — help is the bare fix in text alone, and helpUri is absent rather than null.
+        var report = new CheckReport(
+        [
+            new RuleResult(
+                new ArchRule(
+                    "naming/x", Posture.Enforce, "because", "Rename it.", "sentence", null, null, null),
+                RuleStatus.Passed, [], [], null, [])
+        ]);
+
+        JsonElement rule = report.ToSarif()
+            .SarifRules()
+            .ShouldHaveSingleItem();
+
+        rule.TryGetProperty("helpUri", out _)
+            .ShouldBeFalse();
+        rule.GetProperty("help")
+            .TryGetProperty("markdown", out _)
+            .ShouldBeFalse();
+        rule.GetProperty("help")
+            .GetProperty("text")
+            .GetString()
+            .ShouldBe("Rename it.");
+    }
+
+    [Fact]
     public void Serialize_TripwireDescriptor_DeclaresWarningLevelWhileItsContainmentTwinStaysError()
     {
         // A tripwire warns and can never fail, so its descriptor has to say `warning`: at `error` it advertises
@@ -529,7 +623,7 @@ public sealed class SarifReportRendererTests
     }
 
     // A metadata-only ArchRule (no constraint/migrate/scope payload) for hand-built reports — the renderer's
-    // rule catalog reads only Id, Sentence, Because, Fix, Posture, and whether it is a tripwire.
+    // rule catalog reads only Id, Sentence, Because, Fix, Citation, Posture, and whether it is a tripwire.
     private static ArchRule Rule(string id, Posture posture)
     {
         return new ArchRule(id, posture, "because", null, "sentence", null, null, null);

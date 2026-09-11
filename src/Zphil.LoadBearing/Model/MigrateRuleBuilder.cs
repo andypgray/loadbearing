@@ -17,6 +17,12 @@ internal sealed class MigrateRuleBuilder(RuleRegistration registration) : IMigra
         return this;
     }
 
+    public IMigrateRule Citation(string uri)
+    {
+        registration.Citations.Add(uri);
+        return this;
+    }
+
     public IMigrateRule Baseline(string path)
     {
         registration.Baselines.Add(path);

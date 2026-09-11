@@ -151,7 +151,7 @@ internal static class CommandFactory
         Option<string?> spec = SpecOption();
         Option<bool> noCache = NoCacheOption();
 
-        Command explain = new("explain", "Print a rule's because, fix, posture payload, and linked prose.")
+        Command explain = new("explain", "Print a rule's because, fix, citation, posture payload, and linked prose.")
         {
             ruleId,
             solution,

@@ -401,6 +401,45 @@ public class AgentContextRendererTests
     }
 
     [Fact]
+    public void RuleBullet_EnforceRuleWithCitation_EndsWithTheAutolinkedPage()
+    {
+        // The citation is its own sentence after the reason, in angle brackets so the terminating period
+        // stays out of the link. It rides in the always-on block rather than behind `explain` because the
+        // provenance of a quoted guidance rule is part of the claim the bullet makes.
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Rule("http/reuse-httpclient")
+                .Enforce(arch.Namespace("MyApp.*").MustHaveSuffix("Client"))
+                .Because("A new client per call exhausts sockets.")
+                .Citation("https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines"));
+
+        AgentContextRenderer.RootBlock(model, "Spec")
+            .ShouldContain(
+                "- `http/reuse-httpclient` — Types in `MyApp.*` must be named `*Client`. "
+                + "A new client per call exhausts sockets. "
+                + "See <https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines>.");
+    }
+
+    [Fact]
+    public void RuleBullet_MigrateRuleWithCitation_PutsThePageBetweenTheReasonAndThePolicy()
+    {
+        // The Migrate bullet continues past the reason into the boy-scout policy, so the citation goes
+        // between them: appended after the policy it would separate the reason from the page it cites, and
+        // the reason's own terminator is what the sentence before a URL needs.
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Rule("async/no-blocking-waits")
+                .Migrate("Handlers block on the task.", arch.Types.MustHaveSuffix("Handler"))
+                .Because("Blocking a pooled thread on an incomplete task deadlocks under load.")
+                .Citation("https://learn.microsoft.com/dotnet/csharp/asynchronous-programming/async-scenarios"));
+
+        AgentContextRenderer.RootBlock(model, "Spec")
+            .ShouldContain(
+                "Blocking a pooled thread on an incomplete task deadlocks under load. "
+                + "See <https://learn.microsoft.com/dotnet/csharp/asynchronous-programming/async-scenarios>. "
+                + "If you are already editing a grandfathered site and the migration is small, migrate it; "
+                + "otherwise do not grow the debt.");
+    }
+
+    [Fact]
     public void LayerCard_EnforceRuleWithFix_OmitsFix()
     {
         // A layer whose one Enforce rule carries a Fix — proving the card omits it.

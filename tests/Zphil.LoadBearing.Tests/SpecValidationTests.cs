@@ -76,6 +76,10 @@ public class SpecValidationTests
     [InlineData(typeof(BlankTargetFrameworkSpec), Code.BlankTargetFramework, "area/rule")]
     [InlineData(typeof(BlankProjectWhereSpec), Code.BlankProse, "area/rule")]
     [InlineData(typeof(BlankProjectMustSpec), Code.BlankProse, "area/rule")]
+    // A rule's Citation is prose in the item-5 walk and a URL in item 30's, so a blank one reports as prose
+    // and only a well-formed single line reaches the shape check.
+    [InlineData(typeof(BlankCitationSpec), Code.BlankProse, "area/rule")]
+    [InlineData(typeof(MalformedCitationSpec), Code.MalformedCitation, "citation/page-title")]
     // The correspondence verb's name template (GRAMMAR §8 items 25–26). Blankness rides the shared
     // BlankPattern walk under its own label, because a blank template is the same slip as a blank affix;
     // a template that is merely missing its {Name} needs its own code, since it is well-formed text that
@@ -1220,6 +1224,46 @@ public class SpecValidationTests
             .ShouldBe("SpecValidationSpecs.cs:953: The counterpart name template 'IService' on 'area/rule' contains no "
                       + "'{Name}' placeholder, so every subject derives the same fixed name — a cardinality claim, not a "
                       + "correspondence; use a template such as 'I{Name}' (substitution is case-sensitive).");
+    }
+
+    // ---- A rule's citation (GRAMMAR §8 items 5, 6 and 30). ----
+
+    [Fact]
+    public void RepeatedTrailer_CitationTwice_IsReported()
+    {
+        SpecValidationException ex = BuildExpectingFailure(new RepeatedCitationSpec());
+
+        ex.ShouldHaveError(Code.RepeatedTrailer, "area/rule")
+            .Message.ShouldBe("SpecValidationSpecs.cs:1319: Repeated trailer 'Citation' on 'area/rule'.");
+    }
+
+    [Fact]
+    public void BlankProse_BlankCitation_IsReportedAsProseAndNotAsMalformed()
+    {
+        // A whitespace citation is an empty authored field, which item 5 already names; reporting it a second
+        // time as a malformed URL would say the same slip twice in different words.
+        SpecValidationException ex = BuildExpectingFailure(new BlankCitationSpec());
+
+        ex.ShouldHaveError(Code.BlankProse, "area/rule")
+            .Message.ShouldBe("SpecValidationSpecs.cs:1331: Blank Citation on 'area/rule'.");
+        ex.Errors.ShouldNotContain(error => error.Code == Code.MalformedCitation);
+    }
+
+    [Theory]
+    [InlineData("citation/page-title", 1342, "Reuse HttpClient")]
+    [InlineData("citation/relative-path", 1346, "docs/httpclient.md")]
+    [InlineData("citation/other-scheme", 1350, "ftp://example.com/guidance.txt")]
+    public void MalformedCitation_NotAnAbsoluteHttpUrl_IsReported(string ruleId, int line, string citation)
+    {
+        // The three shapes a hand-written citation actually takes when it is wrong: the page's title pasted
+        // instead of its address, a path into the repository, and a well-formed URI on a scheme no consuming
+        // surface can follow. Each names the offending value, because the fix is to replace that text.
+        SpecValidationException ex = BuildExpectingFailure(new MalformedCitationSpec());
+
+        ex.ShouldHaveError(Code.MalformedCitation, ruleId)
+            .Message
+            .ShouldBe($"SpecValidationSpecs.cs:{line}: Malformed citation on '{ruleId}': '{citation}' is not an "
+                      + "absolute http(s) URL.");
     }
 
     [Fact]

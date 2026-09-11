@@ -819,7 +819,8 @@ NeverMigrate)`] · `arch.Scope(id).Quarantine(selection)` [`.BoundaryOnlyVia(sel
 [`.Dragons(prose)` / `.DragonsDoc(path)`].
 
 **Trailers** — `.Because(prose)` required everywhere; `.Fix(prose)` optional (for containment
-it is auto-derived from the facade list).
+it is auto-derived from the facade list); `.Citation(uri)` optional on `Enforce` and `Migrate`
+rules — the canonical page the reason rests on, an absolute `http`/`https` URL.
 
 **Escape hatches** — descriptions are required parameters and must be non-blank. `Where`
 descriptions are relative clauses continuing the noun ("whose name contains a digit"); `Must`
@@ -878,8 +879,8 @@ subject fails the rule; an inert target warns; both are authoring signals, not c
 
 ## Where to go deeper
 
-- `arch_explain <rule-id>` (CLI: `loadbearing explain`) — any rule's because / fix / posture
-  payload, including desugared `{scope-id}/containment` and `{scope-id}/tripwire` children.
+- `arch_explain <rule-id>` (CLI: `loadbearing explain`) — any rule's because / citation / fix /
+  posture payload, including desugared `{scope-id}/containment` and `{scope-id}/tripwire` children.
 - `arch_context <path>` — the architecture scope cards covering a directory (a quarantined or
   cautioned scope's dragons, a layer's local rules).
 - `loadbearing status` — the burndown after baselining.

@@ -16,4 +16,10 @@ internal sealed class EnforceRuleBuilder(RuleRegistration registration) : IEnfor
         registration.Fixes.Add(fix);
         return this;
     }
+
+    public IEnforceRule Citation(string uri)
+    {
+        registration.Citations.Add(uri);
+        return this;
+    }
 }

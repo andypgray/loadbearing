@@ -59,6 +59,7 @@ public static class ArchModelBuilder
         string sentence = SentenceRenderer.Sentence(constraint);
         string because = rule.Becauses.FirstOrDefault() ?? string.Empty;
         string? fix = rule.Fixes.FirstOrDefault();
+        string? citation = rule.Citations.FirstOrDefault();
 
         if (rule.Posture == Posture.Migrate)
         {
@@ -67,10 +68,10 @@ public static class ArchModelBuilder
             string baseline = rule.Baselines.FirstOrDefault() ?? BaselineConventions.DefaultPath(rule.Id);
             MigrationPolicy policy = rule.Policies.Count > 0 ? rule.Policies[0] : MigrationPolicy.MigrateIfSmall;
             var migrate = new MigrateData(rule.MigrateFrom ?? string.Empty, sentence, baseline, policy);
-            return new ArchRule(rule.Id, Posture.Migrate, because, fix, sentence, constraint, migrate, null);
+            return new ArchRule(rule.Id, Posture.Migrate, because, fix, sentence, constraint, migrate, null, citation);
         }
 
-        return new ArchRule(rule.Id, Posture.Enforce, because, fix, sentence, constraint, null, null);
+        return new ArchRule(rule.Id, Posture.Enforce, because, fix, sentence, constraint, null, null, citation);
     }
 
     private static LayerDefinition ProjectLayer(LayerRegistration registration)

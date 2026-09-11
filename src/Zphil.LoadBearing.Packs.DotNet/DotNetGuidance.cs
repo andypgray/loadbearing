@@ -12,11 +12,12 @@ namespace Zphil.LoadBearing.Packs.DotNet;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The pack owns each rule's <c>Because</c>, because the reason a rule exists is the same
-///         everywhere. The consumer owns the posture and may override the <c>Fix</c>, because
-///         remediation names local types. A <c>Fix</c> override is a parameter rather than a trailer:
-///         every method returns <c>void</c>, so exactly one <c>Because</c> and one <c>Fix</c> reach the
-///         rule and a second trailer is uncompilable rather than a validation error.
+///         The pack owns each rule's <c>Because</c> and its <c>Citation</c>, because the reason a rule
+///         exists — and the canonical page that reason rests on — is the same everywhere. The consumer
+///         owns the posture and may override the <c>Fix</c>, because remediation names local types. A
+///         <c>Fix</c> override is a parameter rather than a trailer: every method returns <c>void</c>, so
+///         exactly one <c>Because</c>, one <c>Citation</c> and one <c>Fix</c> reach the rule and a second
+///         trailer is uncompilable rather than a validation error.
 ///     </para>
 ///     <para>
 ///         Method names are the rule-name half of the ID, PascalCased with the area dropped
@@ -48,7 +49,8 @@ public static class DotNetGuidance
         Constraint constraint = subject.Except(compositionRoot).MustNotConstruct(typeof(HttpClient));
 
         Declare(rule, constraint, posture,
-            "A new HttpClient per call exhausts sockets under load; IHttpClientFactory pools handlers — https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines",
+            "A new HttpClient per call exhausts sockets under load; IHttpClientFactory pools handlers.",
+            "https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines",
             "Take a typed or named client from IHttpClientFactory rather than constructing one.",
             fix);
     }
@@ -72,7 +74,8 @@ public static class DotNetGuidance
             arch.Member(typeof(ServiceProviderServiceExtensions), nameof(ServiceProviderServiceExtensions.GetRequiredService)));
 
         Declare(rule, constraint, posture,
-            "Resolving services from IServiceProvider at call sites hides a type's real dependencies; declare them as constructor parameters — https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines",
+            "Resolving services from IServiceProvider at call sites hides a type's real dependencies; declare them as constructor parameters.",
+            "https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines",
             "Take the dependency in the constructor; the composition root and its scope seam are the only sanctioned resolve sites.",
             fix);
     }
@@ -93,7 +96,8 @@ public static class DotNetGuidance
             arch.Member(typeof(ServiceCollectionContainerBuilderExtensions), nameof(ServiceCollectionContainerBuilderExtensions.BuildServiceProvider)));
 
         Declare(rule, constraint, posture,
-            "Calling BuildServiceProvider while configuring services builds a second container with its own singletons — a duplicate-instance trap — https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines",
+            "Calling BuildServiceProvider while configuring services builds a second container with its own singletons, a duplicate-instance trap.",
+            "https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines",
             "Register the dependency and let the host build the provider once; inject what you need.",
             fix);
     }
@@ -119,7 +123,8 @@ public static class DotNetGuidance
             arch.Member(typeof(TaskAwaiter<>), nameof(TaskAwaiter<>.GetResult)));
 
         Declare(rule, constraint, posture,
-            "Blocking on a Task (.Result/.Wait/.GetResult) ties up a thread and can deadlock in a captured context; await instead — https://learn.microsoft.com/dotnet/csharp/asynchronous-programming/async-scenarios",
+            "Blocking on a Task (.Result/.Wait/.GetResult) ties up a thread and can deadlock in a captured context; await instead.",
+            "https://learn.microsoft.com/dotnet/csharp/asynchronous-programming/async-scenarios",
             "Await the call and make the method async.",
             fix);
     }
@@ -141,7 +146,8 @@ public static class DotNetGuidance
             arch.Registered(Lifetime.Transient));
 
         Declare(rule, constraint, posture,
-            "A singleton is created once and holds every dependency it injects for the whole process, so a scoped or transient service injected into it is captured past its lifetime and shared across all callers — https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines",
+            "A singleton is created once and holds every dependency it injects for the whole process, so a scoped or transient service injected into it is captured past its lifetime and shared across all callers.",
+            "https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines",
             "Resolve the scoped or transient service per unit of work inside an IServiceScopeFactory scope; take only singleton-safe dependencies in the constructor.",
             fix);
     }
@@ -161,7 +167,8 @@ public static class DotNetGuidance
         Constraint constraint = subject.Methods.Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async");
 
         Declare(rule, constraint, posture,
-            "Task-returning methods carry the Async suffix so callers see at the call site that a method must be awaited — https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap",
+            "Task-returning methods carry the Async suffix so callers see at the call site that a method must be awaited.",
+            "https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap",
             "Rename the method to end in Async.",
             fix);
     }
@@ -182,7 +189,8 @@ public static class DotNetGuidance
         Constraint constraint = subject.Except(topLevelHandler).MustNotCatch(typeof(Exception));
 
         Declare(rule, constraint, posture,
-            "Catching base Exception outside a top-level handler swallows the faults you meant to see; the dispatcher's poll loop is that handler, so scope the catch-all there and let other code catch only the specific types it can handle — https://learn.microsoft.com/dotnet/standard/design-guidelines/using-standard-exception-types",
+            "Catching base Exception outside a top-level handler swallows the faults you meant to see; the dispatcher's poll loop is that handler, so scope the catch-all there and let other code catch only the specific types it can handle.",
+            "https://learn.microsoft.com/dotnet/standard/design-guidelines/using-standard-exception-types",
             "Catch the specific exception you can handle; leave the catch-all to the top-level handler.",
             fix);
     }
@@ -202,7 +210,8 @@ public static class DotNetGuidance
         Constraint constraint = subject.Methods.Returning(typeof(Task), typeof(Task<>)).MustAcceptParameter(typeof(CancellationToken));
 
         Declare(rule, constraint, posture,
-            "Accepting a CancellationToken lets a caller stop in-flight async work and flow that request on to the calls it makes, so a Task-returning method without one cannot take part in cooperative cancellation — https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap",
+            "Accepting a CancellationToken lets a caller stop in-flight async work and flow that request on to the calls it makes, so a Task-returning method without one cannot take part in cooperative cancellation.",
+            "https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap",
             "Add a CancellationToken parameter and flow the caller's token through the call chain.",
             fix);
     }
@@ -222,7 +231,8 @@ public static class DotNetGuidance
         Constraint constraint = subject.MustNotBeAttributedWith(typeof(TableAttribute), typeof(ComplexTypeAttribute));
 
         Declare(rule, constraint, posture,
-            "A persistence-specific attribute such as [Table] or [ComplexType] couples a persisted type to one data-access technology, so the same model can no longer be stored another way or moved to a new store; keep it ignorant of how it is persisted — https://learn.microsoft.com/dotnet/architecture/modern-web-apps-azure/architectural-principles",
+            "A persistence-specific attribute such as [Table] or [ComplexType] couples a persisted type to one data-access technology, so the same model can no longer be stored another way or moved to a new store; keep it ignorant of how it is persisted.",
+            "https://learn.microsoft.com/dotnet/architecture/modern-web-apps-azure/architectural-principles",
             "Keep the persisted type a POCO and map it from the persistence layer with fluent configuration (EF Core's IEntityTypeConfiguration, a Dapper column list) instead of attributes on the type.",
             fix);
     }
@@ -258,20 +268,21 @@ public static class DotNetGuidance
     }
 
     // The one place a posture becomes a chain. IEnforceRule and IMigrateRule are unrelated interfaces,
-    // so each arm completes its own; exactly one Because and one Fix reach the rule either way. Note
-    // arch.Rule(id) is deliberately NOT called here — it captures caller info, and one call site would
-    // give all nine rules the same file:line.
+    // so each arm completes its own; exactly one Because, one Citation and one Fix reach the rule either
+    // way. Note arch.Rule(id) is deliberately NOT called here — it captures caller info, and one call site
+    // would give all nine rules the same file:line.
     private static void Declare(
         IRuleBuilder rule,
         Constraint constraint,
         PackPosture posture,
         string because,
+        string citation,
         string defaultFix,
         string? fix)
     {
         if (posture.Posture == Posture.Migrate)
-            rule.Migrate(from: posture.From!, to: constraint).Because(because).Fix(fix ?? defaultFix);
+            rule.Migrate(from: posture.From!, to: constraint).Because(because).Citation(citation).Fix(fix ?? defaultFix);
         else
-            rule.Enforce(constraint).Because(because).Fix(fix ?? defaultFix);
+            rule.Enforce(constraint).Because(because).Citation(citation).Fix(fix ?? defaultFix);
     }
 }

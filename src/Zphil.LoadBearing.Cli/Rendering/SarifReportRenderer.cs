@@ -111,7 +111,8 @@ internal static class SarifReportRenderer
 
     // Every rule, in model order — passed and skipped rules included (metadata carries the whole spec, not
     // just what failed). shortDescription is the law Sentence, omitted when empty (a scope tripwire, of
-    // either posture); fullDescription is the Because; help is the Fix, omitted when absent.
+    // either posture); fullDescription is the Because; helpUri is the Citation; help is the Fix and the
+    // citation together, omitted when the rule carries neither.
     private static IReadOnlyList<SarifReportingDescriptor> BuildRules(CheckReport report)
     {
         return report.Results
@@ -120,10 +121,26 @@ internal static class SarifReportRenderer
                 rule.Id,
                 rule.Sentence.Length > 0 ? new SarifMessage(rule.Sentence) : null,
                 new SarifMessage(rule.Because),
-                rule.Fix is { } fix ? new SarifMessage(fix) : null,
+                Help(rule),
+                rule.Citation,
                 new SarifReportingConfiguration(DefaultLevel(rule)),
                 new SarifRuleProperties(rule.Posture)))
             .ToList();
+    }
+
+    // The rule's help, in both registers. The citation rides here as well as in helpUri because a scanning
+    // service need not read helpUri — GitHub code scanning does not — and help.markdown is what it displays
+    // instead, so a citation that appeared only in helpUri would be invisible exactly where a reader is
+    // standing over the alert. The markdown twin is written only when there is a link to render: with a fix
+    // and no citation the two registers would be the same string, and one of them is the whole point of the
+    // pair. The angle brackets are a CommonMark autolink, which is what keeps the sentence's period out of
+    // the link target.
+    private static SarifMessage? Help(ArchRule rule)
+    {
+        if (rule.Citation is not { } citation) return rule.Fix is { } fixOnly ? new SarifMessage(fixOnly) : null;
+
+        string prefix = rule.Fix is { } fix ? fix + " " : string.Empty;
+        return new SarifMessage($"{prefix}See {citation}.", $"{prefix}See <{citation}>.");
     }
 
     // The severity a rule reports at when it reports, which for the scope tripwires is not error: a tripwire
