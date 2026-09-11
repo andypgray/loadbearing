@@ -110,7 +110,7 @@ internal static class GraphFormatter
     // Only the passenger is annotated. Membership is the unremarkable case — every project of a healthy
     // solution has it — so marking it would put a badge on every line and leave the one line worth reading
     // no easier to find. An unread membership says nothing at all, for the same reason it serializes absent.
-    // What a project targets does not follow that rule and used to: it is not a remark about the project but
+    // What a project targets does not follow that rule: it is not a remark about the project but
     // an answer a reader came for, and the line beside it — what the project references — is stated on every
     // project for exactly that reason.
     private static string ProjectLine(ProjectSummary project, DocumentGrain grain)

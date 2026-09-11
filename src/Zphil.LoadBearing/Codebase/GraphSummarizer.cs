@@ -81,12 +81,11 @@ public static class GraphSummarizer
     // model carries one node per full name and one edge per type PAIR, so a file compiled into several
     // projects collapses N compilations of one reference into one entry; EdgeInstances is what unfolds it,
     // and reading the same enumeration the checker's verdict reads is what keeps the survey from leading a
-    // rule author into a red the spec surface cannot fix. Both halves of the old single-attribution
-    // reading were wrong in opposite directions: a project compiling its own linked-in copy reached a node
-    // stamped with somebody else's name, which invented a dependency no project file declares, and a
-    // MULTIPLY-declared source was read at its winner alone, which lost every other declarer's genuine
-    // outward edge. An instance is emitted per (declarer, reached) pair, so a pair is still counted once
-    // per type pair per project pair.
+    // rule author into a red the spec surface cannot fix. Single attribution gets it wrong in both
+    // directions: a project compiling its own linked-in copy would reach a node stamped with somebody
+    // else's name, inventing a dependency no project file declares, and a MULTIPLY-declared source read at
+    // its winner alone would lose every other declarer's genuine outward edge. An instance is emitted per
+    // (declarer, reached) pair, so a pair is still counted once per type pair per project pair.
     private static IEnumerable<(string Source, string Target)> CrossProjectPairs(CodebaseModel model)
     {
         foreach (ReferenceEdge edge in model.Edges)

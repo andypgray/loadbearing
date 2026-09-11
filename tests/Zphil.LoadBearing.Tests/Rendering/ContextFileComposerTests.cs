@@ -19,7 +19,6 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 /// </summary>
 public class ContextFileComposerTests
 {
-    // A Web layer with one bare-subject Enforce rule anchored on it.
     private static readonly IArchitectureSpec WebLayerSpec = ContextFixtures.WebLayer();
 
     // A Web layer that says what it is for and that no rule anchors on: the rule ranges over the same types

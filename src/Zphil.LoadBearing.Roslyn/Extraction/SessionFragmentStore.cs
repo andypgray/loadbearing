@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Zphil.LoadBearing.Codebase;
+using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Roslyn.Caching;
 
 namespace Zphil.LoadBearing.Roslyn.Extraction;
@@ -36,11 +37,12 @@ internal readonly record struct SessionCodebase(
 /// <summary>
 ///     A session-lifetime, incremental fragment store for the warm MCP server. It holds the
 ///     last-extracted <see cref="CodebaseFragment" />s keyed by project name and, on each
-///     <see cref="GetFragmentsAsync" />, reuses the clean projects' fragments and re-extracts only the ones
-///     whose bytes changed — expanded to their reference-graph dependents — before returning the whole set,
-///     which the caller feeds to the one <see cref="FragmentMerger" /> every extraction path terminates in.
-///     One store pairs with one <see cref="WorkspaceSession" /> for its whole lifetime (both DI singletons,
-///     wired together in the MCP host).
+///     <see cref="GetFragmentsAsync" />, reuses the clean projects' fragments, re-extracts only the ones
+///     whose shape changed — expanded to their reference-graph dependents — and moves the sites of the ones
+///     where only trivia moved, before returning the whole set, which the caller feeds to the one
+///     <see cref="FragmentMerger" /> every extraction path terminates in. One store pairs with one
+///     <see cref="WorkspaceSession" /> for its whole lifetime (both DI singletons, wired together in the MCP
+///     host).
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -58,6 +60,18 @@ internal readonly record struct SessionCodebase(
 ///         sees as an external type (or flip a declared-vs-external classification at merge time) — the same
 ///         reason the persisted extraction cache propagates dirtiness up its Merkle keys. Re-extracting the
 ///         dependents is conservative but never wrong; reusing them could strand a stale fact.
+///     </para>
+///     <para>
+///         <b>Trivia-only edits remap; everything else re-walks.</b> A content-dirty project is re-walked
+///         only when one of its changed documents changed <em>shape</em> (<see cref="SourceShape" />): when
+///         every changed document is shape-equal to the text its fragments were extracted from and yields a
+///         line map, the stored fragments keep every fact and have their sites moved through the maps
+///         (<see cref="FragmentSiteRemapper" />) instead. That is sound because a fragment's facts are read
+///         from tokens and directives and never from comments or whitespace, and every site is a token-start
+///         line. Dependents of a remapped project are left alone: their compilations see the same metadata,
+///         and their sites are in their own files. Any doubt — a split line, a map that disagrees with
+///         another for the same path, an added or removed document, a shape that changed — puts the project
+///         back on the re-walk path, which is never wrong, only slower.
 ///     </para>
 ///     <para>
 ///         <b>No exclusion here.</b> The store always holds and returns fragments for <em>every</em> C#
@@ -101,12 +115,17 @@ internal sealed class SessionFragmentStore : IDisposable
     // snapshot's generation is always >= 1, so the first call always mismatches and full-extracts.
     private long extractedGeneration = -1;
 
+    // The solution the stored fragments were extracted from, which the incremental walk compares each dirty
+    // project's changed documents against. Null only before the first walk, which the incremental path never
+    // runs before: the first call always mismatches the generation.
+    private Solution? extractedSolution;
+
     // The edit-version map the stored fragments were extracted at, for same-generation dirty diffing.
     private IReadOnlyDictionary<string, int> extractedVersions = new Dictionary<string, int>(StringComparer.Ordinal);
 
     // Bumped only when the stored fragments actually change (every full walk, and an incremental walk that
-    // re-extracted something), so a steady-state call reports the version its predecessor did — which is
-    // exactly the condition under which the merged model can be handed back rather than rebuilt.
+    // re-extracted or remapped something), so a steady-state call reports the version its predecessor did —
+    // which is exactly the condition under which the merged model can be handed back rather than rebuilt.
     private long fragmentSetVersion;
 
     // The fragment-set version the memo above holds models for; -1 until the first merge.
@@ -120,11 +139,18 @@ internal sealed class SessionFragmentStore : IDisposable
 
     /// <summary>
     ///     The project names the last <see cref="GetFragmentsAsync" /> re-walked: every C# project on a full
-    ///     walk, the dirty ∪ dependents set on an incremental one, empty on a pure steady-state call.
-    ///     Internal test observable ("a warm re-extract walks only projects whose
-    ///     compilation identity changed"); never printed.
+    ///     walk, the shape-changed ∪ dependents set on an incremental one, empty on a steady-state call and on
+    ///     one whose every content change was trivia-only. Internal test observable ("a warm re-extract walks
+    ///     only projects whose compilation identity changed"); never printed.
     /// </summary>
     internal IReadOnlySet<string> LastReExtractedProjects { get; private set; } = NoProjects;
+
+    /// <summary>
+    ///     The project names the last <see cref="GetFragmentsAsync" /> moved sites for without re-walking —
+    ///     the content-dirty projects whose every changed document kept its shape. Empty on a full walk and on
+    ///     a steady-state call. Internal test observable; never printed.
+    /// </summary>
+    internal IReadOnlySet<string> LastRemappedProjects { get; private set; } = NoProjects;
 
     /// <summary>
     ///     The number of full flush-and-re-extract-everything walks — the first call plus every generation
@@ -145,9 +171,10 @@ internal sealed class SessionFragmentStore : IDisposable
     /// <summary>
     ///     Returns the full fragment set for <paramref name="snapshot" />, reusing everything it can. A new
     ///     generation (or the first call) flushes and re-extracts all C# projects; otherwise it re-extracts
-    ///     exactly the projects whose edit version changed since the last call, expanded to their transitive
-    ///     reference-graph dependents, and reuses the rest. The fragments come back in the ordinal-project-name
-    ///     order a cold run produces, so the caller's <see cref="FragmentMerger" /> yields the identical model.
+    ///     exactly the projects a changed document re-shaped since the last call, expanded to their transitive
+    ///     reference-graph dependents, remaps the stored sites of the projects only trivia moved within, and
+    ///     reuses the rest. The fragments come back in the ordinal-project-name order a cold run produces, so
+    ///     the caller's <see cref="FragmentMerger" /> yields the identical model.
     /// </summary>
     /// <remarks>
     ///     <paramref name="declaredMembers" /> rides down to the extraction rather than being applied to the
@@ -226,17 +253,56 @@ internal sealed class SessionFragmentStore : IDisposable
         fragmentsByProject.Clear();
         Index(fragments);
         extractedGeneration = snapshot.Generation;
+        extractedSolution = snapshot.Solution;
         extractedVersions = Copy(snapshot.ProjectEditVersions);
         fragmentSetVersion++;
         FullWalkCount++;
         LastReExtractedProjects = fragments.Select(f => f.ProjectName).ToHashSet(StringComparer.Ordinal);
+        LastRemappedProjects = NoProjects;
         return new SessionFragmentSet(OrderedFragments(), LastReExtractedProjects, fragmentSetVersion);
     }
 
+    // Classify, seed, expand, commit the remaps the expansion left standing, then extract what is left —
+    // in that order, because whether a remap survives is decided by the expansion rather than by the
+    // classification that proposed it.
     private async Task<SessionFragmentSet> IncrementalWalkAsync(
         WorkspaceSnapshot snapshot, IReadOnlySet<string>? declaredMembers, CancellationToken ct)
     {
-        HashSet<string> dirty = ExpandToDependents(ContentDirtyProjects(snapshot), snapshot.Solution);
+        HashSet<string> contentDirty = ContentDirtyProjects(snapshot);
+        var seed = new HashSet<string>(StringComparer.Ordinal);
+        var candidates = new Dictionary<string, List<CodebaseFragment>>(StringComparer.Ordinal);
+        if (contentDirty.Count > 0)
+        {
+            Dictionary<string, Dictionary<string, LineMap>> mapsByProject =
+                await TriviaOnlyMapsAsync(snapshot, contentDirty, ct).ConfigureAwait(false);
+
+            foreach (string name in contentDirty)
+            {
+                if (!mapsByProject.TryGetValue(name, out Dictionary<string, LineMap>? maps))
+                {
+                    seed.Add(name);
+                    continue;
+                }
+
+                List<CodebaseFragment>? moved = RemapStored(name, maps);
+                if (moved is null) seed.Add(name);
+                else candidates[name] = moved;
+            }
+        }
+
+        HashSet<string> dirty = ExpandToDependents(seed, snapshot.Solution);
+        var remapped = new HashSet<string>(StringComparer.Ordinal);
+
+        // A candidate the expansion pulled in through a dependent edge is re-walked instead and its remap
+        // discarded: the walk answers for both reasons it is dirty, the remap for only one of them.
+        foreach ((string name, List<CodebaseFragment> moved) in candidates)
+        {
+            if (dirty.Contains(name)) continue;
+
+            fragmentsByProject[name] = moved;
+            remapped.Add(name);
+        }
+
         if (dirty.Count > 0)
         {
             IReadOnlyList<CodebaseFragment> reExtracted = await CodebaseExtractor
@@ -246,12 +312,112 @@ internal sealed class SessionFragmentStore : IDisposable
             // Replace only the re-extracted names' lists; the clean projects' fragments ride through untouched.
             foreach (string name in dirty) fragmentsByProject.Remove(name);
             Index(reExtracted);
-            fragmentSetVersion++;
         }
 
+        if (dirty.Count > 0 || remapped.Count > 0) fragmentSetVersion++;
+
+        extractedSolution = snapshot.Solution;
         extractedVersions = Copy(snapshot.ProjectEditVersions);
         LastReExtractedProjects = dirty;
+        LastRemappedProjects = remapped;
         return new SessionFragmentSet(OrderedFragments(), dirty, fragmentSetVersion);
+    }
+
+    /// <summary>
+    ///     The line maps for each content-dirty project whose changed documents all kept their
+    ///     <see cref="SourceShape" />, keyed by project name and then by document path. A dirty name absent
+    ///     from the result is one the caller must re-walk, which covers every name this cannot answer for:
+    ///     the solution reports no change under it, or <see cref="TryMapProjectAsync" /> refused.
+    /// </summary>
+    /// <remarks>
+    ///     The comparison is against <see cref="extractedSolution" /> rather than against the previous call's
+    ///     snapshot, so a project remapped on one call is classified on the next against the text its stored
+    ///     fragments now describe — successive trivia edits each cost one remap rather than compounding.
+    /// </remarks>
+    private async Task<Dictionary<string, Dictionary<string, LineMap>>> TriviaOnlyMapsAsync(
+        WorkspaceSnapshot snapshot, HashSet<string> contentDirty, CancellationToken ct)
+    {
+        var mapsByProject = new Dictionary<string, Dictionary<string, LineMap>>(StringComparer.Ordinal);
+        if (extractedSolution is not { } extracted) return mapsByProject;
+
+        SolutionChanges changes = snapshot.Solution.GetChanges(extracted);
+        IEnumerable<IGrouping<string, ProjectChanges>> byName = changes.GetProjectChanges()
+            .GroupBy(change => change.NewProject.Name, StringComparer.Ordinal);
+
+        foreach (IGrouping<string, ProjectChanges> group in byName)
+        {
+            if (!contentDirty.Contains(group.Key)) continue;
+
+            Dictionary<string, LineMap>? maps = await TryMapProjectAsync(group, ct).ConfigureAwait(false);
+            if (maps is not null) mapsByProject[group.Key] = maps;
+        }
+
+        return mapsByProject;
+    }
+
+    /// <summary>
+    ///     One project name's maps across every <see cref="ProjectChanges" /> it carries — several where a
+    ///     multi-target-framework project's frameworks each compile the file — or <see langword="null" />
+    ///     where any of them says re-walk.
+    /// </summary>
+    /// <remarks>
+    ///     Two frameworks' maps for one path must agree, because the path has one text: a disagreement means a
+    ///     shape read that cannot be trusted to move a site, and is refused rather than resolved. Keyed by
+    ///     <see cref="PathComparison.Comparer" /> because a site spells the tree's own file path.
+    /// </remarks>
+    private static async Task<Dictionary<string, LineMap>?> TryMapProjectAsync(
+        IEnumerable<ProjectChanges> group, CancellationToken ct)
+    {
+        var maps = new Dictionary<string, LineMap>(PathComparison.Comparer);
+        foreach (ProjectChanges change in group)
+        {
+            if (change.GetAddedDocuments()
+                    .Any()
+                || change.GetRemovedDocuments()
+                    .Any())
+                return null;
+
+            foreach (DocumentId id in change.GetChangedDocuments())
+            {
+                Document? before = change.OldProject.GetDocument(id);
+                Document? after = change.NewProject.GetDocument(id);
+                if (before is null || after is null) return null;
+
+                SyntaxTree? beforeTree = await before.GetSyntaxTreeAsync(ct).ConfigureAwait(false);
+                SyntaxTree? afterTree = await after.GetSyntaxTreeAsync(ct).ConfigureAwait(false);
+                if (beforeTree is null || afterTree is null) return null;
+
+                LineMap? map = SourceShape.TryMapLines(SourceShape.Of(beforeTree), SourceShape.Of(afterTree));
+                if (map is null) return null;
+
+                string path = afterTree.FilePath;
+                if (maps.TryGetValue(path, out LineMap? agreed) && !agreed.Equals(map)) return null;
+
+                maps[path] = map;
+            }
+        }
+
+        return maps;
+    }
+
+    // One project's stored fragments with every site moved through its file's map, or null where any fragment
+    // carries a site the maps cannot place — the remapper's own signal to re-walk. A name the store holds no
+    // fragments for reads the same way, so a dirty project that was never extracted is walked rather than
+    // silently left empty.
+    private List<CodebaseFragment>? RemapStored(string name, IReadOnlyDictionary<string, LineMap> maps)
+    {
+        if (!fragmentsByProject.TryGetValue(name, out List<CodebaseFragment>? stored)) return null;
+
+        var moved = new List<CodebaseFragment>(stored.Count);
+        foreach (CodebaseFragment fragment in stored)
+        {
+            CodebaseFragment? remapped = FragmentSiteRemapper.TryRemap(fragment, maps);
+            if (remapped is null) return null;
+
+            moved.Add(remapped);
+        }
+
+        return moved;
     }
 
     // Projects whose edit version differs from the one the stored fragments were extracted at. Within a

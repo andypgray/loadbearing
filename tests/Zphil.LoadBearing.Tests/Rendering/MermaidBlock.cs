@@ -15,6 +15,7 @@ internal static class MermaidBlock
     {
         List<string> lines = block.Split('\n')
             .ToList();
+        // Past the accDescr directive and the blank line under it: both belong to the frame, not the drawing.
         int start = lines.FindIndex(line => line.Contains("accDescr:", StringComparison.Ordinal)) + 2;
         int end = lines.FindLastIndex(line => line == "```");
 

@@ -36,7 +36,7 @@ internal sealed record UnsupportedProjectStamp(string Project, string Reason)
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Three of the five are adjacent lists of the same type, which is a swap the compiler cannot see: a
+///         Three of the six are adjacent lists of the same type, which is a swap the compiler cannot see: a
 ///         reorder exchanging what failed to load with what a solution filter left unchecked type-checks
 ///         cleanly and reaches the wire. Composed once here, off one <see cref="WorkspaceDiagnostics" /> and
 ///         by name, that reorder is untypeable — and no document decides on its own which list is which.

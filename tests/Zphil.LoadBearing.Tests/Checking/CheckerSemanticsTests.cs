@@ -6,9 +6,9 @@ using Zphil.LoadBearing.Tests.Checking.Targets;
 namespace Zphil.LoadBearing.Tests.Checking;
 
 /// <summary>
-///     Checker semantics not tied to one verb: empty-subject failure, the inert-target warning scope
-///     (decision 3), RuleError paths, posture skipping (Migrate/Quarantine), the Quarantine containment
-///     formula evaluated as an Enforce rule, and deterministic violation ordering.
+///     Checker semantics not tied to one verb: empty-subject failure, the inert-target warning scope,
+///     RuleError paths, posture skipping (Migrate/Quarantine), the Quarantine containment formula
+///     evaluated as an Enforce rule, and deterministic violation ordering.
 /// </summary>
 public sealed class CheckerSemanticsTests
 {

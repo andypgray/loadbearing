@@ -51,11 +51,8 @@ flowchart LR
     s_Extraction["Extraction"]
     s_Microsoft_CodeAnalysis("Microsoft.CodeAnalysis.*")
     s_Microsoft_Build("Microsoft.Build.*")
-    s_Adapter["Adapter"]
-    s_Host["Host"]
     s_Pack["Pack"]
-    s_Zphil_LoadBearing_Cli_Mcp_Infrastructure["Zphil.LoadBearing.Cli.Mcp.Infrastructure.*"]
-    s_System_Environment("System.Environment")
+    s_Adapter["Adapter"]
     subgraph s_Zphil_LoadBearing_Roslyn_MsBuild["Quarantine: roslyn/msbuild-bootstrap"]
         s_MsBuildBootstrap[["MsBuildBootstrap"]]
     end
@@ -65,26 +62,22 @@ flowchart LR
     s_Core --x s_Microsoft_Build
     s_Model --x s_Checking
     s_Model --x s_Rendering
-    s_Extraction --x|"expose"| s_Microsoft_Build
+    s_Pack -->|"only"| s_Core
     s_Core --x s_Adapter
     s_Extraction --x s_Adapter
-    s_Host --x s_Adapter
-    s_Pack --x s_Adapter
-    s_Pack -->|"only"| s_Core
-    s_Zphil_LoadBearing_Cli_Mcp_Infrastructure -.-x|"grandfathered"| s_System_Environment
+    s_Extraction --x|"expose"| s_Microsoft_Build
 
     subgraph l_legend["Legend"]
         l_ban["--x = must not reference"]
         l_expose["--x expose = must not expose on a public signature"]
         l_only["--> only = the only references allowed"]
-        l_debt["-.-x grandfathered = Migrate debt, with the existing sites baselined"]
         l_quarantine["Quarantine box = a contained scope; the doubled boxes are its sanctioned surface"]
         l_outside["Rounded box = a place named only as the target of a rule"]
         l_nesting["A box inside a box = the inner place is part of the outer"]
     end
 ```
 
-Not drawn in full: `layering/no-circular-references`, `layering/leaves-independent`, `cli/no-stdout`, `di/no-captive-dependencies`, `di/no-service-locator`, `di/no-buildserviceprovider`, `mcp/tools-accept-cancellation`, `mcp/tool-types-attributed`, `mcp/tool-types-in-cli`, `roslyn/no-msbuildlocator-query`, `mcp/no-blocking-waits`, `mcp/no-path-assembly-loads`, `naming/async-suffix`, `mcp/warm-state-constructed-once`, `xunit/throws-setup-errors-only`, `exceptions/no-swallowed-broad-catches`, `exceptions/no-bare-bcl-throws`, `state/no-static-mutable`, `naming/interfaces`, `model/constraint-nodes`, `model/reified-nodes-immutable`, `api/core-front-door`, `api/extraction-front-door`, `api/host-front-door`, `packaging/core-netstandard-only`, `packaging/core-carries-nothing`, `packaging/shipping-locks-restore`, `packaging/only-the-four-ship`, `roslyn/msbuild-bootstrap/tripwire` (Quarantine), `model/prose-fragments/tripwire` (Caution). Expand any of them with `loadbearing explain <rule-id>`.
+Not drawn in full: `layering/no-circular-references`, `layering/leaves-independent`, `api/core-front-door`, `api/extraction-front-door`, `api/host-front-door`, `model/constraint-nodes`, `model/reified-nodes-immutable`, `packaging/core-netstandard-only`, `packaging/core-carries-nothing`, `packaging/shipping-locks-restore`, `packaging/only-the-four-ship`, `di/no-captive-dependencies`, `di/no-service-locator`, `di/no-buildserviceprovider`, `cli/no-stdout`, `mcp/tools-accept-cancellation`, `mcp/tool-types-attributed`, `mcp/tool-types-in-cli`, `mcp/no-blocking-waits`, `mcp/no-path-assembly-loads`, `mcp/warm-state-constructed-once`, `mcp/env-through-seam`, `roslyn/no-msbuildlocator-query`, `xunit/throws-setup-errors-only`, `exceptions/no-swallowed-broad-catches`, `exceptions/no-bare-bcl-throws`, `state/no-static-mutable`, `naming/async-suffix`, `naming/interfaces`, `roslyn/msbuild-bootstrap/tripwire` (Quarantine), `model/prose-fragments/tripwire` (Caution). Expand any of them with `loadbearing explain <rule-id>`.
 <!-- loadbearing:end -->
 
 Nobody drew either of those, and nobody can let them go stale:

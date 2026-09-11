@@ -3,28 +3,13 @@ using Zphil.LoadBearing.Roslyn.Diagnostics;
 
 namespace Zphil.LoadBearing.Cli.Rendering;
 
-// The wire shape of `check --json` (schemaVersion 3 — Quarantine containment evaluates and ratchets, and a
-// scope tripwire warns), pinned by a golden test. Serialized camelCase, indented, nulls omitted.
-// Clustered in one file: these records are one cohesive DTO, not product types.
-// A new posture and a new warning kind are additive within the version: `caution` and
-// `cautionedScopeTouched` are values of enums the schema already carries, so a consumer that meets neither
-// reads the same document it always read, and one that meets them meets a widened enum rather than a new
-// shape. The schema stays at 3.
-// The additive `targetMember` slot (a banned member's raw symbol ID for a memberUse violation, GRAMMAR
-// §4.5), `subjectMember` slot (an offending member's raw symbol ID for a memberShape violation, GRAMMAR
-// §4.6) and `subjectProject`/`package` pair (an offending project and, for the per-package violations, the
-// package it declares, GRAMMAR §4.10) are null on every other kind and so omitted — the schema stays
-// version 3, byte-identical for specs without a member-target, member-subject or project-subject rule. The
-// ratchet's three measure slots are additive the same way: a baseline block's `shrunk` and `uncounted` and a
-// violation's `grandfatheredSiteCount` are omitted at zero and at absence, so a report over baselines whose
-// counts are all recorded and all still hold carries none of them. The `modelIncomplete`, `failedProjects`,
-// `restoreFailedProjects`, `uncheckedProjects`, `unsupportedProjects`, `multiTargetedProjects` and
-// `rulesFilter` slots are additive the same way: null (omitted) on every run whose workspace loaded, whose
-// NuGet packages resolved, that no solution filter narrowed, whose solution is all C# and single-framework,
-// and that checked the whole spec — so a clean document is unchanged.
-// The `grain` slot is additive in the same sense and absent from every full-grain report, which is every
-// report the CLI writes unless asked otherwise; it holds the schema at version 3, as the survey's own ladder
-// held it at 1 — a consumer reading a full document cannot tell it exists. The per-rule `violationCount` and
+// The wire shape of `check --json` (schemaVersion 3), pinned by a golden test. Serialized camelCase, indented,
+// nulls omitted. Clustered in one file: these records are one cohesive DTO, not product types.
+// The version moves only for a change of shape. A slot that is null on every run with nothing to say — a
+// kind-specific member or project slot, a ratchet measure at zero, a trust stamp for a workspace that loaded
+// whole and unfiltered, the `grain` of a full-grain report — is omitted, so a document that needs none of
+// them is byte-identical to one written before the slot existed; and a widened enum (`caution`,
+// `cautionedScopeTouched`) is a value a consumer meets, not a new shape. The per-rule `violationCount` and
 // per-violation `siteCount` are unconditional at every grain, each declared ahead of the array it
 // summarizes. Declaration order IS the wire order (System.Text.Json writes it verbatim), and CheckJson's is
 // a deliberate ranking: the request echo, then the trust stamps, then `summary`, then `rules`, with
@@ -176,8 +161,8 @@ internal sealed record CheckJson(
 /// <param name="Baseline">The ratchet state, or null (omitted) for a non-ratcheted rule.</param>
 /// <param name="ViolationCount">
 ///     How many violations the rule found, at every grain. The count is the stable key a consumer scripts
-///     against, so it never substitutes for <see cref="Violations" /> or yields to it — while it stood in
-///     for the elided array alone, a defensive absent-means-zero read answered 0 exactly when the rule had
+///     against, so it never substitutes for <see cref="Violations" /> or yields to it — a count present only
+///     when the array is elided lets a defensive absent-means-zero read answer 0 exactly when the rule has
 ///     failed. Declared ahead of the array it summarizes, so a downstream truncator that cuts inside the
 ///     bulk has already written the number. Zero means "none found": beside <c>status: passed</c> it is
 ///     what makes a skeleton report a verdict.

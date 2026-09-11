@@ -7,8 +7,7 @@ namespace Zphil.LoadBearing.Tests.Roslyn;
 /// <summary>
 ///     The one rule <see cref="EvidenceBlock" /> enforces rather than assembles: a lede ending in a colon
 ///     promises the block beneath it, so composing one over nothing is a defect at the call site rather than
-///     a shorter message. The assembly itself is pinned by its consumers — which is why the type had no test
-///     file of its own until the dangling colon reached the field.
+///     a shorter message. The assembly itself is pinned by its consumers.
 /// </summary>
 public sealed class EvidenceBlockTests
 {

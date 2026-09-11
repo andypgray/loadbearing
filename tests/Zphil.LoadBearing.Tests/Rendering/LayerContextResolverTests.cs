@@ -20,8 +20,6 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 /// </summary>
 public class LayerContextResolverTests
 {
-    // A Web layer with one bare-subject Enforce rule anchored on it — saying what it is for when given a
-    // purpose, which is the sentence the card lede carries.
     private static readonly IArchitectureSpec WebLayerSpec = ContextFixtures.WebLayer();
 
     private static readonly IArchitectureSpec DescribedWebLayerSpec =

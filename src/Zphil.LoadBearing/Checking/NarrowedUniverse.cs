@@ -12,8 +12,8 @@ namespace Zphil.LoadBearing.Checking;
 ///         universe is the whole solution reaches exactly the verdicts it always did.
 ///     </para>
 ///     <para>
-///         <b>The reason arrives composed rather than assembled here.</b> The narrowing lexicon lives with
-///         the stamps every verb writes, so a wording minted in Core would drift from them silently; and
+///         The reason arrives composed rather than assembled here: the narrowing lexicon lives with the
+///         stamps every verb writes, so a wording minted in Core would drift from them silently; and
 ///         Core cannot relativize or name a project path anyway (no <c>Path.GetRelativePath</c> on
 ///         netstandard2.0). The filter's name and the count it left out are therefore the composer's
 ///         inputs rather than this value's contents: what a checked rule needs is the sentence.

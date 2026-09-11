@@ -11,8 +11,8 @@ namespace Zphil.LoadBearing.Tests.DocHygiene;
 ///     exercise the same code path.
 /// </summary>
 /// <remarks>
-///     The wording is the subject rather than a detail of it. Five gates moved onto this harness on the
-///     promise that every failure message a reader already knows stays byte-identical, and a composed
+///     The wording is the subject rather than a detail of it. Every gate on this harness rests on the
+///     promise that the failure message a reader already knows stays byte-identical, and a composed
 ///     message is exactly the kind of thing that survives review once and drifts afterwards. Each fact
 ///     below therefore forces a real red and reads the message out of it, rather than asserting on the
 ///     three nouns it was built from.

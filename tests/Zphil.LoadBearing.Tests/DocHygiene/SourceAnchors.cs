@@ -64,11 +64,9 @@ internal static class SourceAnchors
     ///     its final block — <see cref="Scan" /> decides all of that.
     /// </summary>
     /// <remarks>
-    ///     <see cref="FencedLines" /> flattens this, <see cref="Fences" /> drops the line numbers,
-    ///     <see cref="Extract" /> filters it for anchor lines and <c>RuleQuotes.Extract</c> for
-    ///     rule-header lines. A caller needing both block identity and position — a
-    ///     <c>grandfathered: N</c> sub-line takes its rule id from the header line above it
-    ///     <em>in the same fence</em>, and must still fail naming <c>doc:line</c> — reads this directly.
+    ///     A caller needing both block identity and position — a <c>grandfathered: N</c> sub-line takes its
+    ///     rule id from the header line above it <em>in the same fence</em>, and must still fail naming
+    ///     <c>doc:line</c> — reads this directly.
     /// </remarks>
     public static IReadOnlyList<IReadOnlyList<(string Text, int Number)>> FencedBlocks(string docText)
     {
@@ -325,10 +323,7 @@ internal static class SourceAnchors
     /// </summary>
     /// <remarks>
     ///     This is the one fence scanner the quote gates share, and the only place the state machine
-    ///     lives. Every view of a doc is a filter over it: <see cref="FencedBlocks" /> groups the fenced
-    ///     lines into blocks (and <see cref="FencedLines" /> and <see cref="Fences" /> reshape those),
-    ///     <see cref="ProseLines" /> keeps what sits outside every fence, and
-    ///     <see cref="UnfencedLines" /> keeps everything the fenced lines do not cover.
+    ///     lives; every other view of a doc here is a filter over it.
     /// </remarks>
     private static IEnumerable<(string Text, int Number, LineKind Kind)> Scan(string docText)
     {

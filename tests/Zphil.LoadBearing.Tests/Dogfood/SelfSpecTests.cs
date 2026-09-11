@@ -260,33 +260,31 @@ public sealed class SelfSpecTests
 
     /// <summary>
     ///     The verb ledger's completeness pin, and the one gate here that needs neither a workspace nor
-    ///     the codebase. The self-spec's xmldoc claims to exercise the verb families this codebase can
-    ///     honestly exercise, and to name every remaining one with a reason — a claim that was false when
-    ///     it was written and would rot again the moment a verb shipped. So it is enforced instead of
+    ///     the codebase. The self-spec exercises the verb families this codebase can honestly exercise, and
+    ///     <see cref="VerbLedger" /> names every remaining one with a reason. That is enforced rather than
     ///     asserted: reflect the public <c>Must*</c> surface, subtract what the built model actually uses,
-    ///     and require every remainder to be named in the spec's own source. A new verb that lands with
-    ///     neither a self-use nor a ledger line turns this red.
+    ///     and require the remainder to be exactly the ledger. A verb that ships with neither a self-use nor
+    ///     a ledger entry turns this red, and so does an entry for a verb the spec has since taken up.
     /// </summary>
     [Fact]
     public void VerbLedger_AccountsForEveryUnusedVerb()
     {
-        string ledger = File.ReadAllText(RepoRoot.ArchSpecSource);
-
         HashSet<string> used = SelfModel.Rules
             .Where(rule => rule.Constraint is not null)
             .Select(rule => VerbName(rule.Constraint!.GetType()))
             .ToHashSet(StringComparer.Ordinal);
 
-        // The `<c>Verb</c>` needle rather than a bare substring: `Must` is a prefix of every other verb,
-        // so an unbounded search would let one mention account for all of them.
-        List<string> unaccounted = PublicVerbs()
+        List<string> unused = PublicVerbs()
             .Where(verb => !used.Contains(verb))
-            .Where(verb => !ledger.Contains($"<c>{verb}</c>", StringComparison.Ordinal))
             .ToList();
 
-        unaccounted.ShouldBeEmpty(
-            "these verbs are neither used by the self-spec nor named in its ledger — use them on this " +
-            "repo's real code, or add a line to the ledger saying plainly why not.");
+        List<string> ledger = VerbLedger.Unused.Keys
+            .OrderBy(verb => verb, StringComparer.Ordinal)
+            .ToList();
+
+        unused.ShouldBe(ledger,
+            "the self-spec's unused verbs and VerbLedger have drifted apart — use a new verb on this repo's " +
+            "real code or add it to the ledger with a plain reason, and drop an entry the spec now uses.");
     }
 
     /// <summary>

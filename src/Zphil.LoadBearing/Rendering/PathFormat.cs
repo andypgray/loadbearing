@@ -4,7 +4,7 @@ namespace Zphil.LoadBearing.Rendering;
 
 /// <summary>
 ///     Renders source paths solution-relative with forward slashes — the machine-independent form both
-///     render targets emit. This is what keeps the JSON golden pin and the human acceptance box stable
+///     render targets emit. This is what keeps the JSON golden pin and the pinned human report stable
 ///     across machines.
 /// </summary>
 /// <remarks>

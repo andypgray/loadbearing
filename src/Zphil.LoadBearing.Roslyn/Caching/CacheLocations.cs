@@ -12,7 +12,7 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 /// <remarks>
 ///     <para>
 ///         The root is overridable via a parameter — this type never reads an environment variable itself,
-///         keeping the Roslyn project off the <c>mcp/env-through-seam</c> ratchet.
+///         keeping the Roslyn project off the <c>mcp/env-through-seam</c> law.
 ///     </para>
 ///     <para>
 ///         The path identity reuses <see cref="PathCanonicalizer" /> (symlink-resolved, fully-qualified) so

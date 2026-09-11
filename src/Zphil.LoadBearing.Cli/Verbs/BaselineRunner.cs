@@ -347,8 +347,8 @@ internal sealed class BaselineRunner(
         var grew = 0;
         foreach (BaselineEntry entry in captured)
         {
-            // Identity intersection first, exactly as before: an entry no current violation matches is the
-            // reduction being accepted, and it simply does not survive into the section.
+            // Identity intersection first: an entry no current violation matches is the reduction being
+            // accepted, and it simply does not survive into the section.
             if (!observed.TryGetValue(entry, out BaselineEntry? now)) continue;
 
             if (now.SiteCount is not { } sites)

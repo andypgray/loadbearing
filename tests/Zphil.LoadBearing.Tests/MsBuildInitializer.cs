@@ -27,8 +27,7 @@ internal static class MsBuildInitializer
         // through the cache path (miss on first touch of a solution, hit on later identical touches), which
         // makes the whole golden suite a continuous cold-vs-hit equality pin — any leak of the cache into
         // observable output shows up as golden churn. Read CLI-side through IEnvironment/SystemEnvironment.
-        // Routed through TestTempRoot so the roots earlier runs left behind get swept: this directory used
-        // to be minted directly under %TEMP% and never deleted, which had reached 160 roots / 1.3 GB.
+        // Routed through TestTempRoot so the roots earlier runs left behind get swept.
         Environment.SetEnvironmentVariable(LoadBearingEnvVars.CacheDirectory, TestTempRoot.For("cache"));
 
         // NB: fixture restore is deliberately NOT done here. A [ModuleInitializer] runs during the

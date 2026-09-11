@@ -34,9 +34,9 @@ public class SpecDiscoveryTests
     [Fact]
     public void FindSpecs_PublicSpecNestedInPublicType_IsDiscovered()
     {
-        // Type.IsPublic is false for ANY nested type, so the old predicate silently skipped a spec nested
-        // in a public class; Type.IsVisible is true when the whole containing chain is public. This
-        // spec — public, nested through a public chain — is the pin that the switch to IsVisible restores.
+        // Type.IsPublic is false for ANY nested type, so a predicate built on it silently skips a spec
+        // nested in a public class; Type.IsVisible is true when the whole containing chain is public. This
+        // spec — public, nested through a public chain — is the pin under that choice.
         SpecDiscovery.FindSpecs(typeof(PublicOuter.NestedSpec).Assembly)
             .ShouldContain(spec => spec is PublicOuter.NestedSpec);
     }

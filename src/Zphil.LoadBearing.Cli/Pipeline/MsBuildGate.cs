@@ -20,7 +20,7 @@ namespace Zphil.LoadBearing.Cli.Pipeline;
 ///         <b>The host source.</b> Every entry point takes an optional <see cref="ISolutionSource" />: the
 ///         source to serve a run that would otherwise open a fresh one-shot workspace. <c>null</c> — what
 ///         <c>Program</c> passes, and therefore what every real CLI invocation uses — means
-///         <see cref="ColdSolutionSource" />, so production behaviour is exactly as before. A host that
+///         <see cref="ColdSolutionSource" />, so the seam costs a real CLI invocation nothing. A host that
 ///         already holds a solution supplies its own: the MCP server does it through DI on the runners it
 ///         calls directly, and the in-process e2e harness does it here, so a whole test class's CLI
 ///         invocations share one loaded workspace instead of opening one each. The replay decision is
@@ -31,7 +31,7 @@ namespace Zphil.LoadBearing.Cli.Pipeline;
 ///         <b>The environment seam.</b> Every entry point also takes an optional
 ///         <see cref="IEnvironment" />, threaded from <see cref="CliEntry" /> so a host can supply the
 ///         cache-root override without touching real process state. <c>null</c> — what <c>Program</c> passes —
-///         means <see cref="SystemEnvironment" />, so production reads the real variable exactly as before.
+///         means <see cref="SystemEnvironment" />, so production reads the real process variable.
 ///         The gate resolves the root through the same seam it hands the runner, which is what keeps the
 ///         capture store and the fragment cache pointed at one location for the run.
 ///     </para>
@@ -57,8 +57,6 @@ internal static class MsBuildGate
     ///     path was chosen; never printed.
     /// </summary>
     internal static GateAcquisition? LastAcquisition { get; private set; }
-
-    // ── check / status / graph: replay-aware source selection ────────────────────────────────────────────
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static Task<int> RunCheckAsync(
@@ -96,7 +94,7 @@ internal static class MsBuildGate
             ct);
     }
 
-    // ── explain / render / baseline: the plain path, cache-aware but never replay-aware ──────────────────
+    // explain / render / baseline take the plain path: cache-aware, never replay-aware.
     //
     // These three front the persisted extraction cache, and so take the environment seam the cache root is
     // read through, exactly as the three above do. What they do NOT take is the replay
@@ -130,8 +128,6 @@ internal static class MsBuildGate
         EnsureMsBuildRegistered();
         return InvokeBaselineAsync(request, output, error, SourceOrCold(hostSource), environment, ct);
     }
-
-    // ── the source-selection gate ────────────────────────────────────────────────────────────────────────
 
     // The pre-decision: an explicit --binlog wins (replay-first, eagerly); otherwise, unless --no-cache, a
     // structurally-valid capture replays lazily, a stale/unreadable one prints its notice and falls back to a
@@ -299,7 +295,8 @@ internal static class MsBuildGate
         MsBuildBootstrap.EnsureInitialized();
     }
 
-    // ── runner stepping stones (NoInlining: the runner and its workspace types resolve here, post-decision) ──
+    // The runner stepping stones. NoInlining: the runner and its workspace types resolve here, after the
+    // registration and the source-selection decision have run.
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static Task<int> InvokeCheckAsync(

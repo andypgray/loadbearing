@@ -40,4 +40,20 @@
         <GlobalAnalyzerConfigFiles Include="$(MSBuildThisFileDirectory)../analyzers.globalconfig" />
     </ItemGroup>
 
+    <!-- The compiler writes each project's XML documentation file, and the packages carry it beside
+         the assembly, so a consumer's editor shows the doc comments the source already carries. The
+         file is also what turns the documentation-mode diagnostics on: without it the compiler
+         resolves no cref and reports no missing comment, so a namespace move can leave crefs pointing
+         at nothing through a green build and a green suite. That whole family is promoted to an
+         error here, not CS1591 alone, so the build holds both halves of the invariant: every public
+         member is documented, and every comment is well-formed and resolves. A comment naming a type
+         that no longer exists is as broken as a missing one. Scoped to src/ for the same reason as
+         the policies above: the tests project would report thousands of missing comments on its
+         public test members, and the fixture copies staged under bin/ must inherit nothing from
+         here. -->
+    <PropertyGroup>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <WarningsAsErrors>$(WarningsAsErrors);CS0419;CS1570;CS1571;CS1572;CS1573;CS1574;CS1580;CS1581;CS1584;CS1587;CS1589;CS1590;CS1591;CS1592;CS1710;CS1711;CS1712;CS1723;CS1734;CS1735</WarningsAsErrors>
+    </PropertyGroup>
+
 </Project>

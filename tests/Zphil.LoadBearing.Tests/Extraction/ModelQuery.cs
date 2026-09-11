@@ -7,13 +7,10 @@ internal static class ModelQuery
 {
     /// <summary>The lines of a list of sites, in recorded order: <c>edge.Sites.Lines()</c>.</summary>
     /// <remarks>
-    ///     On the sites rather than on each edge. The eight edge kinds share no sited contract in the shipped
-    ///     model, so the shorter <c>edge.Lines()</c> cost one identical overload per kind — and three more
-    ///     verbs besides, for the edges carrying a second site list (<c>UnfilteredLines</c>,
-    ///     <c>SwallowingLines</c>, <c>DeclarationLines</c>), where the verb had to encode which list it meant.
-    ///     Naming the list at the call site says that in the reader's own words and leaves one verb to
-    ///     maintain. Adding the contract to <c>src/</c> to buy the shorter spelling back would put shipped API
-    ///     in the service of a test helper.
+    ///     On the sites rather than on each edge: the eight edge kinds share no sited contract in the shipped
+    ///     model, naming the list at the call site says which of an edge's site lists is meant, and adding a
+    ///     contract to <c>src/</c> to buy <c>edge.Lines()</c> would put shipped API in the service of a test
+    ///     helper.
     /// </remarks>
     public static IReadOnlyList<int> Lines(this IEnumerable<SourceLocation> sites)
     {

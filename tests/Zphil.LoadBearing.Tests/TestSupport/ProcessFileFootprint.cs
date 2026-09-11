@@ -35,11 +35,9 @@ internal sealed record RetainedPath(FootprintScan Scan, string RawPath, string R
 ///     <para>
 ///         <b>Why two scans.</b> A retained build output shows up in two different places, and neither
 ///         subsumes the other. A loaded assembly image is a <em>mapped view</em> of a section — there is no
-///         file handle in the process's table to find — which is how the spec-DLL lock manifested: a path
-///         load pinned the file for the host's whole lifetime and every build of the spec project then
-///         failed. An ordinary open file, a log, or the process's own working directory is a
-///         <em>handle</em> instead. So this walks the address space for file-backed regions and walks the
-///         handle table for disk handles, and reports the union.
+///         file handle in the process's table to find — while an ordinary open file, a log, or the
+///         process's own working directory is a <em>handle</em> instead. So this walks the address space
+///         for file-backed regions and walks the handle table for disk handles, and reports the union.
 ///     </para>
 ///     <para>
 ///         <b>Failure semantics are deliberately split.</b> Structural failures throw — a process it cannot

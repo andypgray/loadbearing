@@ -30,6 +30,7 @@ public sealed class InterchangeArchSpec : IArchitectureSpec
     /// <inheritdoc />
     public void Define(Arch arch)
     {
+        Selection interchange = arch.Types.InNamespace("Meridian.Interchange.*");
         Selection host = arch.Namespace("Meridian.Interchange.Host.*");
 
         // 1 — DI guidelines: no direct instantiation of dependent classes outside the composition root.
@@ -66,24 +67,23 @@ public sealed class InterchangeArchSpec : IArchitectureSpec
             "Resolve the scoped or transient service per unit of work inside an IServiceScopeFactory scope, as ScopedDispatchRunner does; take only singleton-safe dependencies in the constructor.");
 
         // 8 — TAP (normative): Task-returning methods carry the Async suffix.
-        DotNetGuidance.AsyncSuffix(arch, arch.Types.InNamespace("Meridian.Interchange.*"), PackPosture.Enforce);
+        DotNetGuidance.AsyncSuffix(arch, interchange, PackPosture.Enforce);
 
         // 9 — Standard exception types (FDG): catch base Exception only in a top-level handler; the dispatcher's poll loop is the one sanctioned catch-all.
-        DotNetGuidance.NoGeneralCatch(arch, arch.Types.InNamespace("Meridian.Interchange.*"),
+        DotNetGuidance.NoGeneralCatch(arch, interchange,
             arch.Types.DerivedFrom<BackgroundService>(), PackPosture.Enforce,
             "Catch the specific exception you can handle; the only sanctioned catch-all is the dispatcher's poll loop, where OutboxDispatcher logs and continues to the next poll.");
 
         // 10 — TAP: a Task-returning method accepts a CancellationToken so callers can cancel and flow the request down the chain.
-        DotNetGuidance.AcceptCancellation(arch, arch.Types.InNamespace("Meridian.Interchange.*"), PackPosture.Enforce,
+        DotNetGuidance.AcceptCancellation(arch, interchange, PackPosture.Enforce,
             "Add a CancellationToken parameter and flow OutboxDispatcher's stoppingToken through the call chain, as ScopedDispatchRunner and OutboxProcessor already do.");
 
         // 11 — Architectural principles (persistence ignorance): a persisted type carries no ORM mapping attribute; validation DataAnnotations are untouched.
-        DotNetGuidance.NoMappingAttributes(arch, arch.Types.InNamespace("Meridian.Interchange.*"), PackPosture.Enforce);
+        DotNetGuidance.NoMappingAttributes(arch, interchange, PackPosture.Enforce);
 
         // 12 — CQRS reads (ViewModels/DTOs made for the consumer): a persisted entity must not surface on the public partner contract; hand partners a DTO.
         arch.Rule("contracts/no-entity-exposure")
-            .Enforce(arch.Types.InNamespace("Meridian.Interchange.*")
-                .Except(arch.Namespace("Meridian.Interchange.Outbox.*"))
+            .Enforce(interchange.Except(arch.Namespace("Meridian.Interchange.Outbox.*"))
                 .MustNotExpose(typeof(OutboxMessage)))
             .Because("Exposing a persisted entity on a public signature couples partner-facing code to the storage model, so a change to how a message is persisted reshapes the partner contract; hand partners a DTO made for the wire instead.")
             .Citation("https://learn.microsoft.com/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/cqrs-microservice-reads")

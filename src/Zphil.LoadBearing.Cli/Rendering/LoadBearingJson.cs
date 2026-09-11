@@ -59,7 +59,7 @@ internal static class LoadBearingJson
 
 // Source-generated metadata for the five document roots. The generator emits an ordinary property read per
 // member, which is what lets the DTOs stay free of implicit-use annotations: nothing about them is
-// reflection-only any more. Serialization stays byte-identical — the goldens are the proof.
+// reflection-only. Serialization stays byte-identical — the goldens are the proof.
 [JsonSerializable(typeof(CheckJson))]
 [JsonSerializable(typeof(StatusJson))]
 [JsonSerializable(typeof(GraphJson))]

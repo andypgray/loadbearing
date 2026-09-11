@@ -13,6 +13,8 @@ namespace Zphil.LoadBearing.Tests.Roslyn;
 ///     spellings, the partition that sends <c>.csproj</c> entries to the load and every other project kind
 ///     to the coverage statement (with solution folders in neither), and which formats the parser owns at
 ///     all.
+/// </summary>
+/// <remarks>
 ///     <para>
 ///         The <see cref="SolutionProjectFileParser.ParseFilter" /> rows pin the half a solution filter adds:
 ///         its <em>two</em> resolution bases — the referenced solution against the filter's own directory,
@@ -27,7 +29,7 @@ namespace Zphil.LoadBearing.Tests.Roslyn;
 ///         path — and that it is never a throw, since the caller asks before the load that owns refusing a
 ///         bad filter.
 ///     </para>
-/// </summary>
+/// </remarks>
 public sealed class SolutionProjectFileParserTests
 {
     // A path root that need not exist — ParseDeclaredProjects resolves textually via Path.GetFullPath.

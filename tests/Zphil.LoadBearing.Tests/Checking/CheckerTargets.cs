@@ -1,4 +1,4 @@
-// Reflectable target types for checker specs that use typeof(...). Sources.HierarchySource
+// Reflectable target types for checker specs that use typeof(...). Sources.Hierarchy
 // re-declares these plus subject types; the two copies must stay in lockstep — that IS the pin, the
 // same discipline as the FullDisplay correspondence test.
 // The sub-namespace keeps the targets apart from the tests that select them, and the arity of IHandler<>

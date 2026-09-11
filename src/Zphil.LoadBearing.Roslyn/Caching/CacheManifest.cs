@@ -11,7 +11,7 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Why the stamps are our own, not <see cref="FileFreshness" />.</b> A stamp is durable on-disk
+///         The stamps are the manifest's own rather than <see cref="FileFreshness" />: a stamp is durable on-disk
 ///         data; <see cref="FileFreshness.RecordedAtUtc" /> is a runtime notion (the wall-clock instant of a
 ///         capture) that has no meaning across process boundaries. So the racy-window decision is frozen at
 ///         write time into <see cref="FileStamp.Promoted" /> instead, and validation reconstitutes a
@@ -98,13 +98,19 @@ internal sealed record CacheManifest(
 ///     (<see cref="FileFreshness.IsPromoted" /> at capture). When false, validation must re-hash even on a
 ///     stat match, because a same-tick write could have shared the recorded mtime.
 /// </param>
+/// <param name="Shape">
+///     The document's <see cref="SourceShape" /> at capture, or null for a structural stamp, the binlog
+///     copy, an absent file, or a document that could not be read — what lets validation tell a trivia-only
+///     edit from a real one.
+/// </param>
 internal sealed record FileStamp(
     string Path,
     bool Exists,
     long LastWriteTimeUtcTicks,
     long Length,
     string? Sha256,
-    bool Promoted);
+    bool Promoted,
+    SourceShape? Shape = null);
 
 /// <summary>
 ///     One cached project (keyed by name; a multi-target-framework project has one entry — its several

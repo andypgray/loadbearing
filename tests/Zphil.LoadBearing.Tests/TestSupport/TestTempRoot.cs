@@ -34,7 +34,7 @@ internal static class TestTempRoot
         .ToString("N");
 
     // The temp base, resolved through any symlinked ancestor once per run, so every path handed out shares
-    // one spelling. See TempFixtureWorkspace.RealTempRoot for why the harness needs this beyond production.
+    // one spelling.
     private static readonly string TempBase =
         PathCanonicalizer.Resolve(Path.TrimEndingDirectorySeparator(Path.GetTempPath()));
 

@@ -9,7 +9,7 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Baselines;
 
 /// <summary>
-///     Pins the canonical baseline file format and its digest (Spec 1): full-text canonical bytes with
+///     Pins the canonical baseline file format and its digest: full-text canonical bytes with
 ///     a literal digest, ordinal sorting of rules and entries, the one-line empty-array form, LF/no-BOM/
 ///     trailing-newline invariants, the JSON escaper, the digest-input grammar (including the optional
 ///     <c>siteCount</c> measure and <c>because</c> attribution lines), the frozen legacy grammar a
@@ -94,7 +94,7 @@ public sealed class BaselineFormatTests
     public void ComposeFile_SubjectWithNamedControlChars_EscapesBackspaceFormfeedNewlineReturnTabAndUnicode()
     {
         // The subject field reaches Quote unfiltered (ForSubject validates nothing; WithBecause would reject the
-        // newline). \b \f \n \r \t are the named JSON escapes (BaselineFormat.cs:236-250); U+001F (<0x20) falls
+        // newline). \b \f \n \r \t are the named JSON escapes (BaselineFormat.Quote); U+001F (<0x20) falls
         // through to \uXXXX. Built from explicit code points to keep the source free of invisible control chars.
         string subject = "a" + (char)0x08 + (char)0x0C + (char)0x0A + (char)0x0D + (char)0x09 + (char)0x1F + "z";
         string composed = BaselineFormat.ComposeFile(BaselineComposer.Rules(("r/x", [BaselineEntry.ForSubject(subject)])));

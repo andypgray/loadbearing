@@ -10,13 +10,9 @@ namespace Zphil.LoadBearing.Tests.Checking;
 
 /// <summary>
 ///     The second multi-declarer bed: one edge whose endpoints are declared by
-///     <em>
-///         overlapping but
-///         different
-///     </em>
-///     project sets (GRAMMAR §4.1), which <see cref="MultiplyDeclaredCodebase" /> cannot
-///     stage — there every shared type is declared by the same three projects, so every instance of every
-///     shared edge is intra-project.
+///     <em>overlapping but different</em> project sets (GRAMMAR §4.1), which
+///     <see cref="MultiplyDeclaredCodebase" /> cannot stage — there every shared type is declared by the
+///     same three projects, so every instance of every shared edge is intra-project.
 /// </summary>
 /// <remarks>
 ///     <para>

@@ -8,8 +8,7 @@ namespace Zphil.LoadBearing.Tests.Extraction;
 
 /// <summary>
 ///     The cross-input unification semantics of the model build, over the MSBuild-free fast path with
-///     several synthetic <see cref="CompilationInput" />s. These pin the behaviour the
-///     per-input-fragment refactor must reproduce byte-for-byte: first-declarer-wins node facts and
+///     several synthetic <see cref="CompilationInput" />s. These pin first-declarer-wins node facts and
 ///     ProjectName, declaration-site union across declarers, declare-all-before-reference
 ///     (declared-beats-external globally), the reference-equality contract on constructions and edges,
 ///     external-node sharing, and the same-project-name (multi-TFM) project union. The last two blocks pin

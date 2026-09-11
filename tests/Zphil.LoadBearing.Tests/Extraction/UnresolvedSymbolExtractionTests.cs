@@ -24,7 +24,7 @@ public sealed class UnresolvedSymbolExtractionTests
     [Fact]
     public void Extract_TypeDerivingFromUnresolvedBase_MintsTheExternalInsteadOfThrowing()
     {
-        // The F-12 path: PopulateHierarchy resolves the base type, which is an error symbol.
+        // PopulateHierarchy resolves the base type, which is an error symbol.
         CodebaseModel model = CompilationFactory.Extract("namespace App;\npublic class Widget : Ghost.Base { }\n");
 
         TypeNode external = model.Types.Single(t => t.FullName == "Ghost.Base");

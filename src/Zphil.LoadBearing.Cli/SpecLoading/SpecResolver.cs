@@ -406,7 +406,7 @@ internal static class SpecResolver
     }
 
     // One line of the ambiguity error. The project file is what the reader has to pass to --spec, so it is
-    // named whenever it is known; a candidate with no project file renders as the bare name it always did.
+    // named whenever it is known; a candidate with no project file renders as the bare name alone.
     private static string DisambiguationLine(SpecProjectCandidate candidate)
     {
         return string.IsNullOrEmpty(candidate.FilePath)

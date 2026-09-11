@@ -146,8 +146,8 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         // Violations ride in rules[]; which projects failed to load or to restore rides in failedProjects and
         // restoreFailedProjects, and the load's
         // own diagnostics ride in workspaceDiagnostics along with the MSBuild-selection note, which
-        // WorkspaceDiagnostics puts in the list both surfaces read rather than appending at write time (it
-        // was the one line TextWriter.Null used to swallow, and "which MSBuild opened it" is the next
+        // WorkspaceDiagnostics puts in the list both surfaces read rather than appending at write time
+        // (TextWriter.Null would otherwise swallow that one line, and "which MSBuild opened it" is the next
         // question after any load failure). The gate verdict the exit code would have expressed rides in
         // modelIncomplete, and an unmatched --rules filter surfaces as an error result rather than exit 2.
         //

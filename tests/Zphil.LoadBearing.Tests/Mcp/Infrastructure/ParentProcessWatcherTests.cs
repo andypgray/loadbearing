@@ -82,8 +82,8 @@ public sealed class ParentProcessWatcherTests
     {
         if (!OperatingSystem.IsWindows()) return;
 
-        // testhost is spawned by the test runner (vstest.console / dotnet test), so it always
-        // has a parent. A non-null result confirms the P/Invoke shape compiles and dispatches.
+        // The test process is a child of whatever launched it, so a parent always exists. A non-null
+        // result confirms the P/Invoke shape compiles and dispatches.
         int? parentPid = ParentProcessWatcher.GetParentProcessId();
 
         parentPid.ShouldNotBeNull();

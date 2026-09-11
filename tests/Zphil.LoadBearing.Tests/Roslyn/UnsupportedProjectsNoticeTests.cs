@@ -13,10 +13,10 @@ namespace Zphil.LoadBearing.Tests.Roslyn;
 ///     holds no <c>.shproj</c> bed and deliberately does not need one.
 /// </summary>
 /// <remarks>
-///     The reason a kind rides all the way from its producer is that this file used to have nothing to pin:
-///     one string was stamped onto every path at the composing edge, so the <c>.shproj</c> — a container
-///     whose <c>.projitems</c> compile into the projects that import it — was reported as a language this
-///     product cannot read, on every surface at once.
+///     A kind rides all the way from its producer because one string stamped onto every path at the composing
+///     edge cannot describe them all: the <c>.shproj</c> — a container whose <c>.projitems</c> compile into
+///     the projects that import it — would be reported as a language this product cannot read, on every
+///     surface at once.
 /// </remarks>
 public sealed class UnsupportedProjectsNoticeTests
 {
@@ -110,8 +110,8 @@ public sealed class UnsupportedProjectsNoticeTests
     [Fact]
     public void CheckStamp_TwoProjects_LedeStatesNoCauseAndEachEntryStatesItsOwn()
     {
-        // The lede used to end "— this product surveys C# projects only", which was a duplicate of what
-        // every entry beneath it says and false about the second one. It now scopes and nothing more.
+        // The lede scopes and states no cause: a cause stated there would duplicate what every entry beneath
+        // it says, and be false about the second one.
         string stamp = UnsupportedProjectsNotice.CheckStamp(TwoProjects);
 
         stamp.ShouldBe(

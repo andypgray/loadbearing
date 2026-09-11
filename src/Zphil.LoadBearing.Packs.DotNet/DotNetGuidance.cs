@@ -166,7 +166,10 @@ public static class DotNetGuidance
     ///     methods of <paramref name="subject" /> carry the <c>Async</c> suffix.
     /// </summary>
     /// <param name="arch">The spec's stage-machine entry point.</param>
-    /// <param name="subject">The types whose methods the rule governs; the pack narrows to authored types and applies the method projection.</param>
+    /// <param name="subject">
+    ///     The types whose methods the rule governs; the pack narrows to authored types and applies the
+    ///     method projection.
+    /// </param>
     /// <param name="posture">Enforce, or Migrate with the project's counter-prior prose.</param>
     /// <param name="fix">A project-specific remediation hint, replacing the pack's generic one.</param>
     public static void AsyncSuffix(
@@ -211,7 +214,10 @@ public static class DotNetGuidance
     ///     methods of <paramref name="subject" /> accept a <see cref="CancellationToken" />.
     /// </summary>
     /// <param name="arch">The spec's stage-machine entry point.</param>
-    /// <param name="subject">The types whose methods the rule governs; the pack narrows to authored types and applies the method projection.</param>
+    /// <param name="subject">
+    ///     The types whose methods the rule governs; the pack narrows to authored types and applies the
+    ///     method projection.
+    /// </param>
     /// <param name="posture">Enforce, or Migrate with the project's counter-prior prose.</param>
     /// <param name="fix">A project-specific remediation hint, replacing the pack's generic one.</param>
     public static void AcceptCancellation(

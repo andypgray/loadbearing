@@ -1,6 +1,7 @@
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Codebase;
+using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.Caching;
 using Zphil.LoadBearing.Roslyn.Extraction;
@@ -171,5 +172,289 @@ public sealed class SessionFragmentStoreTests
             .ShouldBe(["net10.0", "netstandard2.0"]);
         ModelDump.Render(FragmentMerger.Merge(reExtracted.Fragments))
             .ShouldContain("MultiTfm.Core.WidgetProbe");
+    }
+
+    [Fact]
+    public async Task GetFragmentsAsync_CommentOnlyEditInOneProject_RemapsSitesWithoutReWalking()
+    {
+        // Arrange — populate the store from the clean tree, and record where Web's sites sat.
+        using var fixture = new TempFixtureWorkspace();
+        await using var session = new WorkspaceSession();
+        using var store = new SessionFragmentStore();
+        WorkspaceSnapshot snap1 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        SessionFragmentSet clean = await store.GetFragmentsAsync(snap1, null, Ct);
+        List<FragmentSite> sitesBefore = WebEdgeSites(clean);
+
+        // Act — two comment lines at the top of a Web file: no fact changes, and every site below them moves
+        // down exactly two lines.
+        string homeController = fixture.PathOf(Web, "HomeController.cs");
+        FixtureEdits.EditOnDisk(homeController, content => "// probe one\n// probe two\n" + content);
+        WorkspaceSnapshot snap2 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        SessionFragmentSet edited = await store.GetFragmentsAsync(snap2, null, Ct);
+
+        // Assert — nothing was re-walked. Web's stored fragments were moved instead, and Domain, its only
+        // reverse-dependent, was left alone: a dependent's own sites are in its own files.
+        edited.ReExtractedProjects.ShouldBeEmpty();
+        store.LastReExtractedProjects.ShouldBeEmpty();
+        store.LastRemappedProjects.ShouldBe([Web]);
+        store.FullWalkCount.ShouldBe(1);
+
+        CodebaseModel coldModel = await CodebaseExtractor.ExtractFromSolutionAsync(snap2.Solution, ct: Ct);
+        FragmentMerger.Merge(edited.Fragments)
+            .ShouldModelTheSameAs(coldModel);
+
+        // …and the moved sites themselves, which the model comparison establishes but does not show: the same
+        // files, and every line inside the edited file two lower than it was.
+        List<FragmentSite> sitesAfter = WebEdgeSites(edited);
+        List<int> linesBefore = LinesIn(sitesBefore, homeController);
+        List<int> linesAfter = LinesIn(sitesAfter, homeController);
+        linesBefore.ShouldNotBeEmpty();
+        linesAfter.ShouldBe(linesBefore.Select(line => line + 2));
+        FilesOf(sitesAfter)
+            .ShouldBe(FilesOf(sitesBefore));
+    }
+
+    [Fact]
+    public async Task GetFragmentsAsync_StringLiteralEdit_ReWalksDirtyPlusDependents()
+    {
+        // Arrange
+        using var fixture = new TempFixtureWorkspace();
+        await using var session = new WorkspaceSession();
+        using var store = new SessionFragmentStore();
+        WorkspaceSnapshot snap1 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        await store.GetFragmentsAsync(snap1, null, Ct);
+
+        // Act — a token's text changes and nothing moves line. The shape digest reads token text, so this is
+        // the cheapest edit that is still not trivia.
+        string homeController = fixture.PathOf(Web, "HomeController.cs");
+        FixtureEdits.EditOnDisk(
+            homeController, content => content.Replace("\"total requested\"", "\"total requested!\""));
+        WorkspaceSnapshot snap2 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        SessionFragmentSet edited = await store.GetFragmentsAsync(snap2, null, Ct);
+
+        // Assert — the shape changed, so Web and its reverse-dependent Domain were re-walked, and nothing was
+        // remapped.
+        edited.ReExtractedProjects.ShouldBe([Web, Domain], true);
+        store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
+        store.LastRemappedProjects.ShouldBeEmpty();
+        store.FullWalkCount.ShouldBe(1);
+
+        CodebaseModel coldModel = await CodebaseExtractor.ExtractFromSolutionAsync(snap2.Solution, ct: Ct);
+        FragmentMerger.Merge(edited.Fragments)
+            .ShouldModelTheSameAs(coldModel);
+    }
+
+    [Fact]
+    public async Task GetFragmentsAsync_PreprocessorDirectiveAdded_ReWalks()
+    {
+        // Arrange
+        using var fixture = new TempFixtureWorkspace();
+        await using var session = new WorkspaceSession();
+        using var store = new SessionFragmentStore();
+        WorkspaceSnapshot snap1 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        await store.GetFragmentsAsync(snap1, null, Ct);
+
+        // Act — wrap a method in an always-true conditional. Every token survives and the code stays active,
+        // but a directive is trivia the shape digest deliberately reads.
+        string homeController = fixture.PathOf(Web, "HomeController.cs");
+        FixtureEdits.EditOnDisk(homeController, WrapExportStampInConditional);
+        WorkspaceSnapshot snap2 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        SessionFragmentSet edited = await store.GetFragmentsAsync(snap2, null, Ct);
+
+        // Assert — re-walked rather than remapped, which is conservative here and never wrong.
+        edited.ReExtractedProjects.ShouldBe([Web, Domain], true);
+        store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
+        store.LastRemappedProjects.ShouldBeEmpty();
+        store.FullWalkCount.ShouldBe(1);
+
+        CodebaseModel coldModel = await CodebaseExtractor.ExtractFromSolutionAsync(snap2.Solution, ct: Ct);
+        FragmentMerger.Merge(edited.Fragments)
+            .ShouldModelTheSameAs(coldModel);
+    }
+
+    [Fact]
+    public async Task GetFragmentsAsync_GeneratedBannerInserted_ReWalks()
+    {
+        // Arrange
+        using var fixture = new TempFixtureWorkspace();
+        await using var session = new WorkspaceSession();
+        using var store = new SessionFragmentStore();
+        WorkspaceSnapshot snap1 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        await store.GetFragmentsAsync(snap1, null, Ct);
+
+        // Act — a comment, and so pure trivia by the token test alone; but it is the one comment a fact reads,
+        // so it enters the digest as its verdict and the file's types flip to generated.
+        string homeController = fixture.PathOf(Web, "HomeController.cs");
+        FixtureEdits.EditOnDisk(homeController, content => "// <auto-generated />\n" + content);
+        WorkspaceSnapshot snap2 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        SessionFragmentSet edited = await store.GetFragmentsAsync(snap2, null, Ct);
+
+        // Assert — re-walked, and the cold model is the oracle that the flipped flag really did arrive: a
+        // remap would have kept the old one while moving every line correctly.
+        edited.ReExtractedProjects.ShouldBe([Web, Domain], true);
+        store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
+        store.LastRemappedProjects.ShouldBeEmpty();
+        store.FullWalkCount.ShouldBe(1);
+
+        CodebaseModel coldModel = await CodebaseExtractor.ExtractFromSolutionAsync(snap2.Solution, ct: Ct);
+        FragmentMerger.Merge(edited.Fragments)
+            .ShouldModelTheSameAs(coldModel);
+    }
+
+    [Fact]
+    public async Task GetFragmentsAsync_TokenBearingLineSplit_ReWalks()
+    {
+        // Arrange
+        using var fixture = new TempFixtureWorkspace();
+        await using var session = new WorkspaceSession();
+        using var store = new SessionFragmentStore();
+        WorkspaceSnapshot snap1 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        await store.GetFragmentsAsync(snap1, null, Ct);
+
+        // Act — chop one statement across two lines. The shapes stay equal (only whitespace moved), so this
+        // is the fallback the line map itself refuses rather than the digest.
+        string homeController = fixture.PathOf(Web, "HomeController.cs");
+        FixtureEdits.EditOnDisk(
+            homeController,
+            content => content.Replace(
+                "        log.Append(description);", "        log\n            .Append(description);"));
+        WorkspaceSnapshot snap2 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        SessionFragmentSet edited = await store.GetFragmentsAsync(snap2, null, Ct);
+
+        // Assert — no map, so the project is re-walked; a split line's sites cannot be moved by line alone.
+        edited.ReExtractedProjects.ShouldBe([Web, Domain], true);
+        store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
+        store.LastRemappedProjects.ShouldBeEmpty();
+        store.FullWalkCount.ShouldBe(1);
+
+        CodebaseModel coldModel = await CodebaseExtractor.ExtractFromSolutionAsync(snap2.Solution, ct: Ct);
+        FragmentMerger.Merge(edited.Fragments)
+            .ShouldModelTheSameAs(coldModel);
+    }
+
+    [Fact]
+    public async Task GetFragmentsAsync_TriviaThenRealThenTrivia_ClassifiesEachCallAgainstTheLastWalk()
+    {
+        // Arrange — each call classifies against the text the STORED fragments describe, not against the load,
+        // so a remap has to move that reference forward or the second trivia edit would be measured twice.
+        using var fixture = new TempFixtureWorkspace();
+        await using var session = new WorkspaceSession();
+        using var store = new SessionFragmentStore();
+        WorkspaceSnapshot snap1 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        await store.GetFragmentsAsync(snap1, null, Ct);
+        string homeController = fixture.PathOf(Web, "HomeController.cs");
+
+        // Act/Assert 1 — a comment edit remaps Web.
+        FixtureEdits.EditOnDisk(homeController, content => "// probe one\n" + content);
+        WorkspaceSnapshot snap2 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        SessionFragmentSet first = await store.GetFragmentsAsync(snap2, null, Ct);
+        first.ReExtractedProjects.ShouldBeEmpty();
+        store.LastRemappedProjects.ShouldBe([Web]);
+        CodebaseModel firstCold = await CodebaseExtractor.ExtractFromSolutionAsync(snap2.Solution, ct: Ct);
+        FragmentMerger.Merge(first.Fragments)
+            .ShouldModelTheSameAs(firstCold);
+
+        // Act/Assert 2 — a second comment edit remaps again, against the sites the first one left behind.
+        FixtureEdits.EditOnDisk(homeController, content => "// probe two\n" + content);
+        WorkspaceSnapshot snap3 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        SessionFragmentSet second = await store.GetFragmentsAsync(snap3, null, Ct);
+        second.ReExtractedProjects.ShouldBeEmpty();
+        store.LastRemappedProjects.ShouldBe([Web]);
+        CodebaseModel secondCold = await CodebaseExtractor.ExtractFromSolutionAsync(snap3.Solution, ct: Ct);
+        FragmentMerger.Merge(second.Fragments)
+            .ShouldModelTheSameAs(secondCold);
+
+        // Act/Assert 3 — a real edit re-walks Web and its dependent, and remaps nothing.
+        FixtureEdits.EditOnDisk(
+            homeController, content => content.Replace("\"total requested\"", "\"total requested!\""));
+        WorkspaceSnapshot snap4 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        SessionFragmentSet third = await store.GetFragmentsAsync(snap4, null, Ct);
+        third.ReExtractedProjects.ShouldBe([Web, Domain], true);
+        store.LastRemappedProjects.ShouldBeEmpty();
+        CodebaseModel thirdCold = await CodebaseExtractor.ExtractFromSolutionAsync(snap4.Solution, ct: Ct);
+        FragmentMerger.Merge(third.Fragments)
+            .ShouldModelTheSameAs(thirdCold);
+
+        // Act/Assert 4 — and a comment edit after the re-walk remaps once more.
+        FixtureEdits.EditOnDisk(homeController, content => "// probe three\n" + content);
+        WorkspaceSnapshot snap5 = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        SessionFragmentSet fourth = await store.GetFragmentsAsync(snap5, null, Ct);
+        fourth.ReExtractedProjects.ShouldBeEmpty();
+        store.LastRemappedProjects.ShouldBe([Web]);
+        store.FullWalkCount.ShouldBe(1);
+        CodebaseModel fourthCold = await CodebaseExtractor.ExtractFromSolutionAsync(snap5.Solution, ct: Ct);
+        FragmentMerger.Merge(fourth.Fragments)
+            .ShouldModelTheSameAs(fourthCold);
+    }
+
+    [Fact]
+    public async Task GetFragmentsAsync_MultiTargetedProjectCommentEdit_RemapsBothFrameworksAndLeavesWebAlone()
+    {
+        // Arrange — one name, two compilations, and one file both of them compile: the maps the two
+        // frameworks produce for that file have to agree before either fragment may be moved.
+        using var fixture = new TempFixtureWorkspace("TestSolutions/MultiTfm", "MultiTfm.sln");
+        await using var session = new WorkspaceSession();
+        using var store = new SessionFragmentStore();
+        WorkspaceSnapshot clean = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        await store.GetFragmentsAsync(clean, null, Ct);
+
+        // Act
+        string widget = fixture.PathOf(MultiTfmCore, "Widget.cs");
+        FixtureEdits.EditOnDisk(widget, content => "// probe one\n// probe two\n" + content);
+        WorkspaceSnapshot edited = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        SessionFragmentSet remapped = await store.GetFragmentsAsync(edited, null, Ct);
+
+        // Assert — one name remapped, nothing re-walked, and BOTH of its fragments are still there under their
+        // own frameworks: a remap that dropped or reordered one would strand a framework's facts.
+        remapped.ReExtractedProjects.ShouldBeEmpty();
+        store.LastReExtractedProjects.ShouldBeEmpty();
+        store.LastRemappedProjects.ShouldBe([MultiTfmCore]);
+        store.FullWalkCount.ShouldBe(1);
+        remapped.Fragments.Where(fragment => fragment.ProjectName == MultiTfmCore)
+            .Select(fragment => fragment.TargetFramework)
+            .ShouldBe(["net10.0", "netstandard2.0"]);
+
+        CodebaseModel coldModel = await CodebaseExtractor.ExtractFromSolutionAsync(
+            edited.Solution, null, edited.TargetFrameworks, null, Ct);
+        FragmentMerger.Merge(remapped.Fragments)
+            .ShouldModelTheSameAs(coldModel);
+    }
+
+    // ── helpers ───────────────────────────────────────────────────────────────────────────────────────
+
+    // Wraps HomeController's ExportStamp in an always-true conditional, anchored on the two method
+    // declarations that bracket it so the edit is line-ending agnostic. Every token and every active line
+    // survives; only the two directives are new.
+    private static string WrapExportStampInConditional(string source)
+    {
+        return source.Replace(
+                "    public System.DateTime ExportStamp()", "#if true\n    public System.DateTime ExportStamp()")
+            .Replace(
+                "    public System.DateTime ExportStampUtc()", "#endif\n    public System.DateTime ExportStampUtc()");
+    }
+
+    // Every site on every reference edge of the Web project's fragments, in the order the fragments hold
+    // them — the store's stored positions, read without a merge in between.
+    private static List<FragmentSite> WebEdgeSites(SessionFragmentSet set)
+    {
+        return set.Fragments.Where(fragment => fragment.ProjectName == Web)
+            .SelectMany(fragment => fragment.Edges)
+            .SelectMany(edge => edge.Sites)
+            .ToList();
+    }
+
+    private static List<int> LinesIn(IEnumerable<FragmentSite> sites, string file)
+    {
+        return sites.Where(site => string.Equals(site.File, file, PathComparison.Comparison))
+            .Select(site => site.Line)
+            .ToList();
+    }
+
+    private static List<string> FilesOf(IEnumerable<FragmentSite> sites)
+    {
+        return sites.Select(site => site.File)
+            .Distinct(PathComparison.Comparer)
+            .Order(PathComparison.Comparer)
+            .ToList();
     }
 }

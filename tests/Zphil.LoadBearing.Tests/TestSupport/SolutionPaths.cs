@@ -53,6 +53,9 @@ internal static class SolutionPaths
             }
             catch (UnauthorizedAccessException)
             {
+                // A directory this process cannot enumerate is one discovery cannot enumerate either, so
+                // nothing behind the denial can quietly void the row: the walk-up would throw there rather
+                // than resolve a solution.
                 continue;
             }
 

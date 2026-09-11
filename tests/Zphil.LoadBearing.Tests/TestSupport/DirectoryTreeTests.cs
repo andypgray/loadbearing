@@ -4,9 +4,9 @@ using Xunit;
 namespace Zphil.LoadBearing.Tests.TestSupport;
 
 /// <summary>
-///     The walk's decisions, one row each. None of them is recoverable from the callers: all three copied
-///     what they needed before the consolidation and would go on doing so, so nothing but these rows reds if
-///     a later edit reaches for <see cref="SearchOption.AllDirectories" /> again, drops the overwrite, or
+///     The walk's decisions, one row each. None of them is recoverable from the callers — each copies only
+///     what it needs and would go on working with any of the three reversed — so nothing but these rows reds
+///     if a later edit reaches for <see cref="SearchOption.AllDirectories" /> again, drops the overwrite, or
 ///     starts mirroring directories the predicate emptied.
 /// </summary>
 public sealed class DirectoryTreeTests

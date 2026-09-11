@@ -23,7 +23,6 @@ namespace Zphil.LoadBearing.Roslyn.Baselines;
 ///     <c>siteCount</c> is a stranger in a legacy file rather than an optional key, and the
 ///     recanonicalization, because a legacy file's stored digest was computed in the grammar of its day.
 ///     A write always composes the current version, so any write is also the upgrade.
-///     Lives in the Roslyn host project so both the CLI and the xUnit adapter share it.
 /// </remarks>
 internal static class BaselineStore
 {
@@ -31,9 +30,12 @@ internal static class BaselineStore
     ///     Builds the <see cref="BaselineIndex" /> for a model's ratcheted rules — Migrate and Quarantine
     ///     containment (any rule with a <see cref="ArchRule.BaselinePath" />): resolves each rule's
     ///     baseline path against <paramref name="solutionDirectory" />, parses each distinct file once
-    ///     (verifying its digest — tamper fails fast), and captures the matching section. A missing file
-    ///     or missing section leaves the rule uncaptured. A scope tripwire (no baseline path) is skipped.
+    ///     (verifying its digest — tamper fails fast), and captures the matching section.
     /// </summary>
+    /// <remarks>
+    ///     A missing file or missing section leaves the rule uncaptured. A scope tripwire (no baseline
+    ///     path) is skipped.
+    /// </remarks>
     public static BaselineIndex LoadForModel(ArchitectureModel model, string solutionDirectory)
     {
         var sections = new Dictionary<string, RuleBaseline>(StringComparer.Ordinal);

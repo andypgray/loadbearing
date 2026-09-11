@@ -135,6 +135,8 @@ internal static class ParentProcessWatcher
         }
     }
 
+    // The search path is pinned to System32 so the loader resolves the real ntdll and cannot bind a copy
+    // planted beside the executable or anywhere else on the default probing path (CA5392).
     [DllImport("ntdll.dll")]
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     private static extern int NtQueryInformationProcess(

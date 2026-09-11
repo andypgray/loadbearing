@@ -18,9 +18,8 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 ///         without its own redirected stdin inherits a duplicate of this server's, which under a live
 ///         client is the JSON-RPC pipe the stdio transport is permanently parked on in a synchronous
 ///         read; Git for Windows probes its standard handles at startup and that probe blocks forever
-///         against such a pipe. The child never reached its own entry point, the 30-second ceiling
-///         expired, and the tool call failed 100% of the time — while every test stayed green, because
-///         <see cref="McpPipelineHarness" /> drives the server in-process over memory pipes and the CLI
+///         against such a pipe, so the child never reaches its own entry point. No in-process suite can
+///         see it: <see cref="McpPipelineHarness" /> drives the server over memory pipes and the CLI
 ///         inherits a stdin that is already at EOF. Only a real child over real stdio sees it, so this
 ///         test spawns one.
 ///     </para>

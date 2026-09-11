@@ -13,14 +13,19 @@ namespace Zphil.LoadBearing.Tests.Cli;
 /// <summary>
 ///     End-to-end <c>graph</c> against the real MyApp fixture solution — the pre-spec codebase survey.
 ///     Spec-free (no <c>--spec</c>), read-only (no temp copy), always exits 0. The human survey and the
-///     <c>--json</c> document (schemaVersion 1) are both pinned by goldens. The fixture truth behind the
-///     numbers: 3 projects; Domain→Web = 2 observed type-pairs; Web→Legacy.Billing = 3; Web→System.Data = 2;
-///     Web→System.Threading = 2 (HomeController's Task and Task`1 return forms); Web→Microsoft.Extensions = 2
-///     (ServiceWiring's IServiceCollection parameter and the AddSingleton/AddScoped/AddTransient extensions);
-///     Domain→System = 3 (OrderRuleViolation's Exception base, OrderApproval's InvalidOperationException throw
-///     and RetryPolicy's `when`-filtered caught Exception — a filter never suppresses the reference edge)
-///     and Web→System = 4 (ReportEndpoint's and ReportPublisher's caught Exception among them; a rethrowing
-///     catch mints its reference edge like any other).
+///     <c>--json</c> document (schemaVersion 1) are both pinned by goldens.
+/// </summary>
+/// <remarks>
+///     <para>
+///         The fixture truth behind the numbers: 3 projects; Domain→Web = 2 observed type-pairs;
+///         Web→Legacy.Billing = 3; Web→System.Data = 2; Web→System.Threading = 2 (HomeController's Task and
+///         Task`1 return forms); Web→Microsoft.Extensions = 2 (ServiceWiring's IServiceCollection parameter
+///         and the AddSingleton/AddScoped/AddTransient extensions); Domain→System = 3 (OrderRuleViolation's
+///         Exception base, OrderApproval's InvalidOperationException throw and RetryPolicy's
+///         `when`-filtered caught Exception — a filter never suppresses the reference edge) and
+///         Web→System = 4 (ReportEndpoint's and ReportPublisher's caught Exception among them; a rethrowing
+///         catch mints its reference edge like any other).
+///     </para>
 ///     <para>
 ///         The narrowing rows below pin the two knobs and the one automatic behaviour. <c>--overview</c>
 ///         coarsens the grain (namespace inventories elided, everything else intact); <c>--projects</c>
@@ -30,7 +35,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///         solution, and a fitter carrying the caller's response budget walks the ladder the runner offers,
 ///         degrading the grain instead of cutting the document.
 ///     </para>
-/// </summary>
+/// </remarks>
 [Collection("Serial")]
 public sealed class GraphCommandTests
 {

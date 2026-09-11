@@ -15,7 +15,7 @@ namespace Zphil.LoadBearing.Tests.Checking;
 ///     the two §5.7 mutability verbs carry real semantics and their own files), the
 ///     projection kind filter, <c>Returning</c> at the definition level (exact / open-generic / void /
 ///     multi-anchor), the deterministic <c>(DeclaringType.FullName, SymbolId)</c> ordering, the member
-///     escape hatches reaching real extracted facts end-to-end (acceptance box 2), the empty
+///     escape hatches reaching real extracted facts end-to-end, the empty
 ///     member-subject failure, the ratchet round-trip, the closed-generic check-time backstop, and the
 ///     human/JSON member-shape rendering. Pinned strings are the spec — moving one is a deliberate act.
 /// </summary>
@@ -641,7 +641,7 @@ public sealed class MemberSubjectVerbTests
             .ShouldBe(["P:App.Order.Alpha.Prop", "M:App.Order.Zebra.Run"]);
     }
 
-    // ── escape hatches reaching real facts (acceptance box 2) ─────────────────────────────────────────
+    // ── escape hatches reaching real facts ───────────────────────────────────────────────────────────
 
     [Fact]
     public void Where_EscapeHatch_ReachesIsAsyncEndToEnd()

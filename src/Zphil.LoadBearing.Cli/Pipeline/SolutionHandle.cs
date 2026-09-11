@@ -67,7 +67,7 @@ internal sealed class SolutionHandle(
     ///     computed under the same load generation or the result of running that callback. It captures the
     ///     session's <see cref="SpecResolutionCache" /> and this call's generation, which is what makes an
     ///     edit to a <c>.cs</c> file free and a structural change a miss. Null falls straight through to the
-    ///     callback, so the CLI path resolves exactly as it always did.
+    ///     callback, so the CLI path resolves with no memo at all.
     /// </summary>
     /// <remarks>
     ///     The cold resolution goes down as a callback rather than the seam handing over its inputs, so

@@ -17,14 +17,8 @@ namespace Zphil.LoadBearing.Cli.Mcp;
 ///         makes that coherent: the tools repeat the same discovery and the same message.
 ///     </para>
 ///     <para>
-///         <b>How an MCP tool call differs from a CLI run is a four-part policy, and it lives here.</b> Every
-///         tool asks for the JSON document (the tools return documents, never human text); bypasses the
-///         persisted extraction cache (the warm workspace and <c>cache.json</c> keep independent lifetimes
-///         and must never race on the file); never replays a build capture (latency-critical callers ride the
-///         session); and reports an incomplete model inside its answer rather than refusing to produce one,
-///         because this surface has no exit code to carry the verdict — <c>workspaceDiagnostics</c> and
-///         <c>modelIncomplete</c> do. The factories below name each leg once, as a named constant, so no
-///         tool body can spell one wrong and no leg can change in one place only.
+///         How a tool call differs from a CLI run is the run policy the constants below name, one leg each,
+///         so no tool body can spell one wrong and no leg can change in one place only.
 ///     </para>
 /// </remarks>
 /// <param name="Solution">The positional solution argument (a file, a directory, or null for cwd walk-up).</param>

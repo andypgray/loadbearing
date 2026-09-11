@@ -12,16 +12,22 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 /// <summary>
 ///     Drives a real MCP client against the server over in-memory pipes to lock down
 ///     <see cref="Zphil.LoadBearing.Cli.Mcp.Pipeline.GlobalCallToolFilter" />'s branches — silent user-error, logged
-///     unexpected-error, truncated success, unknown-parameter guard — end to end (acceptance box
-///     2). Most rows ride the <c>arch_explain</c> DLL fast path (a built-DLL spec resolves with no
-///     workspace), so the whole stack is proven in milliseconds; the truncation rows must call
-///     <c>arch_graph</c>, because the narrowing hint is keyed on the tool name and only a real survey
-///     proves it travels, and the bool-coercer row calls it as the only tool declaring a flag — that one
-///     fails at binding, ahead of any survey. Serialized with the watchdog suites: the
-///     filter brackets each call with the shared
-///     <see cref="Zphil.LoadBearing.Cli.Mcp.Infrastructure.IdleTimeoutWatchdog" />
-///     in-flight counter, so it must not run concurrently with the tests that read/reset that static.
+///     unexpected-error, truncated success, unknown-parameter guard — end to end.
 /// </summary>
+/// <remarks>
+///     <para>
+///         Most rows ride the <c>arch_explain</c> DLL fast path (a built-DLL spec resolves with no
+///         workspace), so the whole stack is proven in milliseconds; the truncation rows must call
+///         <c>arch_graph</c>, because the narrowing hint is keyed on the tool name and only a real survey
+///         proves it travels, and the bool-coercer row calls it as the only tool declaring a flag — that
+///         one fails at binding, ahead of any survey.
+///     </para>
+///     <para>
+///         Serialized with the watchdog suites: the filter brackets each call with the shared
+///         <see cref="Zphil.LoadBearing.Cli.Mcp.Infrastructure.IdleTimeoutWatchdog" /> in-flight counter,
+///         so it must not run concurrently with the tests that read/reset that static.
+///     </para>
+/// </remarks>
 [Collection("Serial")]
 public sealed class GlobalCallToolFilterTests
 {

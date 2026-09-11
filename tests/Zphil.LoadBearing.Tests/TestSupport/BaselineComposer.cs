@@ -9,8 +9,9 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 /// </summary>
 /// <remarks>
 ///     The ordinal-comparer dictionary <see cref="BaselineFormat.ComposeFile" /> takes is assembly detail,
-///     not something a row is asserting — spelling it out at every call site put the composer's own input
-///     shape into six test files, where a change to it would have to be chased through all of them.
+///     not something a row is asserting — spelling it out at every call site would put the composer's own
+///     input shape into every test file that composes one, where a change to it would have to be chased
+///     through all of them.
 /// </remarks>
 internal static class BaselineComposer
 {

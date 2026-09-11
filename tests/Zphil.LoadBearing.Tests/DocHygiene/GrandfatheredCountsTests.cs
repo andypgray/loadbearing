@@ -350,7 +350,6 @@ public sealed class GrandfatheredCountsTests
         // fixture solutions carry directories of the same shape further down the tree.
         string[] tracked =
         [
-            "arch/baselines/mcp/env-through-seam.json",
             "arch/baselines/roslyn/msbuild-bootstrap/containment.json",
             "examples/Meridian/arch/baselines/time/inject-clock.json",
             "tests/Zphil.LoadBearing.Tests/Fixtures/TestSolutions/MyApp/arch/baselines/legacy/billing/containment.json",
@@ -361,7 +360,7 @@ public sealed class GrandfatheredCountsTests
         IReadOnlyList<string> files = GrandfatheredCounts.BaselineFiles(string.Empty, tracked);
 
         // Assert
-        files.ShouldBe(["arch/baselines/mcp/env-through-seam.json", "arch/baselines/roslyn/msbuild-bootstrap/containment.json"]);
+        files.ShouldBe(["arch/baselines/roslyn/msbuild-bootstrap/containment.json"]);
     }
 
     [Theory]

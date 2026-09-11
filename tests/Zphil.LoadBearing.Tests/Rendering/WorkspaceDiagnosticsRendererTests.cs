@@ -13,13 +13,13 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 ///     surface lost it: the tools pass <see cref="TextWriter.Null" /> there. Pure over an in-memory value,
 ///     so no workspace is opened; the note's own text and the rendered-once-per-verb behaviour are pinned by
 ///     <c>WorkspaceDiagnosticsGateE2ETests</c>.
-///     <para>
-///         The last two rows share the file's economics rather than its subject: they pin what
-///         <see cref="WorkspaceTrustStamp.From(WorkspaceDiagnostics, string)" /> makes of an unsupported
-///         project, over a hand-built <see cref="WorkspaceDiagnostics" /> and no bed at all — which is what a
-///         fixture solution per project kind would have cost.
-///     </para>
 /// </summary>
+/// <remarks>
+///     The last two rows share the file's economics rather than its subject: they pin what
+///     <see cref="WorkspaceTrustStamp.From(WorkspaceDiagnostics, string)" /> makes of an unsupported
+///     project, over a hand-built <see cref="WorkspaceDiagnostics" /> and no bed at all — which is what a
+///     fixture solution per project kind would have cost.
+/// </remarks>
 public sealed class WorkspaceDiagnosticsRendererTests
 {
     [Fact]

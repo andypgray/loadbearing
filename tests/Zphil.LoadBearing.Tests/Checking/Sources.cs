@@ -8,7 +8,7 @@ namespace Zphil.LoadBearing.Tests.Checking;
 ///     <see cref="CodebaseModel" /> extracted from it.
 /// </summary>
 /// <remarks>
-///     Two jobs, and the second is why the catch scenes moved here. A scene many rows check is compiled
+///     Two jobs, and the second is why the catch scenes live here. A scene many rows check is compiled
 ///     once rather than once per row — extraction is the expensive half of a fast-path test. And a scene
 ///     several <em>classes</em> check is held once rather than copied into each, because those copies are
 ///     the claim: sibling verbs asserting different verdicts over the same input only mean that while the

@@ -43,10 +43,9 @@ internal static class ResponseTruncator
     // response can reach here, so anything that still overruns has already been through the ladder and
     // overview: true would only name a rung it took. What is left in each case is the subject.
     //
-    // Neither offers to redirect the CLI to a file either, though both once did. A field test caught an agent
-    // quoting that clause back as its reason for abandoning the tool surface and paging the whole document
-    // through the shell — the exact move the served instructions call out by name — so the trailer was the
-    // product contradicting itself, and text at the moment of failure is what a reader acts on.
+    // Neither offers to redirect the CLI to a file either: paging a document through the shell is the exact
+    // move the served instructions call out by name, and text at the moment of failure is what a reader acts
+    // on, so an offer here would be the product contradicting itself.
     private static readonly FrozenDictionary<string, string> NarrowingHints = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         [ArchToolNames.Graph] =

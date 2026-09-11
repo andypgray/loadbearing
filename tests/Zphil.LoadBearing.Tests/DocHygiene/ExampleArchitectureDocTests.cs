@@ -77,17 +77,22 @@ public sealed class ExampleArchitectureDocTests
 
     /// <summary>
     ///     The gate on the survey fence's declared-members default, read straight off the committed
-    ///     artifacts. Each example's spec project references the LoadBearing packages it is written
-    ///     against, so the workspace loads this repository's projects on every example render; only the
-    ///     fence's membership filter keeps them off a page captioned "Projects in this solution". The
-    ///     render lines carry no scope flag any more, which is the point — so if that default regressed
-    ///     there would be nothing else between the passengers and the four committed drawings.
+    ///     artifacts.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Each example's spec project references the LoadBearing packages it is written against, so
+    ///         the workspace loads this repository's projects on every example render; only the fence's
+    ///         membership filter keeps them off a page captioned "Projects in this solution". The render
+    ///         lines carry no scope flag, which is the point — so if that default regressed there would be
+    ///         nothing else between the passengers and the four committed drawings.
+    ///     </para>
     ///     <para>
     ///         The second half closes the same hole from the other side: whatever narrows the fence could
     ///         narrow it too far and drop a project the example genuinely owns, and reading the drawing
     ///         alone cannot say which it did. The solution file can.
     ///     </para>
-    /// </summary>
+    /// </remarks>
     [Theory]
     [MemberData(nameof(ExampleDocs))]
     public void ExampleArchitectureDoc_SurveysThisExamplesProjectsAndNoOthers(

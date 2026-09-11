@@ -83,9 +83,8 @@ public sealed class ModelPipelineSpecLoadFailureTests
         // Act
         var thrown = Should.Throw<UserErrorException>(() => ModelPipeline.LoadModel(stagedSpec));
 
-        // Assert: a net48 spec has no .deps.json, so the remedy keys on an absent manifest — this pin
-        // moved deliberately off the packaging remedy it used to assert, which was only ever right for a
-        // package the manifest names.
+        // Assert: a net48 spec has no .deps.json, so the remedy keys on an absent manifest — and never on
+        // the packaging remedy, which is only ever right for a package the manifest names.
         thrown.InnerException.ShouldBeOfType<FileNotFoundException>();
         thrown.Message.ShouldStartWith(
             "The spec assembly 'Zphil.LoadBearing.LegacySpec' failed to load its dependency "

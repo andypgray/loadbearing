@@ -7,10 +7,12 @@ namespace Zphil.LoadBearing.Tests.Caching;
 /// <summary>
 ///     <see cref="CacheLocations" /> path derivation: the default cache root is
 ///     <c>%LOCALAPPDATA%/Zphil.LoadBearing/cache</c>, and a null override falls back to it — so a derived
-///     cache-file path for any solution roots there and is named <c>cache.json</c>. The type reads no
-///     environment variable itself (the override parameter is the only seam), keeping the Roslyn project off
-///     the <c>mcp/env-through-seam</c> ratchet.
+///     cache-file path for any solution roots there and is named <c>cache.json</c>.
 /// </summary>
+/// <remarks>
+///     The type reads no environment variable itself — the override parameter is the only seam — which is
+///     what keeps the Roslyn project off the <c>mcp/env-through-seam</c> law.
+/// </remarks>
 public sealed class CacheLocationsTests
 {
     [Fact]

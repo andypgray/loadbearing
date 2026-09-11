@@ -16,6 +16,7 @@ internal sealed class PackedNineSpec : IArchitectureSpec
 {
     public void Define(Arch arch)
     {
+        Selection interchange = arch.Types.InNamespace("Meridian.Interchange.*");
         Selection host = arch.Namespace("Meridian.Interchange.Host.*");
 
         DotNetGuidance.ReuseHttpClient(arch, arch.Types, host, PackPosture.Enforce,
@@ -32,16 +33,16 @@ internal sealed class PackedNineSpec : IArchitectureSpec
         DotNetGuidance.NoCaptiveDependencies(arch, arch.Registered(Lifetime.Singleton), PackPosture.Enforce,
             "Resolve the scoped or transient service per unit of work inside an IServiceScopeFactory scope, as ScopedDispatchRunner does; take only singleton-safe dependencies in the constructor.");
 
-        DotNetGuidance.AsyncSuffix(arch, arch.Types.InNamespace("Meridian.Interchange.*"), PackPosture.Enforce);
+        DotNetGuidance.AsyncSuffix(arch, interchange, PackPosture.Enforce);
 
-        DotNetGuidance.NoGeneralCatch(arch, arch.Types.InNamespace("Meridian.Interchange.*"),
+        DotNetGuidance.NoGeneralCatch(arch, interchange,
             arch.Types.DerivedFrom<BackgroundService>(), PackPosture.Enforce,
             "Catch the specific exception you can handle; the only sanctioned catch-all is the dispatcher's poll loop, where OutboxDispatcher logs and continues to the next poll.");
 
-        DotNetGuidance.AcceptCancellation(arch, arch.Types.InNamespace("Meridian.Interchange.*"), PackPosture.Enforce,
+        DotNetGuidance.AcceptCancellation(arch, interchange, PackPosture.Enforce,
             "Add a CancellationToken parameter and flow OutboxDispatcher's stoppingToken through the call chain, as ScopedDispatchRunner and OutboxProcessor already do.");
 
-        DotNetGuidance.NoMappingAttributes(arch, arch.Types.InNamespace("Meridian.Interchange.*"), PackPosture.Enforce);
+        DotNetGuidance.NoMappingAttributes(arch, interchange, PackPosture.Enforce);
     }
 }
 

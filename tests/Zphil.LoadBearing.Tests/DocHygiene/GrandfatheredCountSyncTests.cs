@@ -35,19 +35,12 @@ public sealed class GrandfatheredCountSyncTests
     private const string InterchangeRoot = "examples/Meridian.Interchange";
     private const string OperationsRoot = "examples/Meridian.Operations";
 
-    /// <summary>
-    ///     This repository's own root, the baseline base for docs quoting a check over this solution
-    ///     rather than over an example. Empty because its baselines are the ones at <c>arch/baselines/</c>.
-    /// </summary>
-    private const string SelfRoot = "";
-
     private const string InlineSql = "data-access/no-inline-sql";
     private const string InjectClock = "time/inject-clock";
     private const string AsyncSuffix = "naming/async-suffix";
     private const string ClearanceContainment = "clearance/engine/containment";
     private const string DemurrageContainment = "demurrage/engine/containment";
     private const string NoSyncOverAsync = "async/no-sync-over-async";
-    private const string EnvThroughSeam = "mcp/env-through-seam";
 
     /// <summary>The count-quoting docs, each paired with the root whose baselines it quotes.</summary>
     private static readonly (string Doc, string ExampleRoot)[] CountDocs =
@@ -57,9 +50,10 @@ public sealed class GrandfatheredCountSyncTests
         (MeridianStoryboard, MeridianRoot),
         (InterchangeReadme, InterchangeRoot),
         (OperationsReadme, OperationsRoot),
-        // The root README's dogfood spine quotes a self-check over this solution, so its counts come from
-        // this repository's own baselines.
-        (RootReadme, SelfRoot)
+        // The root README's dogfood spine quotes a self-check over this solution, but this repository
+        // grandfathers nothing outside a quarantine, so the only counts it quotes are the Meridian
+        // ratchet its `As SARIF` section is cut from.
+        (RootReadme, MeridianRoot)
     ];
 
     private static readonly DocGate<GrandfatheredCount> Gate = new(
@@ -131,11 +125,11 @@ public sealed class GrandfatheredCountSyncTests
             "{0} edge, one owner",
             [DemurrageContainment],
             GrandfatheredCounts.CountStyle.TitleWord),
-        new(RootReadme, SelfRoot,
-            // The SARIF section's own claim about this repository's one ratcheted rule. It said "four"
-            // for two days after the baseline shrank to two, which is the drift this gate now catches.
+        new(RootReadme, MeridianRoot,
+            // The SARIF section's claim about the Meridian ratchet it is cut from. Its predecessor said
+            // "four" for two days after that baseline shrank to two, which is the drift this gate catches.
             "Its {0} baselined sites keep the rule green",
-            [EnvThroughSeam],
+            [InlineSql],
             GrandfatheredCounts.CountStyle.Word)
     ];
 

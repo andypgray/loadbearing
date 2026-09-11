@@ -5,9 +5,8 @@ namespace Zphil.LoadBearing.Model;
 /// <summary>
 ///     A refinement on a <see cref="MemberSelection" /> — a closed hierarchy so each member adjective
 ///     owns its own prose fragment (GRAMMAR §2 admission rule, §4.6). Reuses
-///     <see cref="AdjectivePlacement" />: member adjectives are either <see cref="AdjectivePlacement.Inline" />
-///     reduced relative clauses or the sentence-final <c>Where</c>; there is no head substitution
-///     (the projection fixes the head, §6).
+///     <see cref="AdjectivePlacement" /> minus <see cref="AdjectivePlacement.Head" />: the projection
+///     fixes the head, so no member adjective substitutes it (§6).
 /// </summary>
 internal abstract class MemberAdjective
 {

@@ -46,11 +46,18 @@ internal static class GeneratedSourceSignals
         return HasGeneratedBanner(tree);
     }
 
-    // The banner is only a banner where it leads the file, so this reads the leading trivia of the first
-    // token and nothing else: a mention anywhere further down is prose about the convention, not a claim
-    // under it. Directive trivia is skipped rather than stopping the scan — a Razor view opens with
-    // #pragma checksum and puts its banner on the line after.
-    private static bool HasGeneratedBanner(SyntaxTree tree)
+    /// <summary>
+    ///     Whether <paramref name="tree" /> opens with the marker comment the convention puts above the
+    ///     first token — the banner half of <see cref="IsGeneratedTree" />, whose other half is the
+    ///     workspace's provenance answer and so cannot be asked of a tree alone.
+    /// </summary>
+    /// <remarks>
+    ///     The banner is only a banner where it leads the file, so this reads the leading trivia of the
+    ///     first token and nothing else: a mention anywhere further down is prose about the convention,
+    ///     not a claim under it. Directive trivia is skipped rather than stopping the scan — a Razor view
+    ///     opens with #pragma checksum and puts its banner on the line after.
+    /// </remarks>
+    internal static bool HasGeneratedBanner(SyntaxTree tree)
     {
         foreach (SyntaxTrivia trivia in tree.GetRoot().GetLeadingTrivia())
         {

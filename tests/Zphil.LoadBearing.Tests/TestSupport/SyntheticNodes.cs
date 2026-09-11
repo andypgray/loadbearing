@@ -11,7 +11,7 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 /// </summary>
 /// <remarks>
 ///     One spelling of the thirteen-argument <see cref="TypeNode" /> constructor, so a slot added to it is
-///     one edit here rather than one per test file that used to carry its own copy.
+///     one edit here rather than one per test file.
 /// </remarks>
 internal static class SyntheticNodes
 {

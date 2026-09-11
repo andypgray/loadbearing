@@ -45,7 +45,7 @@ The compiler is the source of truth for your code. LoadBearing is the source of 
 
 ## This repo's own spec
 
-LoadBearing governs itself. Thirty-five rules over this repository's real code, across eight declared layers, live in [`LoadBearingArchSpec.cs`](https://github.com/andypgray/loadbearing/blob/main/arch/Zphil.LoadBearing.ArchSpec/LoadBearingArchSpec.cs), and every fence from here down to [This page is tested](#this-page-is-tested) is that spec, or this solution under it, on one surface after another. Take the rule that keeps the CLI off stdout — `host` is the layer the CLI project defines:
+LoadBearing governs itself. Thirty-five rules over this repository's real code, across eight declared layers, live in [`LoadBearingArchSpec.cs`](https://github.com/andypgray/loadbearing/blob/main/arch/Zphil.LoadBearing.ArchSpec/LoadBearingArchSpec.cs), and every fence from here down to [This page is tested](#this-page-is-tested) is that spec, or this solution under it, on one surface after another — bar the two under [As SARIF](#as-sarif), which come from the Meridian example, because showing a ratchet needs live debt and this repository has paid its own off. Take the rule that keeps the CLI off stdout — `host` is the layer the CLI project defines:
 
 ```csharp
         arch.Rule("cli/no-stdout")
@@ -57,6 +57,7 @@ LoadBearing governs itself. Thirty-five rules over this repository's real code, 
             .Because("Stdout is a protocol channel here — the MCP server speaks JSON-RPC over it and CLI " +
                      "output flows through System.CommandLine's console — so a direct Console write corrupts " +
                      "the wire and is invisible to the in-process tests.")
+            .Citation("https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#stdio")
             .Fix("Write CLI output through the command's InvocationConfiguration console; route server " +
                  "diagnostics to the logger or Console.Error.");
 ```
@@ -68,7 +69,7 @@ Nothing in the build system stops the CLI writing to `Console`, and the MCP serv
 `loadbearing render` derives the rule sentence from the constraint, carries the `Because` across verbatim, and writes the result into the managed block of this repository's committed [`AGENTS.md`](https://github.com/andypgray/loadbearing/blob/main/AGENTS.md), the convention file Claude Code, Codex, Cursor, and Copilot read:
 
 ```markdown
-- `cli/no-stdout` — The Host layer must not use `Console.Out`, `Console.Write()` or `Console.WriteLine()`. Stdout is a protocol channel here — the MCP server speaks JSON-RPC over it and CLI output flows through System.CommandLine's console — so a direct Console write corrupts the wire and is invisible to the in-process tests.
+- `cli/no-stdout` — The Host layer must not use `Console.Out`, `Console.Write()` or `Console.WriteLine()`. Stdout is a protocol channel here — the MCP server speaks JSON-RPC over it and CLI output flows through System.CommandLine's console — so a direct Console write corrupts the wire and is invisible to the in-process tests. See <https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#stdio>.
 ```
 
 Nobody wrote that sentence, and nobody can let it go stale: [`SelfSpecTests.AgentsMd_IsCurrent`](https://github.com/andypgray/loadbearing/blob/main/tests/Zphil.LoadBearing.Tests/Dogfood/SelfSpecTests.cs) composes the block in process and asserts the committed file already equals it. Its sibling `ScopedCards_AreCurrent` holds the whole class the same way, every per-directory card this repository commits, and also fails on a card that no rule placement produced, so one orphaned by a spec change cannot stay behind being read. The prose an agent reads is provably the spec the build enforces. Agents that query rather than read get the same model over MCP (`loadbearing mcp`).
@@ -82,13 +83,14 @@ Suppose an agent adds a progress printer to the CLI so a slow solution load stop
 ```text
 FAIL cli/no-stdout — The Host layer must not use `Console.Out`, `Console.Write()` or `Console.WriteLine()`.
   because: Stdout is a protocol channel here — the MCP server speaks JSON-RPC over it and CLI output flows through System.CommandLine's console — so a direct Console write corrupts the wire and is invisible to the in-process tests.
+  citation: https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#stdio
   fix: Write CLI output through the command's InvocationConfiguration console; route server diagnostics to the logger or Console.Error.
   subject: 154 types, 1 generated
   src/Zphil.LoadBearing.Cli/Rendering/ProgressPrinter.cs:10 — Zphil.LoadBearing.Cli.Rendering.ProgressPrinter uses System.Console.WriteLine()
   src/Zphil.LoadBearing.Cli/Rendering/ProgressPrinter.cs:15 — Zphil.LoadBearing.Cli.Rendering.ProgressPrinter uses System.Console.WriteLine()
 ```
 
-That stanza is one rule's worth of the board the wrapper hands back whole. It carries the four things an agent needs to act without asking a human: the rule ID, the reason, the fix, and the exact `file:line` of every offending write. The `subject:` line is scope rather than a finding, and appears only when a generator wrote some of what the rule swept. The agent routes the output through the command's console instead, the next check is green, and the block clears in the same turn, before the change lands.
+That stanza is one rule's worth of the board the wrapper hands back whole. It carries the five things an agent needs to act without asking a human: the rule ID, the reason, the page that reason rests on, the fix, and the exact `file:line` of every offending write. The `subject:` line is scope rather than a finding, and appears only when a generator wrote some of what the rule swept. The agent routes the output through the command's console instead, the next check is green, and the block clears in the same turn, before the change lands.
 
 ## In xUnit
 
@@ -106,50 +108,48 @@ Each test's display name is its rule ID, so a broken rule is named in the run su
 
 ## As SARIF
 
-`check --sarif` writes the same verdict as SARIF 2.1.0, which is what GitHub code scanning reads. This repository's one `Migrate` rule is retiring direct `System.Environment` reads out of the MCP infrastructure, over a counted baseline:
+`check --sarif` writes the same verdict as SARIF 2.1.0, which is what GitHub code scanning reads. A `Migrate` rule is where that matters most, and this repository no longer has one: its own ratchet reached zero and was promoted, which is the last step of the recipe rather than a gap in it. So the two fences below are the [Meridian example](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian), a legacy monolith retiring inline SQL out of its controllers over a counted baseline:
 
 ```csharp
-        arch.Rule("mcp/env-through-seam")
+        arch.Rule("data-access/no-inline-sql")
             .Migrate(
-                from: "MCP infrastructure reads process env vars via System.Environment directly.",
-                to: arch.Types.InNamespace("Zphil.LoadBearing.Cli.Mcp.Infrastructure.*")
-                    .Except(arch.Types.Named("SystemEnvironment"))
-                    .MustNotReference(typeof(Environment)))
-            .Because("A single IEnvironment seam keeps the MCP pipeline testable without mutating real " +
-                     "process state.")
-            .Fix("Inject IEnvironment (see SystemEnvironment); read via GetVariable.");
+                from: "Controllers open SqlConnection and run inline SQL directly.",
+                to: arch.Namespace("Meridian.Web.Controllers.*")
+                    .MustNotReference(typeof(SqlConnection), typeof(SqlCommand)))
+            .Because("Data access behind a repository can be tested and swapped; SQL in the request path cannot.")
+            .Fix("Move the SQL into a repository; see BookingRepository.");
 ```
 
-Its two baselined sites keep the rule green at the command line and still reach code scanning, as note-level results marked suppressed, so the burndown is visible to anyone reviewing without ever failing a build. One result object from a fresh run:
+Its twelve baselined sites keep the rule green at the command line and still reach code scanning, as note-level results marked suppressed, so the burndown is visible to anyone reviewing without ever failing a build. One result object from a fresh run:
 
 ```json
 {
-  "ruleId": "mcp/env-through-seam",
+  "ruleId": "data-access/no-inline-sql",
   "level": "note",
   "message": {
-    "text": "Zphil.LoadBearing.Cli.Mcp.Infrastructure.SerilogConfiguration references System.Environment"
+    "text": "Meridian.Web.Controllers.CustomsController references Microsoft.Data.SqlClient.SqlCommand"
   },
   "locations": [
     {
       "physicalLocation": {
         "artifactLocation": {
-          "uri": "src/Zphil.LoadBearing.Cli/Mcp/Infrastructure/SerilogConfiguration.cs",
+          "uri": "src/Meridian.Web/Controllers/CustomsController.cs",
           "uriBaseId": "SRCROOT"
         },
         "region": {
-          "startLine": 21
+          "startLine": 27
         }
       }
     }
   ],
   "partialFingerprints": {
-    "loadBearingViolationIdentity/v1": "v1|T:Zphil.LoadBearing.Cli.Mcp.Infrastructure.SerilogConfiguration|T:System.Environment||src/Zphil.LoadBearing.Cli/Mcp/Infrastructure/SerilogConfiguration.cs|0"
+    "loadBearingViolationIdentity/v1": "v1|T:Meridian.Web.Controllers.CustomsController|T:Microsoft.Data.SqlClient.SqlCommand||src/Meridian.Web/Controllers/CustomsController.cs|0"
   },
   "baselineState": "unchanged",
   "suppressions": [
     {
       "kind": "external",
-      "justification": "grandfathered in arch/baselines/mcp/env-through-seam.json"
+      "justification": "grandfathered in arch/baselines/data-access/no-inline-sql.json"
     }
   ]
 }
@@ -158,25 +158,25 @@ Its two baselined sites keep the rule green at the command line and still reach 
 A rule that is genuinely red lands the same shape at `error` level, with `"baselineState": "new"` and no `suppressions` array, so a reviewer can tell house debt from a fresh breach at a glance. Reproduce the file from a checkout:
 
 ```bash
-dotnet build Zphil.LoadBearing.slnx
-loadbearing check Zphil.LoadBearing.slnx --spec arch/Zphil.LoadBearing.ArchSpec/Zphil.LoadBearing.ArchSpec.csproj --sarif loadbearing.sarif
+dotnet build examples/Meridian/Meridian.slnx
+loadbearing check examples/Meridian/Meridian.slnx --sarif loadbearing.sarif
 ```
 
-CI's [`self-check` job](https://github.com/andypgray/loadbearing/blob/main/.github/workflows/ci.yml) runs that check on every push and uploads the SARIF it writes.
+CI's [`self-check` job](https://github.com/andypgray/loadbearing/blob/main/.github/workflows/ci.yml) runs the same check over this repository's own spec on every push and uploads the SARIF it writes.
 
 The same rule from `check --json`, the document `arch_check` returns over MCP, with the ratchet as counters rather than suppressions:
 
 ```json
 {
-  "id": "mcp/env-through-seam",
+  "id": "data-access/no-inline-sql",
   "posture": "migrate",
   "status": "passed",
-  "sentence": "Types in `Zphil.LoadBearing.Cli.Mcp.Infrastructure.*`, except types named `SystemEnvironment`, must not reference `Environment`.",
-  "because": "A single IEnvironment seam keeps the MCP pipeline testable without mutating real process state.",
-  "fix": "Inject IEnvironment (see SystemEnvironment); read via GetVariable.",
+  "sentence": "Types in `Meridian.Web.Controllers.*` must not reference `SqlConnection` or `SqlCommand`.",
+  "because": "Data access behind a repository can be tested and swapped; SQL in the request path cannot.",
+  "fix": "Move the SQL into a repository; see BookingRepository.",
   "baseline": {
-    "path": "arch/baselines/mcp/env-through-seam.json",
-    "grandfathered": 2,
+    "path": "arch/baselines/data-access/no-inline-sql.json",
+    "grandfathered": 12,
     "stale": 0
   },
   "violationCount": 0,
@@ -184,6 +184,8 @@ The same rule from `check --json`, the document `arch_check` returns over MCP, w
   "warnings": []
 }
 ```
+
+Both counters go to zero when the last controller moves its SQL behind a repository, and the rule is then narrowed to what it actually meant, promoted to `Enforce`, and its baseline file deleted. That is what happened to this repository's own ratchet: the MCP infrastructure had migrated its environment reads to the `IEnvironment` seam, leaving two baselined sites the seam could not take, so the law was narrowed to the environment-variable members it was always about and the file went with it.
 
 ## The graph
 
@@ -241,11 +243,8 @@ flowchart LR
     s_Extraction["Extraction"]
     s_Microsoft_CodeAnalysis("Microsoft.CodeAnalysis.*")
     s_Microsoft_Build("Microsoft.Build.*")
-    s_Adapter["Adapter"]
-    s_Host["Host"]
     s_Pack["Pack"]
-    s_Zphil_LoadBearing_Cli_Mcp_Infrastructure["Zphil.LoadBearing.Cli.Mcp.Infrastructure.*"]
-    s_System_Environment("System.Environment")
+    s_Adapter["Adapter"]
     subgraph s_Zphil_LoadBearing_Roslyn_MsBuild["Quarantine: roslyn/msbuild-bootstrap"]
         s_MsBuildBootstrap[["MsBuildBootstrap"]]
     end
@@ -255,26 +254,22 @@ flowchart LR
     s_Core --x s_Microsoft_Build
     s_Model --x s_Checking
     s_Model --x s_Rendering
-    s_Extraction --x|"expose"| s_Microsoft_Build
+    s_Pack -->|"only"| s_Core
     s_Core --x s_Adapter
     s_Extraction --x s_Adapter
-    s_Host --x s_Adapter
-    s_Pack --x s_Adapter
-    s_Pack -->|"only"| s_Core
-    s_Zphil_LoadBearing_Cli_Mcp_Infrastructure -.-x|"grandfathered"| s_System_Environment
+    s_Extraction --x|"expose"| s_Microsoft_Build
 
     subgraph l_legend["Legend"]
         l_ban["--x = must not reference"]
         l_expose["--x expose = must not expose on a public signature"]
         l_only["--> only = the only references allowed"]
-        l_debt["-.-x grandfathered = Migrate debt, with the existing sites baselined"]
         l_quarantine["Quarantine box = a contained scope; the doubled boxes are its sanctioned surface"]
         l_outside["Rounded box = a place named only as the target of a rule"]
         l_nesting["A box inside a box = the inner place is part of the outer"]
     end
 ```
 
-Nothing in that drawing is a shape somebody chose for it. A bare `--x` is a reference this spec forbids, the labelled arrows are the verbs that need naming, the dotted one is the single Migrate rule with its existing sites baselined, and the box holding a doubled node is the quarantined scope with its sanctioned surface. Model, Checking and Rendering sit inside Core because the spec defines each of them as a namespace cone inside the Core layer, so that nesting is declared rather than inferred. The legend is generated with the rest, one row per construct this particular drawing uses.
+Nothing in that drawing is a shape somebody chose for it. A bare `--x` is a reference this spec forbids, the labelled arrows are the verbs that need naming, and the box holding a doubled node is the quarantined scope with its sanctioned surface. A `Migrate` rule would draw a dotted arrow and add a legend row for it; this spec has none left, so neither is there, which is the legend earning its keep rather than a construct going missing. Model, Checking and Rendering sit inside Core because the spec defines each of them as a namespace cone inside the Core layer, so that nesting is declared rather than inferred. The legend is generated with the rest, one row per construct this particular drawing uses.
 
 The line under the fence is the honest part. A diagram can only draw a rule whose subject and targets are *places*, and most of this spec's rules are about shapes, names, attributes and members instead. Those rules are listed by ID rather than quietly dropped, so the picture is never mistaken for the whole law.
 
@@ -296,7 +291,7 @@ The page is the tool's output, and the [CI badge](https://github.com/andypgray/l
 
 The grammar comes from surveying that prior art, and [GRAMMAR.md](https://github.com/andypgray/loadbearing/blob/main/GRAMMAR.md) records each divergence. Constraints negate in the verb (`MustNotReference`), following ArchUnitNET. If you know ArchUnit's `FreezingArchRule`: what freezing does (accept a rule's current violations as a baseline) is `Migrate` with its counted baseline here. `Quarantine` contains a scope; it does not accept the scope's violations.
 
-`Because` is mandatory. A rule without one is an invalid spec: `check` refuses to run it and reports every spec error in one pass. Even the predicate escape hatch, `Must(condition, description:)`, does not compile without its description. Every reason ships to your agents in the rendered context, and in the [Interchange example](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian.Interchange) each of the twelve rules' `Because` cites the learn.microsoft.com page it enforces. Nine of those twelve come from a shared rule pack, which is an ordinary class library of static methods: the pack owns the citation, the spec picks the posture. That pack ships in this repository as a working example rather than as a package to install, because a pack is a pattern you own rather than a registry you depend on.
+`Because` is mandatory. A rule without one is an invalid spec: `check` refuses to run it and reports every spec error in one pass. Even the predicate escape hatch, `Must(condition, description:)`, does not compile without its description. Every reason ships to your agents in the rendered context, and in the [Interchange example](https://github.com/andypgray/loadbearing/tree/main/examples/Meridian.Interchange) each of the twelve rules carries a `Citation` naming the learn.microsoft.com page its reason rests on. Nine of those twelve come from a shared rule pack, which is an ordinary class library of static methods: the pack owns the citation, the spec picks the posture. That pack ships in this repository as a working example rather than as a package to install, because a pack is a pattern you own rather than a registry you depend on.
 
 ## The four postures
 

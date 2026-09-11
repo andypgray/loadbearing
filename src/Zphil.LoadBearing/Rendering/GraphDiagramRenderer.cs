@@ -18,11 +18,8 @@ namespace Zphil.LoadBearing.Rendering;
 ///     never exercised. That second edge is the diagram's reason to exist — the text survey leaves the
 ///     reader to compute it by eye from two separate sections.
 ///     <para>
-///         Labels carry no type or reference counts. They move on nearly every commit, and this artifact is
-///         committed and drift-gated, so a count-bearing diagram would need re-rendering constantly and
-///         become a permanent merge magnet. Structure-only labels change when a project or a cross-project
-///         reference appears or disappears — exactly when a hand-drawn diagram would have gone stale.
-///         Counts stay in the <c>graph</c> survey, which nothing commits.
+///         Labels carry no type or reference counts: this artifact is committed and drift-gated, and counts
+///         move on nearly every commit. They stay in the <c>graph</c> survey, which nothing commits.
 ///     </para>
 /// </remarks>
 public static class GraphDiagramRenderer

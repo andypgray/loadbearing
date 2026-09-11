@@ -446,8 +446,6 @@ internal sealed class CodebaseSource : IDisposable
         return all;
     }
 
-    // ── construction helpers ──────────────────────────────────────────────────────────────────────────────
-
     private static async Task<CodebaseSource> CreateColdWithSpecAsync(
         ISolutionSource source, string solutionPath, string? spec, string normalizedSpec,
         ExtractionCacheStore? store, CacheReadResult cacheRead, CodebaseSourceOutcome outcome, CancellationToken ct)
@@ -510,8 +508,6 @@ internal sealed class CodebaseSource : IDisposable
             outcome, solutionPath, handle.LoadDiagnostics, null, null, handle, store, cacheRead, "");
     }
 
-    // ── spec replay on a hit ──────────────────────────────────────────────────────────────────────────────
-
     /// <summary>
     ///     Resolves the spec on a cache hit without a workspace, or returns null when the cold path is needed.
     ///     An explicit DLL resolves directly (a missing one throws the same loud error a cold run would); a
@@ -538,8 +534,6 @@ internal sealed class CodebaseSource : IDisposable
             record.SpecProjectName, normalized, record.ExcludeProjectNames, record.OutputFilePaths,
             record.IntermediateAssemblyPath);
     }
-
-    // ── cache write ───────────────────────────────────────────────────────────────────────────────────────
 
     private CacheFingerprint? TryCaptureFingerprint(Solution solution, CancellationToken ct)
     {
@@ -592,8 +586,6 @@ internal sealed class CodebaseSource : IDisposable
             .Append(record)
             .ToList();
     }
-
-    // ── small helpers ─────────────────────────────────────────────────────────────────────────────────────
 
     // What a run that has to open a workspace calls itself: a partial read keeps its clean fragments and
     // re-extracts only the dirty ones, and every other read (a miss, or a hit the spec could not replay)

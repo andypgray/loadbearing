@@ -39,7 +39,7 @@ This repo governs itself: [`arch/Zphil.LoadBearing.ArchSpec`](arch/Zphil.LoadBea
 
 - Small and focused: one change per PR.
 - A green `dotnet test Zphil.LoadBearing.slnx` on your machine.
-- XML doc comments on public members; comments explain *why*, not *what*.
+- XML doc comments on public members: the packages ship them, so in the shipping projects a missing one, or a `cref` that does not resolve, is a build error. Comments explain *why*, not *what*.
 - Fluent-surface changes ship together with their pinned-test moves in the same PR.
 - Cross-platform portability matters: goldens are forward-slash and CRLF-tolerant by design; a change that only passes on one OS is not done.
 

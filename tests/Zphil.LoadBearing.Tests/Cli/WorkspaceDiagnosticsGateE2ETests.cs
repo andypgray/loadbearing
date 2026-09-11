@@ -21,48 +21,6 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///         and the one way to put the inputs in front of it <em>separately</em>, which is the whole subject
 ///         of the last three parts below.
 ///     </para>
-///     <list type="bullet">
-///         <item>
-///             <b>Fail closed.</b> A project that failed to load means the model is incomplete, so
-///             <c>check</c> exits 2 by default (overriding the clean 0 and the violated 1) rather than read
-///             green on a partial model; <c>--allow-workspace-diagnostics</c> restores the prior 0/1 exit
-///             with the load failures printed as warnings. <c>--json</c> stdout stays pure, and a
-///             <c>--sarif</c> report written before the gate returns records the unsuccessful invocation
-///             with the load diagnostics as notifications.
-///         </item>
-///         <item>
-///             <b>Merge notes never gate.</b> A real same-FQN cross-project conflation (Shared.Widget
-///             declared by two projects that do not reference each other) renders on the same diagnostics
-///             stream — <c>warning:</c> on stderr, the <c>workspaceDiagnostics</c> array in JSON — while the
-///             exit stays 0: the advisory notes ride a separate slot by construction.
-///         </item>
-///         <item>
-///             <b>NuGetAudit advisories never gate.</b> An injected advisory in the codeless shape Roslyn
-///             delivers — external publication timing, not a broken model — renders on the same stream (the
-///             <c>warning:</c> line, the <c>workspaceDiagnostics</c> array, a SARIF notification) while the
-///             exit stays 0/1, and a genuine load failure riding alongside it still fails closed.
-///         </item>
-///         <item>
-///             <b>No message gates, in any language.</b> The measured field defects, replayed verbatim: a
-///             NuGet pruning advisory (<c>NU1510</c>) that refused a solution whose only rule passed, and an
-///             audit-fetch failure (<c>NU1900</c>) in German that refused where the identical English run
-///             exits 0. Both now render and exit 0, because a diagnostic is no longer an input to the
-///             decision — which is what makes the fix language-independent rather than one more phrase in a
-///             matcher.
-///         </item>
-///         <item>
-///             <b>A narrowed universe scopes, never gates.</b> Unchecked projects injected on their own put
-///             <c>uncheckedProjects</c> in the document and one warning-level notification in the SARIF while
-///             the clean spec still exits 0 and neither incomplete-model slot appears — the separation the
-///             product makes between a model that is wrong and one that is merely smaller.
-///         </item>
-///         <item>
-///             <b>A failed NuGet restore gates on the same terms, in its own words.</b> The project loaded
-///             completely, so nothing in the loaded structure blames it — but its package edges are missing,
-///             which was measured to turn a failing rule green. It exits 2 with a lede naming restore rather
-///             than the build, takes the same opt-out, and when both causes hold the load block leads.
-///         </item>
-///     </list>
 /// </remarks>
 [Collection("Serial")]
 public sealed class WorkspaceDiagnosticsGateE2ETests

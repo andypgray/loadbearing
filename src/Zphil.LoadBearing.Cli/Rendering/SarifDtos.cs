@@ -54,7 +54,7 @@ internal sealed record SarifReportingConfiguration(string Level);
 /// <summary>
 ///     A rule's LoadBearing-specific property bag — currently just its posture, the model's own enum cased
 ///     for the wire by <see cref="LoadBearingJson.Options" /> exactly as <c>check --json</c> cases it. A
-///     posture added to the enum therefore reaches the wire with no edit here: <c>caution</c> did.
+///     posture added to the enum therefore reaches the wire with no edit here.
 /// </summary>
 internal sealed record SarifRuleProperties(Posture Posture);
 

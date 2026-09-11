@@ -7,7 +7,7 @@ using Zphil.LoadBearing.Tests.Extraction;
 namespace Zphil.LoadBearing.Tests.Correspondence;
 
 /// <summary>
-///     The load-bearing correspondence pin (plan Step 2): for each type shape,
+///     The load-bearing correspondence pin: for each type shape,
 ///     <see cref="TypeName.FullDisplay" /> over the reflection type must equal the FullName Roslyn
 ///     extraction produces for the byte-identical source. <c>CorrespondenceTypes.cs</c> declares
 ///     the reflectable mirrors; the source below re-declares them. If either renderer drifts, a
@@ -97,9 +97,9 @@ public sealed class TypeNameFullDisplayTests
         model.Types.ShouldContain(t => t.FullName == "TopLevel");
     }
 
-    // The three type shapes with no source-level extraction analog throw (Prose/TypeName.cs:56,66): a by-ref
-    // (int&) and a pointer (int*) at line 56, and a partially-open construction (Dictionary<int, TValue> — some
-    // arguments bound, some free) at line 66. A discriminant selects the case so the computed types never
+    // The three type shapes with no source-level extraction analog throw in TypeName.FullDisplay: a by-ref
+    // (int&), a pointer (int*), and a partially-open construction (Dictionary<int, TValue> — some arguments
+    // bound, some free). A discriminant selects the case so the computed types never
     // round-trip through xUnit's theory-data serializer (a by-ref/pointer/partial-open Type does not).
     [Theory]
     [InlineData(0)]

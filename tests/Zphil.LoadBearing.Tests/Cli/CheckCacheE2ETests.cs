@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Cli.Pipeline;
@@ -98,6 +99,56 @@ public sealed class CheckCacheE2ETests
         partial.Err.ShouldBe(freshCold.Err);
         partial.Exit.ShouldBe(freshCold.Exit);
         partial.Out.ShouldNotBe(cold.Out);
+    }
+
+    [Fact]
+    public async Task Check_CommentOnlyEditBetweenRuns_HitsWithSitesMovedAndMatchesAFreshColdRun()
+    {
+        using var workspace = new TempFixtureWorkspace();
+        using var cache = new TempCacheRoot("check-cache");
+        using TempDirectory logs = TestTempRoot.Fresh("check-cache-sarif");
+        string coldSarif = logs.PathOf("cold.sarif");
+        string warmSarif = logs.PathOf("warm.sarif");
+        string freshSarif = logs.PathOf("fresh.sarif");
+
+        // Populate the cache from the clean tree.
+        CacheRun cold = await RunCheckAsync(
+            workspace.SolutionPath, CliRunner.ViolatedSpecDll, cache.Root, sarif: coldSarif);
+        cold.Outcome.ShouldBe(CodebaseSourceOutcome.Miss);
+
+        // Two comment lines above each controller — the red one and the grandfathered one. Every fact the
+        // stored fragments hold is still true; only the lines they hold them at have moved, by exactly two.
+        FixtureEdits.EditOnDisk(workspace.PathOf(Web, "HomeController.cs"), Prepended);
+        FixtureEdits.EditOnDisk(workspace.PathOf(Web, "InvoiceController.cs"), Prepended);
+
+        CacheRun warm = await RunCheckAsync(
+            workspace.SolutionPath, CliRunner.ViolatedSpecDll, cache.Root, sarif: warmSarif);
+        CacheRun fresh = await RunCheckAsync(
+            workspace.SolutionPath, CliRunner.ViolatedSpecDll, cache.Root, true, freshSarif);
+
+        // Nothing was re-extracted and no workspace was opened: a comment edit is a hit, not a partial.
+        warm.Outcome.ShouldBe(CodebaseSourceOutcome.Hit);
+        warm.AcquireCount.ShouldBe(0);
+        warm.ReExtracted.ShouldBeEmpty();
+
+        // And the hit answers what a full cold extraction of the edited tree answers, on every channel.
+        warm.Out.ShouldBe(fresh.Out);
+        warm.Err.ShouldBe(fresh.Err);
+        warm.Exit.ShouldBe(fresh.Exit);
+        File.ReadAllBytes(warmSarif)
+            .ShouldBe(File.ReadAllBytes(freshSarif));
+
+        // The edit really was seen — a hit that replayed the stored lines would match the cold run instead.
+        warm.Out.ShouldNotBe(cold.Out);
+
+        // Site by site: the grandfathered notes and the red error each moved down by the two lines inserted
+        // above them, and no site was gained or lost on the way.
+        string coldLog = File.ReadAllText(coldSarif);
+        string warmLog = File.ReadAllText(warmSarif);
+        InlineSqlSiteLines(warmLog, "note")
+            .ShouldBe(MovedDownByTwo(InlineSqlSiteLines(coldLog, "note")));
+        InlineSqlSiteLines(warmLog, "error")
+            .ShouldBe(MovedDownByTwo(InlineSqlSiteLines(coldLog, "error")));
     }
 
     [Fact]
@@ -248,7 +299,8 @@ public sealed class CheckCacheE2ETests
 
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
 
-    private static async Task<CacheRun> RunCheckAsync(string solution, string spec, string cacheRoot, bool noCache = false)
+    private static async Task<CacheRun> RunCheckAsync(
+        string solution, string spec, string cacheRoot, bool noCache = false, string? sarif = null)
     {
         var output = new StringWriter();
         var error = new StringWriter();
@@ -256,7 +308,7 @@ public sealed class CheckCacheE2ETests
         var runner = new CheckRunner(output, error, counting, EnvironmentFor(cacheRoot));
 
         int exit = await runner.RunAsync(
-            new CheckRequest(solution, spec, true, false, null, SolutionPaths.SolutionDirectoryOf(solution), noCache, null, false, null, null, DocumentGrain.Full),
+            new CheckRequest(solution, spec, true, false, null, SolutionPaths.SolutionDirectoryOf(solution), noCache, null, false, sarif, null, DocumentGrain.Full),
             Ct);
 
         return new CacheRun(
@@ -286,6 +338,43 @@ public sealed class CheckCacheE2ETests
     private static async Task AddSourceFileAsync(string filePath, string content)
     {
         await File.WriteAllTextAsync(filePath, content, Ct);
+    }
+
+    // Two comment lines above everything else: the one edit that changes a file's bytes and none of its
+    // facts, and moves every site in it down by exactly two.
+    private static string Prepended(string source)
+    {
+        return "// a note about this controller\n// and a second line of it\n" + source;
+    }
+
+    private static IReadOnlyList<int> MovedDownByTwo(IReadOnlyList<int> lines)
+    {
+        return lines.Select(line => line + 2)
+            .ToList();
+    }
+
+    // The inline-SQL rule's result lines at one SARIF level, in render order.
+    private static IReadOnlyList<int> InlineSqlSiteLines(string sarif, string level)
+    {
+        IReadOnlyList<int> lines = sarif.SarifResults()
+            .Where(result => result.GetProperty("ruleId")
+                .GetString() == "data-access/no-inline-sql")
+            .Where(result => result.GetProperty("level")
+                .GetString() == level)
+            .Select(StartLine)
+            .ToList();
+        lines.ShouldNotBeEmpty();
+        return lines;
+    }
+
+    // The 1-based source line of a single-location result — the site the reader is sent to.
+    private static int StartLine(JsonElement result)
+    {
+        return result.GetProperty("locations")[0]
+            .GetProperty("physicalLocation")
+            .GetProperty("region")
+            .GetProperty("startLine")
+            .GetInt32();
     }
 
     // A zero-byte assembly for the spec-replay trees: the built-output check resolves a path, it never reads

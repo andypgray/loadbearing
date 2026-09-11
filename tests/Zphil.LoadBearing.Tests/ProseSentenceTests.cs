@@ -5,8 +5,9 @@ using Zphil.LoadBearing.Tests.Checking;
 namespace Zphil.LoadBearing.Tests;
 
 /// <summary>
-///     The five headline sentence pins from the canonical sample (GRAMMAR §12).
-///     These strings are the spec: each is the deterministic law rendered from a reified rule.
+///     The headline sentence pins: the canonical sample's rules (GRAMMAR §12) and the flagship rules
+///     rendered beside them. These strings are the spec: each is the deterministic law rendered from a
+///     reified rule.
 /// </summary>
 public class ProseSentenceTests
 {
@@ -90,7 +91,7 @@ public class ProseSentenceTests
     [Fact]
     public void Enforce_AsyncSuffix_RendersMemberSubjectFlagship()
     {
-        // Acceptance box 1: the flagship member-subject rule (GRAMMAR §4.6, §6). The member
+        // The flagship member-subject rule (GRAMMAR §4.6, §6). The member
         // subject is "{kind-plural} of {selection-reference}" + the Returning adjective; single anchor.
         // Single-anchor Enforce form, matching the acceptance sentence verbatim.
         Checker.Model(arch =>

@@ -37,7 +37,7 @@ public sealed class ShadowedPackageNameTests
     {
         CodebaseModel model = await ShadowedCodebase.Value;
 
-        // The acceptance criterion as an absence: nothing the product references is attributed to the test
+        // The guarantee stated as an absence: nothing the product references is attributed to the test
         // project, whatever names the two happen to share.
         model.Edges
             .Where(edge => edge.Source.ProjectName == Product)
@@ -113,7 +113,7 @@ public sealed class ShadowedPackageNameTests
     {
         CodebaseModel model = await ShadowedCodebase.Value;
 
-        // Acceptance criterion #1 as the rule the field test wrote. Green alone would prove nothing — an
+        // The rule the field test wrote, over the real workspace. Green alone would prove nothing — an
         // empty subject or target set is green too — so the row below reds on the same two selections
         // inverted, which is only possible if both are live.
         Checker.Run(model, arch =>

@@ -19,7 +19,7 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 ///         directory with its tree reset to pristine. Every caller is in the
 ///         <see cref="SerialCollection">"Serial"</see> collection, so two tests can never hold one lease at
 ///         once — <see cref="RequireSerialCollection(string?,string?)">enforced</see> at construction rather
-///         than merely stated here, because five classes had drifted out of it before anything checked.
+///         than merely stated here, because a class can drift out of the collection with nothing to notice.
 ///     </para>
 ///     <para>
 ///         <b>Why the path must be stable, not merely private.</b> A fresh directory per test cost far more

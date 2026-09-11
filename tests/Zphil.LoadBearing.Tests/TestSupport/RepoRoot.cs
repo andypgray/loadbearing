@@ -20,10 +20,6 @@ internal static class RepoRoot
     public static string ArchSpecCsproj =>
         Path.Combine(Directory, "arch", "Zphil.LoadBearing.ArchSpec", "Zphil.LoadBearing.ArchSpec.csproj");
 
-    /// <summary>The absolute path to the dogfood arch-spec's source file (the verb ledger's home).</summary>
-    public static string ArchSpecSource =>
-        Path.Combine(Directory, "arch", "Zphil.LoadBearing.ArchSpec", "LoadBearingArchSpec.cs");
-
     /// <summary>The absolute path to the committed root <c>AGENTS.md</c>.</summary>
     public static string AgentsMd => Path.Combine(Directory, "AGENTS.md");
 

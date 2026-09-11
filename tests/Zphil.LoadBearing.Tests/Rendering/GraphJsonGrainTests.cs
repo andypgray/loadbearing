@@ -25,10 +25,9 @@ public sealed class GraphJsonGrainTests
     [Fact]
     public void Document_IndexGrain_ElidesTheDiagnosticStreamToItsCount()
     {
-        // Measured on a 56-project bed whose package-audit feed was unreachable: 427 entries, 222,108
-        // characters, against a 4,703-character project roster. The roster rung did exactly what it was
-        // designed to do and the survey still overran its channel by 3.7x, because this array rode every
-        // rung untouched. It is the last thing the floor drops.
+        // On a field bed whose package-audit feed was unreachable this array was 98% of the survey and rode
+        // every rung untouched, so the roster rung alone still overran the channel (measured). It is the
+        // last thing the floor drops.
         string index = Render(DocumentGrain.Index, [Diagnostic, Diagnostic]);
 
         index.ShouldNotContain("\"workspaceDiagnostics\"");

@@ -15,11 +15,8 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 ///         them run at once.
 ///     </para>
 ///     <para>
-///         <b>What breaks without it.</b> Tests that spawn a child process with redirected stdout/stderr
-///         (<see cref="TempGitRepo" /> and <see cref="Hooks.HookWrapperTests" /> → <c>git</c>,
-///         <see cref="FixtureRestorer" /> → <c>dotnet restore</c>,
-///         <see cref="Hooks.McpLaunchScriptTests" /> and <see cref="Hooks.McpRegistrationTests" /> → <c>sh</c>,
-///         <see cref="Mcp.Infrastructure.ParentProcessWatcherTests" /> → <c>cmd</c>) deadlock when a
+///         <b>What breaks without it.</b> A test that spawns a child process with redirected stdout/stderr
+///         (<c>git</c>, <c>dotnet restore</c>, <c>sh</c>, <c>cmd</c>) deadlocks when a
 ///         workspace-loading test concurrently spawns a long-lived Roslyn <c>BuildHost</c>: the BuildHost
 ///         (or a reused MSBuild node) inherits a duplicate of the child's stdout write handle, so the read
 ///         never sees EOF and the whole run hangs. <see cref="Zphil.LoadBearing.Roslyn.Hosting.ChildProcess" /> bounds

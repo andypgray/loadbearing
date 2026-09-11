@@ -132,9 +132,8 @@ internal sealed record ExtractionResult(
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>One atomic file.</b> A write goes to a sibling temp file and is then
-///         <see cref="File.Move(string,string,bool)" />d
-///         over the target, so a reader never sees a half-written file. Any torn, garbled, or hand-edited
+///         <b>One atomic file.</b> A write goes through <see cref="AtomicFile" />, so a reader never sees a
+///         half-written file. Any torn, garbled, or hand-edited
 ///         content degrades to a parse-error <see cref="CacheOutcome.Miss" /> — the cache is disposable local
 ///         derived data, so unlike a baseline it has <b>no tamper story</b>: a bad file is simply ignored and
 ///         rebuilt, never a loud error and never a wrong answer.
@@ -153,6 +152,17 @@ internal sealed record ExtractionResult(
 ///         delta. A hit that had to re-hash a settled file rewrites the manifest with promoted stamps so the
 ///         next validation takes the pure-stat fast path.
 ///     </para>
+///     <para>
+///         <b>A trivia-only edit is a hit, not a partial.</b> Every document stamp carries its
+///         <see cref="SourceShape" /> beside its hash. When a document's bytes changed but its shape did not,
+///         and the two shapes yield a line map, validation keys the dirty decision on the <em>recorded</em>
+///         hash — so the project and its dependents stay clean — and replays that project's fragments with
+///         their sites moved through the map (<see cref="FragmentSiteRemapper" />); the manifest it then
+///         promotes carries the new hashes and shapes, so the next validation is pure-stat again. A shape
+///         that changed, or a map that cannot be built, is an ordinary content change; a site the map does
+///         not cover dirties that one project alone, because the equivalence its dependents rely on still
+///         holds.
+///     </para>
 /// </remarks>
 internal sealed class ExtractionCacheStore
 {
@@ -160,9 +170,13 @@ internal sealed class ExtractionCacheStore
     // a clean Miss — the cache is disposable derived data, so a schema it cannot read is rebuilt, never a loud
     // error. Bump this whenever a fragment gains a fact, OR changes how one is computed: a widened fact keeps
     // its name and its type while taking a different value for identical inputs, so a hit would replay the old
-    // answer forever with nothing to distinguish it. The suite cannot catch a missed bump — every run gets a
-    // fresh cache directory — so the discipline is the only guard.
-    private const int CurrentSchemaVersion = 26;
+    // answer forever with nothing to distinguish it. The same holds when a manifest record gains a slot, even
+    // one that deserializes to a harmless default, so a reader never reasons about which slots a file
+    // predates. The suite cannot catch a missed bump — every run gets a fresh cache directory — so the
+    // discipline is the only guard.
+    private const int CurrentSchemaVersion = 27;
+
+    private static readonly IReadOnlySet<string> NoDocuments = new HashSet<string>(PathComparison.Comparer);
 
     private readonly string cacheFilePath;
     private readonly string solutionPath;
@@ -195,6 +209,13 @@ internal sealed class ExtractionCacheStore
     internal long ContentHashCount => Volatile.Read(ref contentHashCount);
 
     /// <summary>
+    ///     The absolute paths of the documents the last <see cref="ReadAndValidate" /> moved sites for
+    ///     instead of dirtying their project — empty in the steady state and on every miss. Internal test
+    ///     observable; never printed.
+    /// </summary>
+    internal IReadOnlySet<string> LastRemappedDocuments { get; private set; } = NoDocuments;
+
+    /// <summary>
     ///     Stats and hashes every input <em>now</em>, returning the pre-extraction fingerprint to hand to
     ///     <see cref="Write" /> after extraction. Does not touch <see cref="ContentHashCount" /> (that counts
     ///     validation reads only) and writes nothing.
@@ -207,10 +228,10 @@ internal sealed class ExtractionCacheStore
 
         Dictionary<string, string?> structuralShaByPath = BuildStructuralShaLookup(structuralStamps);
 
-        // Each project's fingerprint reads only its own files, so the whole SHA-256 pass over the solution's
-        // sources runs in parallel — the one place a cold run spends real wall-clock — and lands in
-        // position-indexed slots. The Merkle pass below needs every content key before it can start, so it
-        // stays sequential; only the independent half moves.
+        // Each project's fingerprint reads only its own files, so the whole hash-and-parse pass over the
+        // solution's sources runs in parallel — the one place a cold run spends real wall-clock — and lands
+        // in position-indexed slots. The Merkle pass below needs every content key before it can start, so
+        // it stays sequential; only the independent half moves.
         var contentKeyByIndex = new string[projects.Count];
         var documentsByIndex = new IReadOnlyList<FileStamp>[projects.Count];
 
@@ -218,7 +239,7 @@ internal sealed class ExtractionCacheStore
         {
             ProjectInputs project = projects[index];
 
-            List<FileStamp> documents = project.DocumentPaths.Select(FileStamping.StampOf).ToList();
+            IReadOnlyList<FileStamp> documents = StampDocuments(project.DocumentPaths, ct);
             List<(string Path, string? Sha256)> documentShas = documents.Select(d => (d.Path, d.Sha256)).ToList();
             string? csprojSha = structuralShaByPath.GetValueOrDefault(Path.GetFullPath(project.CsprojPath));
             string? assetsSha = structuralShaByPath.GetValueOrDefault(
@@ -306,7 +327,8 @@ internal sealed class ExtractionCacheStore
     /// <summary>
     ///     Reads and validates the cache against disk with zero MSBuild, in order: parse → schema/tool-version
     ///     → structural sweep (any existence flip or content change ⇒ miss) → per-document sweep + cone scan →
-    ///     recomputed content/Merkle keys ⇒ dirty set. A hit that re-hashed a settled file rewrites promoted
+    ///     recomputed content/Merkle keys ⇒ dirty set → the fragments of the projects a trivia-only edit
+    ///     moved, replayed through their line maps. A hit that re-hashed a settled file rewrites promoted
     ///     stamps so the next call is pure-stat. Never throws (bar cancellation) — any failure is a miss.
     /// </summary>
     public CacheReadResult ReadAndValidate(CancellationToken ct = default)
@@ -327,6 +349,8 @@ internal sealed class ExtractionCacheStore
 
     private CacheReadResult ValidateCore(CancellationToken ct)
     {
+        LastRemappedDocuments = NoDocuments;
+
         CacheManifest? manifest = TryRead();
         if (manifest is null) return CacheReadResult.Miss();
         if (manifest.SchemaVersion != CurrentSchemaVersion) return CacheReadResult.Miss();
@@ -345,39 +369,41 @@ internal sealed class ExtractionCacheStore
 
         Dictionary<string, string?> structuralShaByPath = BuildStructuralShaLookup(refreshedStructural);
 
-        // Per-document sweep + cone scan ⇒ each project's recomputed content key. Independent per project —
+        // Per-document sweep + cone scan ⇒ each project's recomputed content keys. Independent per project —
         // each reads only its own documents and its own cone — so it runs in parallel into position-indexed
         // slots; the Merkle pass below needs them all and stays sequential.
-        var checkedByIndex = new (string ContentKey, IReadOnlyList<FileStamp> RefreshedDocuments)[manifest.Projects.Count];
+        var checkedByIndex = new ProjectCheck[manifest.Projects.Count];
 
         Parallel.For(0, manifest.Projects.Count, new ParallelOptions { CancellationToken = ct },
             index => checkedByIndex[index] = CheckProject(manifest.Projects[index], structuralShaByPath, ct));
 
-        // Rebuilt in manifest order: DocumentStampsEqual compares the refreshed list against the manifest's
-        // index-wise, so the order is what makes a promotion write the same file back.
-        var recomputedContentKeys = new Dictionary<string, string>(StringComparer.Ordinal);
+        var decisionContentKeys = new Dictionary<string, string>(StringComparer.Ordinal);
+        var trueContentKeys = new Dictionary<string, string>(StringComparer.Ordinal);
         var referencesByName = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
-        var refreshedProjects = new List<ProjectCacheEntry>(manifest.Projects.Count);
-        for (var index = 0; index < manifest.Projects.Count; index++)
+        var mapsByProject = new Dictionary<string, IReadOnlyDictionary<string, LineMap>>(StringComparer.Ordinal);
+        foreach (ProjectCheck check in checkedByIndex)
         {
-            ProjectCacheEntry project = manifest.Projects[index];
-            (string contentKey, IReadOnlyList<FileStamp> refreshedDocuments) = checkedByIndex[index];
-            recomputedContentKeys[project.ProjectName] = contentKey;
-            referencesByName[project.ProjectName] = project.ProjectReferences;
-            refreshedProjects.Add(project with { Documents = refreshedDocuments });
+            decisionContentKeys[check.ProjectName] = check.DecisionContentKey;
+            trueContentKeys[check.ProjectName] = check.TrueContentKey;
+            referencesByName[check.ProjectName] = check.ProjectReferences;
+            if (check.Maps is { } maps) mapsByProject[check.ProjectName] = maps;
         }
 
-        // Recompute Merkle keys bottom-up; the dirty set is exactly the projects whose key no longer matches
-        // — content-dirty projects plus every dependent reachable through the Merkle edges.
-        var memo = new Dictionary<string, string>(StringComparer.Ordinal);
+        // Recompute Merkle keys bottom-up over the DECISION keys, in which a trivia-only edit still shows the
+        // hash its fragments were extracted from; the dirty set is exactly the projects whose key no longer
+        // matches — content-dirty projects plus every dependent reachable through the Merkle edges.
         var dirtyProjects = new HashSet<string>(StringComparer.Ordinal);
+        var decisionMemo = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (ProjectCacheEntry project in manifest.Projects)
         {
             string recomputedMerkle = ComputeMerkleKey(
-                project.ProjectName, recomputedContentKeys, referencesByName, memo, new HashSet<string>(StringComparer.Ordinal));
+                project.ProjectName, decisionContentKeys, referencesByName, decisionMemo, new HashSet<string>(StringComparer.Ordinal));
             if (!string.Equals(recomputedMerkle, project.MerkleKey, StringComparison.Ordinal))
                 dirtyProjects.Add(project.ProjectName);
         }
+
+        IReadOnlyList<CodebaseFragment> replayedFragments = Replay(manifest.Fragments, mapsByProject, dirtyProjects);
+        LastRemappedDocuments = RemappedDocumentsOf(mapsByProject, dirtyProjects);
 
         // Re-paired once, here, from the flat lists the manifest persists — the only place the five become a
         // verdict again, so no consumer can assemble them in a different order. The merge's own two facts —
@@ -389,22 +415,126 @@ internal sealed class ExtractionCacheStore
 
         if (dirtyProjects.Count == 0)
         {
-            PromoteIfChanged(manifest, refreshedStructural, refreshedProjects);
-            return CacheReadResult.Hit(manifest.Fragments, manifest.SpecResolutions, loadDiagnostics);
+            IReadOnlyList<ProjectCacheEntry> refreshedProjects = RefreshedProjects(
+                manifest.Projects, checkedByIndex, trueContentKeys, referencesByName);
+            PromoteIfChanged(manifest, refreshedStructural, refreshedProjects, replayedFragments);
+            return CacheReadResult.Hit(replayedFragments, manifest.SpecResolutions, loadDiagnostics);
         }
 
-        List<CodebaseFragment> reusable = manifest.Fragments.Where(f => !dirtyProjects.Contains(f.ProjectName)).ToList();
+        List<CodebaseFragment> reusable = replayedFragments.Where(f => !dirtyProjects.Contains(f.ProjectName)).ToList();
         return CacheReadResult.Partial(reusable, dirtyProjects, manifest.SpecResolutions, loadDiagnostics);
     }
 
-    // ── structural + document checks ────────────────────────────────────────────────────────────────────
+    /// <summary>
+    ///     The project entries a hit promotes: the manifest's own, rebuilt in manifest order — which is what
+    ///     <see cref="DocumentStampsEqual" />'s index-wise compare relies on — carrying the refreshed stamps
+    ///     and the <em>true</em> keys.
+    /// </summary>
+    /// <remarks>
+    ///     The keys must be the true ones because that manifest is what the next validation stats against:
+    ///     write the decision key and the next run compares a fresh hash to a stale key and calls the project
+    ///     dirty forever.
+    /// </remarks>
+    private static IReadOnlyList<ProjectCacheEntry> RefreshedProjects(
+        IReadOnlyList<ProjectCacheEntry> projects,
+        IReadOnlyList<ProjectCheck> checkedByIndex,
+        IReadOnlyDictionary<string, string> trueContentKeys,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> referencesByName)
+    {
+        var memo = new Dictionary<string, string>(StringComparer.Ordinal);
+        var refreshed = new List<ProjectCacheEntry>(projects.Count);
+        for (var index = 0; index < projects.Count; index++)
+        {
+            ProjectCacheEntry project = projects[index];
+            ProjectCheck check = checkedByIndex[index];
+            string trueMerkle = ComputeMerkleKey(
+                project.ProjectName, trueContentKeys, referencesByName, memo, new HashSet<string>(StringComparer.Ordinal));
+            refreshed.Add(project with
+            {
+                Documents = check.RefreshedDocuments, ContentKey = check.TrueContentKey, MerkleKey = trueMerkle
+            });
+        }
 
-    private (string ContentKey, IReadOnlyList<FileStamp> RefreshedDocuments) CheckProject(
+        return refreshed;
+    }
+
+    /// <summary>
+    ///     <paramref name="fragments" /> in place and in order, with every fragment of a clean project that
+    ///     recorded line maps moved through them. A fragment the maps cannot place puts <em>its own</em>
+    ///     project into <paramref name="dirtyProjects" /> — and no dependent, because the equivalence a
+    ///     dependent relies on is about this project's compiled surface, which a trivia-only edit leaves
+    ///     exactly as it was.
+    /// </summary>
+    private static IReadOnlyList<CodebaseFragment> Replay(
+        IReadOnlyList<CodebaseFragment> fragments,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, LineMap>> mapsByProject,
+        HashSet<string> dirtyProjects)
+    {
+        if (mapsByProject.Count == 0) return fragments;
+
+        var replayed = new List<CodebaseFragment>(fragments.Count);
+        foreach (CodebaseFragment fragment in fragments)
+        {
+            if (dirtyProjects.Contains(fragment.ProjectName)
+                || !mapsByProject.TryGetValue(fragment.ProjectName, out IReadOnlyDictionary<string, LineMap>? maps))
+            {
+                replayed.Add(fragment);
+                continue;
+            }
+
+            CodebaseFragment? moved = FragmentSiteRemapper.TryRemap(fragment, maps);
+            if (moved is null) dirtyProjects.Add(fragment.ProjectName);
+
+            replayed.Add(moved ?? fragment);
+        }
+
+        return replayed;
+    }
+
+    // The paths of every map that actually stood: a project the Merkle pass or the replay dirtied is
+    // re-extracted, so its documents did not move sites instead of dirtying it.
+    private static IReadOnlySet<string> RemappedDocumentsOf(
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, LineMap>> mapsByProject, HashSet<string> dirtyProjects)
+    {
+        var moved = new HashSet<string>(PathComparison.Comparer);
+        foreach ((string name, IReadOnlyDictionary<string, LineMap> maps) in mapsByProject)
+        {
+            if (dirtyProjects.Contains(name)) continue;
+
+            foreach (string path in maps.Keys) moved.Add(path);
+        }
+
+        return moved;
+    }
+
+    /// <summary>
+    ///     One project's verdict from the per-document sweep: the two content keys, the stamps to carry
+    ///     forward, and the line maps a trivia-only edit produced.
+    /// </summary>
+    /// <remarks>
+    ///     The two keys are the same string unless <see cref="Maps" /> is non-null.
+    ///     <see cref="DecisionContentKey" /> is keyed on the hashes the stored fragments were extracted from,
+    ///     so it — and every Merkle key above it — is what decides dirtiness; <see cref="TrueContentKey" />
+    ///     is keyed on the bytes now on disk and belongs to the manifest a hit promotes, whose whole job is
+    ///     to describe disk. Writing the decision key there would leave the next validation comparing a fresh
+    ///     hash against a stale key and calling the project dirty forever.
+    /// </remarks>
+    private sealed record ProjectCheck(
+        string ProjectName,
+        IReadOnlyList<string> ProjectReferences,
+        string DecisionContentKey,
+        string TrueContentKey,
+        IReadOnlyList<FileStamp> RefreshedDocuments,
+        IReadOnlyDictionary<string, LineMap>? Maps);
+
+    private ProjectCheck CheckProject(
         ProjectCacheEntry project, IReadOnlyDictionary<string, string?> structuralShaByPath, CancellationToken ct)
     {
-        var documentShas = new List<(string Path, string? Sha)>(project.Documents.Count);
+        var decisionShas = new List<(string Path, string? Sha)>(project.Documents.Count);
+        var trueShas = new List<(string Path, string? Sha)>(project.Documents.Count);
         var refreshedDocuments = new List<FileStamp>(project.Documents.Count);
         var knownDocuments = new HashSet<string>(PathComparison.Comparer);
+        Dictionary<string, LineMap>? maps = null;
 
         foreach (FileStamp document in project.Documents)
         {
@@ -415,21 +545,71 @@ internal sealed class ExtractionCacheStore
             if (!current.Exists)
             {
                 // A deleted document is a content change for its project (the MISSING sentinel drives the key).
-                documentShas.Add((document.Path, null));
-                refreshedDocuments.Add(document with { Exists = false, LastWriteTimeUtcTicks = 0, Length = 0, Sha256 = null, Promoted = false });
+                decisionShas.Add((document.Path, null));
+                trueShas.Add((document.Path, null));
+                refreshedDocuments.Add(document with
+                {
+                    Exists = false, LastWriteTimeUtcTicks = 0, Length = 0, Sha256 = null, Promoted = false, Shape = null
+                });
                 continue;
             }
 
             if (FileStamping.ToFreshness(document).MatchesStat(current) && document.Promoted)
             {
-                documentShas.Add((document.Path, document.Sha256)); // provably unchanged: trust the recorded hash
+                decisionShas.Add((document.Path, document.Sha256)); // provably unchanged: trust the recorded hash
+                trueShas.Add((document.Path, document.Sha256));
                 refreshedDocuments.Add(document);
                 continue;
             }
 
-            string? sha = HashDuringValidation(document.Path);
-            documentShas.Add((document.Path, sha));
-            refreshedDocuments.Add(FileStamping.RefreshStamp(document.Path, current, sha));
+            if (document.Shape is not { } recordedShape)
+            {
+                // No recorded shape — a structural-style stamp, or a document that was unreadable at capture.
+                // Nothing to compare, so the hash alone decides, exactly as this sweep always did.
+                string? sha = HashDuringValidation(document.Path);
+                decisionShas.Add((document.Path, sha));
+                trueShas.Add((document.Path, sha));
+                refreshedDocuments.Add(FileStamping.RefreshStamp(document.Path, current, sha));
+                continue;
+            }
+
+            (string Sha256, SourceShape Shape)? read = ReadDuringValidation(document.Path);
+            if (read is not { } fresh)
+            {
+                // Unreadable now: the MISSING sentinel, the same answer a failed hash has always given.
+                decisionShas.Add((document.Path, null));
+                trueShas.Add((document.Path, null));
+                refreshedDocuments.Add(FileStamping.RefreshStamp(document.Path, current, null));
+                continue;
+            }
+
+            if (string.Equals(fresh.Sha256, document.Sha256, StringComparison.Ordinal))
+            {
+                // A bare touch: the recorded shape still describes these bytes, so it rides forward and the
+                // next sweep is pure-stat.
+                decisionShas.Add((document.Path, document.Sha256));
+                trueShas.Add((document.Path, document.Sha256));
+                refreshedDocuments.Add(FileStamping.RefreshStamp(document.Path, current, document.Sha256, recordedShape));
+                continue;
+            }
+
+            LineMap? map = SourceShape.TryMapLines(recordedShape, fresh.Shape);
+            if (map is null)
+            {
+                // A real content change: both keys take the new hash, and the stamp the new shape.
+                decisionShas.Add((document.Path, fresh.Sha256));
+                trueShas.Add((document.Path, fresh.Sha256));
+                refreshedDocuments.Add(FileStamping.RefreshStamp(document.Path, current, fresh.Sha256, fresh.Shape));
+                continue;
+            }
+
+            // Trivia only: the decision key sees the hash the fragments were extracted from, the true key the
+            // hash on disk, and the map moves this document's sites.
+            decisionShas.Add((document.Path, document.Sha256));
+            trueShas.Add((document.Path, fresh.Sha256));
+            refreshedDocuments.Add(FileStamping.RefreshStamp(document.Path, current, fresh.Sha256, fresh.Shape));
+            maps ??= new Dictionary<string, LineMap>(PathComparison.Comparer);
+            maps[document.Path] = map;
         }
 
         // Capture and validation compute cone-adds through the one routine over the same known-document set,
@@ -438,11 +618,13 @@ internal sealed class ExtractionCacheStore
         string? csprojSha = structuralShaByPath.GetValueOrDefault(project.CsprojPath);
         string? assetsSha = structuralShaByPath.GetValueOrDefault(
             IntermediateOutputTree.DefaultAssetsPathOf(project.ProjectDirectory));
-        string contentKey = ComputeContentKey(project.ProjectName, documentShas, csprojSha, assetsSha, adds);
-        return (contentKey, refreshedDocuments);
+        string decisionKey = ComputeContentKey(project.ProjectName, decisionShas, csprojSha, assetsSha, adds);
+        string trueKey = maps is null
+            ? decisionKey
+            : ComputeContentKey(project.ProjectName, trueShas, csprojSha, assetsSha, adds);
+        return new ProjectCheck(
+            project.ProjectName, project.ProjectReferences, decisionKey, trueKey, refreshedDocuments, maps);
     }
-
-    // ── keys ────────────────────────────────────────────────────────────────────────────────────────────
 
     // ContentKey(P) = hash over P's document hashes (path + sha, deleted ⇒ MISSING), its structural inputs
     // (csproj + assets hashes), and any cone-add paths. Changes iff P's own content changes. Sorted by path so
@@ -509,16 +691,22 @@ internal sealed class ExtractionCacheStore
         return key;
     }
 
-    // ── promotion + write ───────────────────────────────────────────────────────────────────────────────
-
+    // The stamp comparison covers the remap case too: a document whose sites moved is a document whose hash
+    // and shape changed, so its stamp did.
     private void PromoteIfChanged(
-        CacheManifest manifest, IReadOnlyList<FileStamp> refreshedStructural, IReadOnlyList<ProjectCacheEntry> refreshedProjects)
+        CacheManifest manifest,
+        IReadOnlyList<FileStamp> refreshedStructural,
+        IReadOnlyList<ProjectCacheEntry> refreshedProjects,
+        IReadOnlyList<CodebaseFragment> replayedFragments)
     {
         bool changed = !FileStamping.StampsEqual(manifest.StructuralStamps, refreshedStructural)
                        || !DocumentStampsEqual(manifest.Projects, refreshedProjects);
         if (!changed) return; // already reflects disk — steady state writes nothing
 
-        CacheManifest promoted = manifest with { StructuralStamps = refreshedStructural, Projects = refreshedProjects };
+        CacheManifest promoted = manifest with
+        {
+            StructuralStamps = refreshedStructural, Projects = refreshedProjects, Fragments = replayedFragments
+        };
         TryWriteAtomic(promoted); // best-effort; a later change is still caught by the next validation's stat delta
     }
 
@@ -535,7 +723,16 @@ internal sealed class ExtractionCacheStore
         return ManifestJson.TryRead(cacheFilePath, ManifestJson.Context.CacheManifest);
     }
 
-    // ── stamping + hashing ──────────────────────────────────────────────────────────────────────────────
+    // A document stamp parses the document for its shape, so one project's documents are stamped in
+    // parallel too: stamped one after another, the largest project would be the whole capture's critical
+    // path. Position-indexed, so the stamps keep the document order the manifest is compared in.
+    private static IReadOnlyList<FileStamp> StampDocuments(IReadOnlyList<string> paths, CancellationToken ct)
+    {
+        var stamps = new FileStamp[paths.Count];
+        Parallel.For(0, paths.Count, new ParallelOptions { CancellationToken = ct },
+            index => stamps[index] = FileStamping.StampDocument(paths[index]));
+        return stamps;
+    }
 
     private static bool StatChangedSinceCapture(FileStamp stamp)
     {
@@ -551,7 +748,13 @@ internal sealed class ExtractionCacheStore
         return FileStamping.TryHashFile(path);
     }
 
-    // ── structural enumeration ──────────────────────────────────────────────────────────────────────────
+    // One content read, counted once: the hash and the shape come off the same bytes, so a shape comparison
+    // costs a validation exactly what a hash comparison did.
+    private (string Sha256, SourceShape Shape)? ReadDuringValidation(string path)
+    {
+        Interlocked.Increment(ref contentHashCount);
+        return FileStamping.TryReadDocument(path);
+    }
 
     // ProjectCone owns the composition — solution, the solution a filter points at, then each project's file
     // and probe set — so the build capture stamps the identical set from the identical routine.
@@ -565,8 +768,6 @@ internal sealed class ExtractionCacheStore
                 project.EvaluatedOutputPath,
                 project.IntermediateAssemblyPath)));
     }
-
-    // ── small helpers ───────────────────────────────────────────────────────────────────────────────────
 
     private static Dictionary<string, string?> BuildStructuralShaLookup(IReadOnlyList<FileStamp> stamps)
     {

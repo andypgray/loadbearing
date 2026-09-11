@@ -7,19 +7,24 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 /// <summary>
 ///     Compiles a one-off <see cref="IArchitectureSpec" /> assembly from C# source and emits it to disk —
 ///     the test-time analog of the committed fixture spec projects, for cases that need a spec DLL carrying
-///     a rule the golden-pinned fixtures do not (e.g. a warm-MCP pin over a freshly-built verb). The
-///     compilation references the full trusted-platform-assembly set plus the in-process
-///     <c>Zphil.LoadBearing</c> core, so the spec binds to the SAME contract types the host loaded;
-///     <c>SpecLoadContext</c> then resolves <c>Zphil.LoadBearing</c> from the Default context, keeping type
-///     identity across the load boundary. The emitted DLL needs no <c>.deps.json</c> because it depends
-///     only on the core and the BCL — both resolvable from the running runtime.
+///     a rule the golden-pinned fixtures do not (e.g. a warm-MCP pin over a freshly-built verb).
 /// </summary>
 /// <remarks>
-///     The <see cref="EmitSpecDll(string,string,string,MetadataReference)" /> overload <em>swaps</em> the
-///     contract instead of adding to it, for the one subject that needs a spec built against a contract
-///     identity this host does not carry (<see cref="SkewedContract" />). Its reference set is
-///     <see cref="PlatformReferences" /> — the same closure with the in-process core filtered out — because
-///     leaving the real core beside a stand-in makes every contract type ambiguous at compile time.
+///     <para>
+///         The compilation references the full trusted-platform-assembly set plus the in-process
+///         <c>Zphil.LoadBearing</c> core, so the spec binds to the SAME contract types the host loaded;
+///         <c>SpecLoadContext</c> then resolves <c>Zphil.LoadBearing</c> from the Default context, keeping
+///         type identity across the load boundary. The emitted DLL needs no <c>.deps.json</c> because it
+///         depends only on the core and the BCL — both resolvable from the running runtime.
+///     </para>
+///     <para>
+///         The <see cref="EmitSpecDll(string,string,string,MetadataReference)" /> overload <em>swaps</em> the
+///         contract instead of adding to it, for the one subject that needs a spec built against a contract
+///         identity this host does not carry (<see cref="SkewedContract" />). Its reference set is
+///         <see cref="PlatformReferences" /> — the same closure with the in-process core filtered out —
+///         because leaving the real core beside a stand-in makes every contract type ambiguous at compile
+///         time.
+///     </para>
 /// </remarks>
 internal static class SpecAssemblyCompiler
 {
@@ -31,7 +36,7 @@ internal static class SpecAssemblyCompiler
     private static readonly MetadataReference[] Platform = BuildPlatformReferences();
 
     private static readonly MetadataReference[] HostContract =
-        [..Platform, MetadataReference.CreateFromFile(CorePath)];
+        [.. Platform, MetadataReference.CreateFromFile(CorePath)];
 
     /// <summary>
     ///     The reference closure with the in-process <c>Zphil.LoadBearing</c> removed — what a compilation
@@ -55,7 +60,7 @@ internal static class SpecAssemblyCompiler
     /// </summary>
     public static void EmitSpecDll(string source, string outputPath, string assemblyName, MetadataReference contract)
     {
-        EmitSpecDll(source, outputPath, assemblyName, [..Platform, contract]);
+        EmitSpecDll(source, outputPath, assemblyName, [.. Platform, contract]);
     }
 
     /// <summary>

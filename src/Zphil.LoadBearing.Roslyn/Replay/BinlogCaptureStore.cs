@@ -125,7 +125,8 @@ internal sealed class BinlogCaptureStore
     /// </summary>
     internal long ContentHashCount { get; private set; }
 
-    // ── message factories (dictated text; exposed so tests pin without duplicating format logic) ──────────
+    // The message factories are internal rather than private so tests pin the dictated text without
+    // duplicating the format.
 
     /// <summary>The <see cref="UserErrorException" /> text when a structural file is newer than the binlog.</summary>
     internal static string StaleAtIngestMessage(string binlogArgument, string newestStructuralFile)
@@ -172,8 +173,6 @@ internal sealed class BinlogCaptureStore
         return $"build capture is stale ('{offendingFile}' no longer matches the capture); running a "
                + "design-time build instead. Re-capture: rebuild with -bl and re-run with --binlog.";
     }
-
-    // ── ingest ───────────────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
     ///     Sanity-checks <paramref name="replayedSolution" /> against <paramref name="binlogFullPath" /> and,
@@ -301,8 +300,6 @@ internal sealed class BinlogCaptureStore
         return TryWriteManifestAtomic(manifest);
     }
 
-    // ── validate ─────────────────────────────────────────────────────────────────────────────────────────
-
     /// <summary>
     ///     Validates the persisted capture against disk with zero MSBuild. Reports <see cref="CaptureState.Absent" />
     ///     (no capture — silent cold path), <see cref="CaptureState.Usable" /> (replay the binlog copy), or
@@ -391,8 +388,6 @@ internal sealed class BinlogCaptureStore
         TryWriteManifestAtomic(promoted); // best-effort; a later change is still caught by the next stat delta
     }
 
-    // ── project collection ───────────────────────────────────────────────────────────────────────────────
-
     // One entry per C# project, with the FULL document set — obj-generated sources included, deliberately:
     // they are csc inputs the binlog's command line fixes and replay cannot regenerate, so a clean that
     // deletes one must invalidate the capture rather than let replay drift from the real build. That
@@ -422,8 +417,6 @@ internal sealed class BinlogCaptureStore
             project.IntermediateAssemblyPath);
     }
 
-    // ── read + atomic write ──────────────────────────────────────────────────────────────────────────────
-
     // ManifestJson owns both halves and the degradation contract they share with the fragment cache; all this
     // pair adds is which file and which generated metadata. Absence is asked separately by ValidateCore,
     // which — unlike the fragment cache — must tell "no capture" (silent cold path) from "a capture that no
@@ -437,8 +430,6 @@ internal sealed class BinlogCaptureStore
     {
         return ManifestJson.TryWriteAtomic(captureManifestPath, manifest, ManifestJson.Context.CaptureManifest);
     }
-
-    // ── small helpers ────────────────────────────────────────────────────────────────────────────────────
 
     private static IReadOnlyList<(string Original, string Canonical)> CanonicalPairs(IEnumerable<string> paths)
     {

@@ -252,6 +252,24 @@ jobs:
             exit 1
           }
 
+      # The three library packages carry their XML documentation beside the assembly, which is what a
+      # consumer's editor reads for the doc comments. It is a build property rather than a pack item,
+      # so nothing else in the pack would notice it going missing. The Core glob pins a digit after
+      # the id, because the bare prefix also matches the other three packages.
+      - name: Verify the XML documentation is packed
+        run: |
+          while read -r package entry; do
+            entries="$(unzip -Z1 artifacts/$package)"
+            grep -Fxq "$entry" <<<"$entries" || {
+              echo "::error::$entry is missing from artifacts/$package: the package ships no XML documentation"
+              exit 1
+            }
+          done <<'EOF'
+          Zphil.LoadBearing.[0-9]*.nupkg lib/netstandard2.0/Zphil.LoadBearing.xml
+          Zphil.LoadBearing.Roslyn.*.nupkg lib/net10.0/Zphil.LoadBearing.Roslyn.xml
+          Zphil.LoadBearing.Xunit.*.nupkg lib/net10.0/Zphil.LoadBearing.Xunit.xml
+          EOF
+
       # The README quickstart is `dotnet tool install -g Zphil.LoadBearing.Cli` then `loadbearing
       # check <solution>`, and nothing anywhere executed it: CI drives the CLI through `dotnet run`,
       # the agent hook through `dotnet exec`, and there is no tool manifest. So the one path every

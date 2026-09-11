@@ -136,8 +136,7 @@ public static class CodebaseExtractor
         // The provenance half of the generated-code signal (GRAMMAR §5.2), read once per project. It runs
         // AFTER the compilation batch rather than beside it because binding is what executes the generators:
         // by here every generated document is realized, so this batch is a cache read rather than a second
-        // round of generator work. This single fill covers the CLI, the warm MCP session, the xUnit adapter
-        // and binlog replay, because every one of them funnels through this method.
+        // round of generator work.
         IEnumerable<Task<IReadOnlySet<SyntaxTree>>> generatedTreeTasks =
             projects.Select(project => GeneratedTreesOfAsync(project, ct));
         IReadOnlySet<SyntaxTree>[] generatedTrees = await Task.WhenAll(generatedTreeTasks);

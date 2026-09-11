@@ -7,9 +7,8 @@ namespace Zphil.LoadBearing.Roslyn.Hosting;
 ///     quarantine's dragons note) cites names it cannot check.
 /// </summary>
 /// <remarks>
-///     Here rather than in the CLI because this is the one project the CLI, the xUnit adapter and the
-///     tests all reference — so a reader in any of them spells a name by constant. The last two are not
-///     ours: they are the host's, read to fit in with it rather than to configure anything of LoadBearing's.
+///     The last two are not ours: they are the host's, read to fit in with it rather than to configure
+///     anything of LoadBearing's.
 /// </remarks>
 internal static class LoadBearingEnvVars
 {

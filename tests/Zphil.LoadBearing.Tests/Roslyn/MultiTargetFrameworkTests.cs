@@ -35,7 +35,7 @@ public sealed class MultiTargetFrameworkTests
         Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions", "MultiTfm", "MultiTfm.sln");
 
     /// <summary>
-    ///     The fixture's codebase, extracted once for the seven gates below that read it. The model is
+    ///     The fixture's codebase, extracted once for the gates below that read it. The model is
     ///     immutable and the snapshot behind it is pooled for the whole class, so the extraction itself is
     ///     the only part that was being repeated.
     /// </summary>

@@ -63,12 +63,11 @@ internal static class SpecDependencyLoadFailure
     ///         be staged by any build setting.
     ///     </para>
     ///     <para>
-    ///         The taxonomy this replaced offered two worlds — "if it is a package" versus "if it is a .NET
-    ///         Framework assembly" — and a .NET <em>shared</em> framework is a third the reader had no word
-    ///         for. Measured on a field bundle and re-measured as an A/B: a spec anchoring
-    ///         <c>typeof(ControllerBase)</c> under <c>&lt;FrameworkReference&gt;</c> fails identically with
-    ///         <c>CopyLocalLockFileAssemblies</c> on and off, because the property has nothing to copy — the
-    ///         shared framework contributes no entry to the manifest and no file to the output at all.
+    ///         A .NET <em>shared</em> framework is neither a package nor a .NET Framework assembly, and the
+    ///         remedy must not pretend otherwise: under <c>&lt;FrameworkReference&gt;</c> it contributes no
+    ///         entry to the manifest and no file to the output at all, so <c>CopyLocalLockFileAssemblies</c>
+    ///         has nothing to copy and a spec anchoring <c>typeof(ControllerBase)</c> fails identically with
+    ///         the property on and off (measured).
     ///     </para>
     /// </remarks>
     internal static UserErrorException Map(FileNotFoundException exception, string specDllPath)

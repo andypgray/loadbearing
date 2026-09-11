@@ -82,8 +82,8 @@ internal static class GlobalCallToolFilter
                     {
                         // The same budget the tools degrade against, resolved from the request context — one
                         // service, so a response can never be composed against one cap and cut against
-                        // another. Required, not optional: the old GetService chain fell back to the default
-                        // cap whenever the service was missing, which turned a composition bug into a
+                        // another. Required, not optional: a GetService fallback would quietly use the
+                        // default cap whenever the service was missing, turning a composition bug into a
                         // silently-wrong number. The provider cannot be absent by the time a result exists —
                         // the tool that produced it was itself constructed from it — unlike the logger above,
                         // which is best-effort by design.

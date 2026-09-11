@@ -344,8 +344,7 @@ public static class AgentContextRenderer
     // The rule's citation, as a sentence of its own after the reason: a CommonMark angle-bracket autolink,
     // which is what keeps the following period out of the link target. It sits inside the bullet rather
     // than behind `explain` because the provenance of a quoted guidance rule is the claim the bullet makes,
-    // and it is written leading-space-first so a rule with no citation renders the bullet byte for byte as
-    // it did before the trailer existed.
+    // and it is written leading-space-first so a rule with no citation adds nothing to the bullet at all.
     private static string CitationClause(ArchRule rule)
     {
         return rule.Citation is { } citation ? $" See <{citation}>." : string.Empty;

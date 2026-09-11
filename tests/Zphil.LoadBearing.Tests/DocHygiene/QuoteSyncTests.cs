@@ -70,10 +70,13 @@ public sealed class QuoteSyncTests
             "class AdapterSelfSpecTests : ArchRuleTests<LoadBearingArchSpec>",
             "tests/Zphil.LoadBearing.Tests/Dogfood/AdapterSelfSpecTests.cs"),
         new(
+            // The one Migrate fence on the page. It is cut from Meridian rather than from the self-spec:
+            // this repository's own ratchet reached zero and was promoted, and a ratchet needs live debt
+            // to show.
             RootReadme,
             "migrate-rule",
-            "arch.Rule(\"mcp/env-through-seam\")",
-            SelfSpec),
+            "arch.Rule(\"data-access/no-inline-sql\")",
+            "examples/Meridian/arch/Meridian.ArchSpec/MeridianArchSpec.cs"),
         new(
             // The one tool-output fence with a committed counterpart: `render --diagram` writes the block
             // into ARCHITECTURE.md, so the README quote is synced rather than demonstration-exempt. The
@@ -107,7 +110,7 @@ public sealed class QuoteSyncTests
         new(
             RootReadme,
             "sarif-result",
-            "\"ruleId\": \"mcp/env-through-seam\"",
+            "\"ruleId\": \"data-access/no-inline-sql\"",
             null),
         new(
             RootReadme,

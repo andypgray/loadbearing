@@ -6,10 +6,10 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Caching;
 
 /// <summary>
-///     <see cref="AtomicFile" />: the committed-file atomic writer the baseline store and the managed-block
-///     render adapter now write through. Proves the observable contract over scratch temp dirs — a
-///     successful write leaves exactly the target (the temp sibling is renamed onto it, never left behind),
-///     an existing target is overwritten in place, and a missing target directory is created first.
+///     <see cref="AtomicFile" />: the committed-file atomic writer. Proves the observable contract over
+///     scratch temp dirs — a successful write leaves exactly the target (the temp sibling is renamed onto
+///     it, never left behind), an existing target is overwritten in place, and a missing target directory is
+///     created first.
 /// </summary>
 public sealed class AtomicFileTests
 {

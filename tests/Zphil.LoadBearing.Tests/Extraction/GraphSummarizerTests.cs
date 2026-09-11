@@ -13,14 +13,14 @@ namespace Zphil.LoadBearing.Tests.Extraction;
 ///     namespace root (two-segment, one-segment, and global), namespace inventory counts, and
 ///     deterministic ordering. Sources are controlled so the counts are hand-verifiable; the golden CLI
 ///     test proves the same summary shape over the real MyApp solution.
-///     <para>
-///         The scoping rows below pin <see cref="GraphSummarizer.Scope" />'s asymmetry: a project edge
-///         survives on <em>either</em> endpoint, an external edge on its source alone, and a surviving
-///         project keeps its declared references verbatim. Both coverage statements take the either-end
-///         rule too — a multiply-declared type on any of its declarers, a shadowed one on its declarer or
-///         any of the projects binding the assembly instead.
-///     </para>
 /// </summary>
+/// <remarks>
+///     The scoping rows below pin <see cref="GraphSummarizer.Scope" />'s asymmetry: a project edge
+///     survives on <em>either</em> endpoint, an external edge on its source alone, and a surviving
+///     project keeps its declared references verbatim. Both coverage statements take the either-end
+///     rule too — a multiply-declared type on any of its declarers, a shadowed one on its declarer or
+///     any of the projects binding the assembly instead.
+/// </remarks>
 public sealed class GraphSummarizerTests
 {
     [Fact]

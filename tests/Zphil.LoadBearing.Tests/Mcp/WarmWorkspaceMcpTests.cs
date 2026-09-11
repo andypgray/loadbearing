@@ -19,11 +19,14 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 ///     default) and assert on the deterministic observables — the session's <c>SweepContentReads</c> /
 ///     <c>FullReloadCount</c> counters reached through the harness <see cref="McpPipelineHarness.Services" />
 ///     accessor, byte-equality against a fresh cold CLI run, and cold/warm source selection — never on wall
-///     time. Serialized with the other workspace-loading suites: each case opens a real
-///     <c>MSBuildWorkspace</c>. The existing <see cref="CliMcpParityTests" /> is the broad warm-path parity
-///     net (it now runs warm by default); this suite pins the warm-specific behaviour that parity cannot see.
+///     time.
 /// </summary>
 /// <remarks>
+///     <para>
+///         Serialized with the other workspace-loading suites: each case opens a real
+///         <c>MSBuildWorkspace</c>. <see cref="CliMcpParityTests" /> is the broad warm-path parity net; this
+///         suite pins the warm-specific behaviour that parity cannot see.
+///     </para>
 ///     <para>
 ///         Every CLI leg here goes through <see cref="CliRunner.InvokeColdAsync(string[])" />, never the
 ///         warm-by-default <see cref="CliRunner.InvokeAsync" />. The oracle in each case is a <em>freshly loaded</em> run
@@ -587,7 +590,39 @@ public sealed class WarmWorkspaceMcpTests
         resolutions.FullResolveCount.ShouldBe(1);
     }
 
-    // ── helpers ───────────────────────────────────────────────────────────────────────────────────────
+    [Fact]
+    public async Task ArchCheck_CommentLinesInsertedOnDisk_RemapsSitesAndMatchesColdCli()
+    {
+        // Arrange — a warm server bound to the violated spec, whose rules red several sites inside
+        // HomeController.cs, so the check document carries file:line positions that an inserted line moves.
+        using var fixture = new TempFixtureWorkspace();
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            McpServerBindings.For(fixture.SolutionPath, CliRunner.ViolatedSpecDll), Ct);
+        var store = harness.Services.GetRequiredService<SessionFragmentStore>();
+
+        string before = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
+
+        // Act — prepend two comment lines on disk, then re-check the still-warm server. Nothing the checker
+        // reads changed, so this is the whole warm remap path end to end. A fresh cold CLI run over the same
+        // edited tree is the parity oracle.
+        string homeController = fixture.PathOf(Web, "HomeController.cs");
+        FixtureEdits.EditOnDisk(homeController, source => "// probe one\n// probe two\n" + source);
+        string after = (await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct)).ShouldHaveTextContent();
+        CliResult coldEdited = await CliRunner.InvokeColdAsync(
+            "check", fixture.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+
+        // Assert — the moved sites are byte-identical to the ones a cold walk of the edited tree reports, and
+        // the payload really did move (the red sites' lines are two lower than before the edit).
+        after.NormalizedTrimmed()
+            .ShouldBe(coldEdited.Out.NormalizedTrimmed());
+        after.NormalizedTrimmed()
+            .ShouldNotBe(before.NormalizedTrimmed());
+
+        // …and the store reached that answer without re-walking anything: Web's fragments were remapped, and
+        // Domain, its reverse-dependent, was never touched.
+        store.LastReExtractedProjects.ShouldBeEmpty();
+        store.LastRemappedProjects.ShouldBe([Web]);
+    }
 
     // The output-layout fixture, copied, restored and really built under the default layout. Leased per
     // class, and the lease's reset leaves bin/ alone — so the copy, the restore and the build are paid by

@@ -14,28 +14,25 @@ namespace Zphil.LoadBearing.Tests.Roslyn;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Why a measurement rather than a description.</b> The predicate on its own only says what the XML
-///         contains. The claim it is used for is larger —
-///         <em>SDK-style projects write an assets file when they restore, and legacy ones never do</em>
-///         — and nothing about reading an attribute establishes
-///         that. So the corpus below pairs each verdict with the file it predicts: every project under the
-///         three roots it scans, classified, and beside each one whether an assets file is actually on disk at
-///         a location <see cref="IntermediateOutputTree.AssetsPathsOf" /> stamps. Eighteen projects, and the
-///         only rows where the two columns come apart are the three beds deliberately left unrestored — which
-///         is the whole state the gate exists to catch — plus the two of the output-layout bed, which is
-///         restored and built only inside the temp copy that drives it.
+///         A measurement rather than a description, because the predicate on its own only says what the XML
+///         contains while the claim it is used for is larger —
+///         <em>SDK-style projects write an assets file when they restore, and legacy ones never do</em>.
+///         So the corpus below pairs each verdict with the file it predicts: every project under the three
+///         roots it scans, classified, and beside each one whether an assets file is actually on disk at a
+///         location <see cref="IntermediateOutputTree.AssetsPathsOf" /> stamps. The only rows where the two
+///         columns come apart are the beds deliberately left unrestored — the state the gate exists to
+///         catch — and the output-layout bed, which is restored and built only inside the temp copy that
+///         drives it.
 ///     </para>
 ///     <para>
-///         <b>Why the corpus is real files rather than only written ones.</b> The written shapes fix the
-///         boundaries — a comment mentioning an SDK, malformed XML, a legacy project that happens to declare a
-///         property called <c>Sdk</c> — but they are written by the same reading of MSBuild that wrote the
-///         predicate, so agreement between them proves only self-consistency. The real corpus is the part that
-///         could have refuted it, and two of its files are the awkward ones on purpose:
-///         <c>FieldMini.Core.csproj</c> and <c>BrokenApp.Web.csproj</c> carry their root element under
-///         twenty-nine and forty lines of XML comment.
+///         Real files rather than only written shapes: the written ones fix the boundaries — a comment
+///         mentioning an SDK, malformed XML, a legacy project that happens to declare a property called
+///         <c>Sdk</c> — but they are written by the same reading of MSBuild that wrote the predicate, so only
+///         the real corpus could refute it. <c>FieldMini.Core.csproj</c> and <c>BrokenApp.Web.csproj</c> are
+///         its awkward ones on purpose, each carrying its root element under dozens of lines of XML comment.
 ///     </para>
 ///     <para>
-///         <b>Where the corpus stops.</b> Three roots — the fixture trees as the test output holds them,
+///         Where the corpus stops: three roots — the fixture trees as the test output holds them,
 ///         <c>src/</c> and <c>arch/</c> — and not every project file this repository tracks. Out are the
 ///         spec-fixture projects under <c>tests/Fixtures/</c> and the test project itself, which are solution
 ///         members and so would every one read <c>SDK-style, assets file present</c>; and everything under
@@ -176,7 +173,7 @@ public sealed class SdkStyleProjectTests
     [Fact]
     public void IsSdkStyle_OverEveryRealProjectFile_MatchesTheGroundTruthAndPredictsTheAssetsFile()
     {
-        // The measurement AC #1 asks for. Both columns in one table, because the classification alone would
+        // The measurement the gate rests on. Both columns in one table, because the classification alone would
         // only describe the XML: what licenses the gate is that "SDK-style" and "has an assets file" agree
         // everywhere except where a bed was deliberately left unrestored.
         List<string> measured = RealProjectFiles()
@@ -198,7 +195,7 @@ public sealed class SdkStyleProjectTests
     [Fact]
     public void Detect_TheLegacyBedWithNoAssetsFile_IsStillNotBlamed()
     {
-        // AC #3 at the predicate's own level, over the real ClassicApp tree rather than a written stand-in:
+        // The legacy bed at the predicate's own level, over the real ClassicApp tree rather than a written stand-in:
         // the one project in the corpus that is not SDK-style is the one the restore gate must never blame,
         // because it was never going to write the file whose absence is being read.
         string classicBilling = Path.Combine(

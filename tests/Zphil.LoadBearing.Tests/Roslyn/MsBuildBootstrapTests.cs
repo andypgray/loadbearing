@@ -6,6 +6,10 @@ using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Roslyn;
 
+/// <summary>
+///     Serializes the cases that set MSBuild-selection environment variables, so a variable one case scopes
+///     to itself cannot be read by another running beside it.
+/// </summary>
 [CollectionDefinition("MsBuildBootstrapEnvVar", DisableParallelization = true)]
 public sealed class MsBuildBootstrapEnvVarCollection;
 

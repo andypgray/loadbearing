@@ -8,8 +8,7 @@ namespace Zphil.LoadBearing.Roslyn.Diagnostics;
 ///     <see cref="NarrowedUniverseNotice" />'s stamps, a validation error list, a context card — is joined
 ///     with <c>\n</c>, because a composed block has to be one comparable value whatever machine built it.
 ///     Written whole, those embedded LFs would reach a CRLF console verbatim; split and written a line at a
-///     time, the block adopts the writer's own newline instead. Sited here because both composers live in
-///     this project, and the CLI's writers reach it through <c>InternalsVisibleTo</c>.
+///     time, the block adopts the writer's own newline instead.
 /// </remarks>
 internal static class LineBlocks
 {

@@ -10,11 +10,8 @@ namespace Zphil.LoadBearing.Tests.Checking;
 /// <summary>
 ///     The throw verb <c>MustOnlyThrow</c> over the fast path (GRAMMAR §4.8, §4.3, §5.3): a STRICT allow-list
 ///     — every throw edge whose thrown type is not in the allowed set is a violation,
-///     <b>
-///         external thrown types
-///         included
-///     </b>
-///     (the point of departure from <c>MustOnlyReference</c>, which exempts external targets).
+///     <b>external thrown types included</b> (the point of departure from <c>MustOnlyReference</c>, which
+///     exempts external targets).
 /// </summary>
 /// <remarks>
 ///     A <c>Type</c>-sugar operand resolves an external allowed type by FQN (so an allowed external throw passes);

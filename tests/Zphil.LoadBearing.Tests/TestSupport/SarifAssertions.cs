@@ -15,8 +15,7 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 ///     <para>
 ///         Shared because every row driving the renderer directly makes the same five-argument call and
 ///         then walks the same <c>runs[0]</c>, whatever the row's subject is — the per-site mapping, or a
-///         project violation's message text. The second copy of that walk asserted less than the first,
-///         which is what a copy does.
+///         project violation's message text.
 ///     </para>
 ///     <para>
 ///         The readers sit beside the assertion rather than in a <c>SarifJson</c> of their own, as

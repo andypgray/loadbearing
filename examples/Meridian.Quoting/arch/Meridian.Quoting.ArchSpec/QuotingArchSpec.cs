@@ -13,6 +13,12 @@ public sealed class QuotingArchSpec : IArchitectureSpec
     /// <inheritdoc />
     public void Define(Arch arch)
     {
+        // The layers are namespace cones, not project references, and deliberately so: each maps
+        // one-to-one onto a project here, so `arch.Project` would read tidier and say strictly less.
+        // The boundary an agent actually breaches is a file in the Api project declaring the
+        // Application namespace, which compiles. A project-defined Application layer could never see
+        // that file, and could not be breached at all: Infrastructure already references Application,
+        // so MSBuild rejects the only reference the rule forbids. The README walks the edit.
         Layer domain = arch.Layer("Domain", "Meridian.Quoting.Domain.*")
             .Purpose("Domain holds the quote and rate-card model.");
         Layer application = arch.Layer("Application", "Meridian.Quoting.Application.*")

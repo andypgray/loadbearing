@@ -21,12 +21,9 @@ internal enum AdjectivePlacement
     HeadPrefix,
 
     /// <summary>
-    ///     Canonicalized to sentence-final regardless of chain position (<c>Except</c>/<c>Where</c>). An
-    ///     <c>Except</c> here is a parenthetical: its fragment opens with a comma, and the composer closes it
-    ///     with one at whatever junction follows — the verb, a member subject's own clauses, the next item of
-    ///     a list — while a sentence-final period closes it by itself (GRAMMAR §6). Within the group an
-    ///     <c>Except</c> renders after every <c>Where</c> of the same subject, so the parenthetical is the
-    ///     last thing before that junction.
+    ///     Canonicalized to sentence-final regardless of chain position (<c>Except</c>/<c>Where</c>). Within
+    ///     the group an <c>Except</c> renders after every <c>Where</c> of the same subject, so the
+    ///     parenthetical it opens is the last thing before the junction that closes it (GRAMMAR §6).
     /// </summary>
     SubjectFinal
 }

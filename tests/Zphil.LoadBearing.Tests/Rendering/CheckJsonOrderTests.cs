@@ -98,10 +98,9 @@ public sealed class CheckJsonOrderTests
     [Fact]
     public void Document_IndexGrain_ElidesTheDiagnosticStreamToItsCountAndKeepsEveryTrustStamp()
     {
-        // The slot's other consequence, and the one a field re-proof found the hard way: "no ceiling" is not
-        // a figure of speech. On a 9-project bed whose package-audit feed was unreachable this array was
-        // 86,518 characters beside a 2,709-character rule list — 96% of the document, at EVERY grain — so a
-        // ladder that elided everything else still could not fit a channel. It is the last thing the floor
+        // The slot's other consequence: "no ceiling" is not a figure of speech. On a field bed whose
+        // package-audit feed was unreachable this array was 96% of the document at EVERY grain (measured), so
+        // a ladder that elided everything else still could not fit a channel. It is the last thing the floor
         // rung drops, and it can be dropped because its actionable half is keyed above it.
         string index = Render(DocumentGrain.Index);
 

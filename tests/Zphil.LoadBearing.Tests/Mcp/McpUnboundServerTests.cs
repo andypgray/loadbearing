@@ -13,18 +13,16 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>What this guards.</b> Both shapes used to kill the server during <c>initialize</c>. The
-///         refusals were well written and named a fix, and <em>neither reached a client</em>: there is no
-///         tool call in which a result could be returned before the handshake, and the message went to
-///         stderr, which for the MCP surface is discarded by construction. What the client saw was a server
-///         that failed to start, and nothing else. So the server now starts unbound and says why through
-///         the two in-band channels a client does read — the <c>initialize</c> instructions, and every
-///         tool call's error result, which re-runs the identical discovery. Both then close with the one
-///         recovery the session can act on itself, because the config edits that rebind the server are not
-///         available to whoever is reading.
+///         <b>What this guards.</b> A refusal during <c>initialize</c> reaches no client: there is no tool
+///         call in which a result could be returned before the handshake, and stderr is discarded by the
+///         MCP surface by construction, so all a client would see is a server that failed to start. The
+///         server therefore starts unbound and says why through the two in-band channels a client does
+///         read — the <c>initialize</c> instructions, and every tool call's error result, which re-runs the
+///         identical discovery. Both close with the one recovery the session can act on itself, because the
+///         config edits that rebind the server are not available to whoever is reading.
 ///     </para>
 ///     <para>
-///         <b>Why a real child.</b> The no-argument path no longer fails fast, so an in-process invocation
+///         <b>Why a real child.</b> The no-argument path does not fail fast, so an in-process invocation
 ///         of it starts a server that never exits: the test host redirects stdin and never closes it. That
 ///         is the hang <c>CliBehaviorTests</c> records, and it is why nothing here may run in-process. The
 ///         plumbing is <see cref="McpChildHarness" />, shared with the other child suites; the frames are

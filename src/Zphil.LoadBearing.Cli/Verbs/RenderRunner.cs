@@ -113,8 +113,8 @@ internal sealed class RenderRunner(
     // The diagram target. It asks for its own model, with no project exclusions, which is the same call
     // `graph` makes: the scoped-card extraction above passes the spec resolution's excluded projects (the
     // spec project plus the private plumbing only it references), and reusing that model would draw a
-    // different universe than the survey does. The surviving invariant is one summarizer and one summary
-    // shape. What the two now differ on is the view: the survey fence draws only declared solution members,
+    // different universe than the survey does. The shared invariant is one summarizer and one summary
+    // shape. Where the two differ is the view: the survey fence draws only declared solution members,
     // while `graph` reports every project it loaded and labels which is which — so a project missing from
     // the drawing is a question `graph` answers rather than the two disagreeing. The two exclusion sets cost
     // one walk between them, not two: CodebaseSource walks once per source and memoizes the merge per

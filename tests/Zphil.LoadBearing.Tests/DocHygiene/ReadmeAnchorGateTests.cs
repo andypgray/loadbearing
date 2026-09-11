@@ -204,8 +204,7 @@ public sealed class ReadmeAnchorGateTests
     public void EveryTrackedDocQuotingAnchors_IsRegistered()
     {
         // Act & Assert: the registry above is hand-written, so the failure it cannot see is a doc that
-        // quotes anchors and was never added to it — a whole walkthrough silently outside the gate, which
-        // is the one fact this gate shipped without while its three siblings all stated it.
+        // quotes anchors and was never added to it — a whole walkthrough silently outside the gate.
         Gate.ShouldFindNothingOutsideTheRegistry(
             counted: "source anchor(s)",
             swept: "source anchors",

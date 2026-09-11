@@ -9,17 +9,12 @@ namespace Zphil.LoadBearing.Roslyn.Caching;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Why one walk rather than one per store.</b> The extraction cache and the build capture were
-///         each collapsing a multi-target-framework project's several <see cref="Project" />s onto the one
-///         name
-///         <see cref="SolutionExtensions.NormalizeProjectNames">
-///             the load boundary normalized them
-///             to
-///         </see>
-///         , and each doing it by hand. The two answers must agree — they decide, from the same
-///         solution, what "the structure moved" means, and a project one of them collapses differently is a
-///         cached model served against inputs the other never watched. Collapsed here, the agreement is by
-///         construction rather than by two comments promising it.
+///         One walk serves both stores. The extraction cache and the build capture each collapse a
+///         multi-target-framework project's several <see cref="Project" />s onto the one name
+///         <see cref="SolutionExtensions.NormalizeProjectNames">the load boundary normalized them to</see>,
+///         and the two answers must agree — they decide, from the same solution, what "the structure moved"
+///         means, and a project one of them collapses differently is a cached model served against inputs
+///         the other never watched. Collapsed here, the agreement is by construction.
 ///     </para>
 ///     <para>
 ///         <b>First framework wins for identity, union across frameworks for documents.</b> The project file,

@@ -5,13 +5,11 @@ using Zphil.LoadBearing.Codebase;
 namespace Zphil.LoadBearing.Tests.Extraction;
 
 /// <summary>
-///     Top-level statements (a synthesized <c>Program</c> entry point) on the extraction fast path.
-///     The investigation hypothesis — that the synthesized <c>Program</c> never enters
-///     extraction because <c>FragmentExtractor.Declare</c> drops implicitly-declared types — is
-///     <em>disconfirmed</em> on this Roslyn: the simple-program <c>Program</c> is NOT implicitly declared,
-///     so it is admitted like any solution type, its top-level-statement references bind to it, and the
-///     <c>ReferenceWalker</c> descent boundary already keeps a sibling type declared in the same file from
-///     being misattributed to it. These pins hold that passing behavior in place.
+///     Top-level statements (a synthesized <c>Program</c> entry point) on the extraction fast path. The
+///     simple-program <c>Program</c> is not implicitly declared on this Roslyn, so it is admitted like any
+///     solution type, its top-level-statement references bind to it, and the <c>ReferenceWalker</c> descent
+///     boundary keeps a sibling type declared in the same file from being misattributed to it. These pins
+///     hold that behavior in place.
 /// </summary>
 public sealed class TopLevelProgramExtractionTests
 {

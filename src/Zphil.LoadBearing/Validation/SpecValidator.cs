@@ -699,10 +699,10 @@ internal static class SpecValidator
     // GRAMMAR §8 item 19: an arch.Registered noun carrying a Lifetime value outside the defined set (e.g.
     // (Lifetime)7 via a cast) names no lifetime. Walked over every selection an anchor reaches — a rule's
     // subject, operands, Except payloads and union parts, a scope's scoped interior and sanctioned
-    // surface — through the same expansion the foreign-Arch and pattern walks take, so a noun cannot be
-    // checked in one position and unchecked in another. The union guard mirrors SelectionPatterns (a
-    // UnionSelection has no single noun). Reported all-at-once, and the build throws before membership
-    // resolution ever sees the bad value.
+    // surface, and a layer's definition — through the same expansion the foreign-Arch and pattern walks
+    // take, so a noun cannot be checked in one position and unchecked in another. The union guard mirrors
+    // SelectionPatterns (a UnionSelection has no single noun). Reported all-at-once, and the build throws
+    // before membership resolution ever sees the bad value.
     private static void CheckLifetimes(
         IEnumerable<Selection> selections, ErrorTarget target, List<SpecValidationError> errors)
     {

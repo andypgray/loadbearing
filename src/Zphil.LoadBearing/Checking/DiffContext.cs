@@ -22,6 +22,9 @@ public sealed class DiffContext
     ///     Builds a diff context from the base ref, the solution directory, and the changed files
     ///     (any separators, any casing — all normalized to forward slashes).
     /// </summary>
+    /// <param name="baseRef">The git ref the changed-file set was taken against.</param>
+    /// <param name="solutionDirectory">The directory a tripwire message's paths are made relative to.</param>
+    /// <param name="changedFiles">The files that changed since <paramref name="baseRef" />.</param>
     public DiffContext(string baseRef, string solutionDirectory, IEnumerable<string> changedFiles)
     {
         Guard.NotNull(baseRef, nameof(baseRef));

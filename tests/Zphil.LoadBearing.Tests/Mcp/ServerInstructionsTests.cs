@@ -29,17 +29,15 @@ public sealed class ServerInstructionsTests
     ///     server's client ever sees.
     /// </summary>
     /// <remarks>
-    ///     Raised from 400 when the banner took on <see cref="ServerInstructions.UnboundCallCoda" />: an
-    ///     unbound client buys a recovery it can act on with roughly 240 more characters of the file's tail,
-    ///     which is the trade the file's ordering was designed to make payable. This is also the coda's only
-    ///     budget — it is inside the banner, so bounding the banner bounds it.
+    ///     The banner carries <see cref="ServerInstructions.UnboundCallCoda" />, so an unbound client buys a
+    ///     recovery it can act on at the price of characters of the file's tail — the trade the file's
+    ///     ordering was designed to make payable. This is also the coda's only budget: it is inside the
+    ///     banner, so bounding the banner bounds it.
     ///     <para>
-    ///         Raised again from 650 when the coda took on the <c>dnx</c> spelling for the session that has
-    ///         no installed command. That spelling carries a pinned version, so the banner's length now moves
-    ///         with the version string: every readable wording of the clause landed within four characters of
-    ///         650, which would have made a version bump alone red this fact from a distance. The ceiling is
-    ///         set clear of that rather than against it, and what the extra buys is priced in the same
-    ///         currency as before — roughly fifty more characters of the file's most droppable tail.
+    ///         The coda spells a pinned version, so the banner's length moves with the version string. Every
+    ///         readable wording of that clause measured within four characters of 650, so a ceiling there
+    ///         would let a version bump alone red this fact from a distance; it is set clear of that rather
+    ///         than against it.
     ///     </para>
     /// </remarks>
     private const int BannerBudget = 700;

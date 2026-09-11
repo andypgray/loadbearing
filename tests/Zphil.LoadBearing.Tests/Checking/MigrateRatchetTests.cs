@@ -162,9 +162,9 @@ public sealed class MigrateRatchetTests
     [Fact]
     public void Check_MoreSitesThanTheEntryRecords_IsRedAsGrowth()
     {
-        // The hole the measure closes: a second old-pattern site inside an already-grandfathered pair used
-        // to ride in free, which is precisely where new code in the old pattern gets written — inside a
-        // type whose surrounding code already does it.
+        // The hole the measure closes: without a recorded count, a second old-pattern site inside an
+        // already-grandfathered pair rides in free — which is precisely where new code in the old pattern
+        // gets written, inside a type whose surrounding code already does it.
         BaselineIndex index = Checker.Baselines(
             "data/x",
             OldControllerToDb.WithSiteCount(1));
@@ -220,9 +220,8 @@ public sealed class MigrateRatchetTests
     [Fact]
     public void Check_UncountedEntry_GrandfathersAtPairGrainAndCountsUncounted()
     {
-        // An entry recording no count holds its pair at any size, exactly as every entry did before the
-        // measure existed. That is what keeps a partially upgraded or foreign baseline section valid — and
-        // it is reported, because it is the state a write can clear.
+        // An entry recording no count holds its pair at any size. That is what keeps a partially upgraded
+        // or foreign baseline section valid — and it is reported, because it is the state a write can clear.
         BaselineIndex index = Checker.Baselines(
             "data/x", OldControllerToDb);
 

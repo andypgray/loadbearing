@@ -73,7 +73,7 @@ internal static class SarifReportRenderer
     ///     <paramref name="workspaceDiagnostics" /> become tool-execution notifications (omitted when empty).
     ///     The failed, restore-failed, unchecked and unsupported projects <paramref name="diagnostics" />
     ///     carries each add one further structured notification when non-empty, so a whole, healthy run
-    ///     (<see cref="WorkspaceDiagnostics.None" />) renders exactly what it always rendered.
+    ///     (<see cref="WorkspaceDiagnostics.None" />) carries none of them.
     /// </summary>
     internal static string Serialize(
         CheckReport report,
@@ -147,8 +147,8 @@ internal static class SarifReportRenderer
     // warns and can never fail, so an error-level descriptor advertises an alert it has
     // no way to raise — and a scanning service that reads defaultConfiguration to set an alert's severity
     // would file the touch as an error. Keyed on the rule's own payload rather than its posture, because a
-    // quarantine's other half is the containment law and that one is red — and keying on the role rather
-    // than the posture is also what already had a caution's one rule right the day the posture landed.
+    // quarantine's other half is the containment law and that one is red — so a posture added later takes
+    // its level from the role it declares, with no edit here.
     private static string DefaultLevel(ArchRule rule)
     {
         return rule.Scope is { Role: ScopeRole.Tripwire } ? WarningLevel : ErrorLevel;
@@ -179,10 +179,10 @@ internal static class SarifReportRenderer
         return [new SarifInvocation(executionSuccessful, notifications.Count > 0 ? notifications : null)];
     }
 
-    // An incomplete model reached SARIF only as MSBuild's replayed prose, in which a fatal evaluation failure
-    // and an ordinary restore warning are indistinguishable — so the one channel that could name the cause
-    // named neither. Error rather than warning, and independent of executionSuccessful: the opt-out buys a
-    // different exit code, not a different truth about the model.
+    // Without it an incomplete model reaches SARIF only as MSBuild's replayed prose, in which a fatal
+    // evaluation failure and an ordinary restore warning are indistinguishable — so the one channel that
+    // could name the cause names neither. Error rather than warning, and independent of executionSuccessful:
+    // the opt-out buys a different exit code, not a different truth about the model.
     private static SarifNotification LoadFailureNotification(IReadOnlyList<string> failedProjects)
     {
         string subject = ProjectSubject(failedProjects.Count);

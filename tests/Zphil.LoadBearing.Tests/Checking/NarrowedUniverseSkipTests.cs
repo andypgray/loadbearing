@@ -115,8 +115,8 @@ public sealed class NarrowedUniverseSkipTests
     [Fact]
     public void Check_EmptySubjectWithNoNarrowing_IsStillRed()
     {
-        // The invariant this whole change is measured against: an unfiltered run must reach byte-identical
-        // verdicts. Over the whole solution an empty subject is a spec defect and stays loud.
+        // The invariant the narrowed-universe skip is measured against: an unfiltered run must reach
+        // byte-identical verdicts. Over the whole solution an empty subject is a spec defect and stays loud.
         RuleResult result = Checker.Run(WebAndData, BaselineIndex.Empty, null, arch =>
                 arch.Rule("layering/x")
                     .Enforce(arch.Namespace("App.Nowhere.*").MustNotReference(arch.Namespace("App.Data.*")))

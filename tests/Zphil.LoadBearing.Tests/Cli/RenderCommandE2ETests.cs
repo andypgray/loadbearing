@@ -13,7 +13,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 /// <summary>
 ///     End-to-end <c>render</c> against the real MyApp fixture solution (one class, so xUnit serializes
 ///     the runs that share the bin-copied tree; each test establishes its own AGENTS.md state). Proves
-///     the acceptance boxes: a fresh render writes the pinned root and scope files with the right stdout
+///     the render contract: a fresh render writes the pinned root and scope files with the right stdout
 ///     lines; a re-render is a byte-identical zero diff (<c>unchanged</c>); hand content around the
 ///     markers survives byte-for-byte (LF and CRLF); a no-scope spec writes the root file only; and
 ///     <c>--diagram</c> adds two Mermaid fences — the codebase graph and the spec's law — as a target of

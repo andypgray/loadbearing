@@ -5,13 +5,9 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Extraction;
 
 /// <summary>
-///     The Shouldly surface over total-fact equality of two <see cref="CodebaseModel" />s: the claim the
-///     round-trip, incremental-store and replay suites are actually making —
-///     <em>
-///         this model carries the same
-///         facts as that one
-///     </em>
-///     — rather than the two <see cref="ModelDump" /> renders that establish it.
+///     The Shouldly surface over total-fact equality of two <see cref="CodebaseModel" />s: the claim that
+///     <em>this model carries the same facts as that one</em>, rather than the two
+///     <see cref="ModelDump" /> renders that establish it.
 /// </summary>
 /// <remarks>
 ///     <para>

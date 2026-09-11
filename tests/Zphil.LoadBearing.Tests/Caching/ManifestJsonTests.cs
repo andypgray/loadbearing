@@ -58,6 +58,7 @@ public sealed class ManifestJsonTests
         json.ShouldContain("\"MemberKind\":\"Property\"");
         json.ShouldContain("\"Lifetime\":\"Scoped\"");
         json.ShouldContain("\"Kind\":\"SharedProject\"");
+        json.ShouldContain("\"TokensPerLine\":[1,0,2]");
     }
 
     [Fact]
@@ -171,7 +172,8 @@ public sealed class ManifestJsonTests
             Sha256: "9f2c",
             Promoted: true);
 
-        // An absent file, so the nullable hash and the false flags are exercised alongside their opposites.
+        // An absent file, so the nullable hash, the null shape and the false flags are exercised alongside
+        // their opposites.
         var documentStamp = new FileStamp(
             Path: "C:/repo/src/App/Widget.cs",
             Exists: false,
@@ -180,12 +182,23 @@ public sealed class ManifestJsonTests
             Sha256: null,
             Promoted: false);
 
+        // And a present one carrying the shape, whose per-line token profile is the newest nested collection
+        // in the graph and the one a resolver swap would most easily flatten or drop.
+        var shapedDocumentStamp = new FileStamp(
+            Path: "C:/repo/src/App/Gadget.cs",
+            Exists: true,
+            LastWriteTimeUtcTicks: 638_000_000_000_000_002,
+            Length: 96,
+            Sha256: "7b40",
+            Promoted: true,
+            Shape: new SourceShape("3c1a", [1, 0, 2]));
+
         var project = new ProjectCacheEntry(
             ProjectName: "App",
             CsprojPath: "C:/repo/src/App/App.csproj",
             ProjectDirectory: "C:/repo/src/App",
             ProjectReferences: ["Lib"],
-            Documents: [documentStamp],
+            Documents: [documentStamp, shapedDocumentStamp],
             ContentKey: "content-9f2c",
             MerkleKey: "merkle-4d81");
 

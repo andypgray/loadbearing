@@ -49,6 +49,12 @@ public sealed class ExtractionCacheStoreTests
     // replay as one nothing was evaluated for — a rule about what a project targets or ships would find no
     // subject at all and pass over a solution it has never read.
     [InlineData(25)]
+    // A v26 cache predates the shape on a document stamp (schema bumped 26→27). This one would in fact
+    // deserialize — the slot defaults to null, and every document would take the hash-only path until its
+    // next real change, which is slow rather than wrong. It is refused anyway, because the rule here is that
+    // a manifest is read only by the writer of its shape: a reader that starts reasoning about which slots a
+    // file predates is one bump away from reasoning wrongly.
+    [InlineData(26)]
     public void ReadAndValidate_SchemaVersionOtherThanTheCurrentOne_ReturnsMiss(int schemaVersion)
     {
         // Arrange
@@ -459,7 +465,268 @@ public sealed class ExtractionCacheStoreTests
             .ShouldBe(1);
     }
 
+    // ── trivia-only edits: remap rather than dirty ──────────────────────────────────────────────────────
+
+    [Fact]
+    public void ReadAndValidate_CommentOnlyEdit_HitsWithSitesMovedAndRehashesOnce()
+    {
+        // Arrange — one project whose fragment carries sites on the two field lines of its only document.
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", TwoFieldClass("A")));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.Write(store.CaptureFingerprint(solution.Projects), SitedExtraction(solution, ("A", "A.cs", [3, 4])))
+            .ShouldBeTrue();
+
+        // The control: a clean tree hits without opening a file.
+        long beforeClean = store.ContentHashCount;
+        store.ReadAndValidate()
+            .Outcome.ShouldBe(CacheOutcome.Hit);
+        (store.ContentHashCount - beforeClean).ShouldBe(0);
+
+        // Act — two comment lines above the class. Every fact the fragment holds is still true; only the
+        // lines it holds them at have moved.
+        PrependLines(solution.PathOf("A", "A.cs"), "// a note", "// and another");
+        long beforeEdit = store.ContentHashCount;
+        CacheReadResult afterEdit = store.ReadAndValidate();
+
+        // Assert — a hit, one read (the edited document), and the sites moved down by the two comment lines.
+        afterEdit.Outcome.ShouldBe(CacheOutcome.Hit);
+        (store.ContentHashCount - beforeEdit).ShouldBe(1);
+        store.LastRemappedDocuments.ShouldBe([Path.GetFullPath(solution.PathOf("A", "A.cs"))]);
+        SiteLinesOf(afterEdit, "A")
+            .ShouldBe([5, 6]);
+
+        // Act 2 — the promoted manifest describes the edited tree, so the next validation is pure-stat.
+        byte[] afterPromotion = File.ReadAllBytes(solution.CacheFilePath);
+        long beforeSettled = store.ContentHashCount;
+        CacheReadResult settled = store.ReadAndValidate();
+
+        // Assert 2 — nothing read, nothing remapped, and nothing rewritten: no perpetual churn.
+        settled.Outcome.ShouldBe(CacheOutcome.Hit);
+        (store.ContentHashCount - beforeSettled).ShouldBe(0);
+        store.LastRemappedDocuments.ShouldBeEmpty();
+        File.ReadAllBytes(solution.CacheFilePath)
+            .ShouldBe(afterPromotion);
+    }
+
+    [Fact]
+    public void ReadAndValidate_CommentOnlyEditInADependency_LeavesTheDependentClean()
+    {
+        // Arrange — B references A, and both fragments carry sites in their own document.
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", TwoFieldClass("A")));
+        solution.AddProject("B", ["A"], ("B.cs", TwoFieldClass("B")));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        ExtractionResult extraction = SitedExtraction(solution, ("A", "A.cs", [3, 4]), ("B", "B.cs", [3, 4]));
+        store.Write(store.CaptureFingerprint(solution.Projects), extraction)
+            .ShouldBeTrue();
+
+        // Act — a comment edit in the dependency alone.
+        PrependLines(solution.PathOf("A", "A.cs"), "// a note", "// and another");
+        CacheReadResult result = store.ReadAndValidate();
+
+        // Assert — the dependent is not dirtied by a change that moved no fact, and its own sites are
+        // untouched: the map belongs to A.cs, and B holds nothing there.
+        result.Outcome.ShouldBe(CacheOutcome.Hit);
+        result.DirtyProjects.ShouldBeEmpty();
+        SiteLinesOf(result, "A")
+            .ShouldBe([5, 6]);
+        SiteLinesOf(result, "B")
+            .ShouldBe([3, 4]);
+        store.LastRemappedDocuments.ShouldBe([Path.GetFullPath(solution.PathOf("A", "A.cs"))]);
+    }
+
+    [Fact]
+    public void ReadAndValidate_StringLiteralEdit_PartialWithDependents()
+    {
+        // Arrange — A's document carries a string literal, which is a token and therefore part of its shape.
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", ClassWithLiteral("A", "before")));
+        solution.AddProject("B", ["A"], ("B.cs", TwoFieldClass("B")));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.Write(store.CaptureFingerprint(solution.Projects), SitedExtraction(solution, ("A", "A.cs", [3, 4])))
+            .ShouldBeTrue();
+
+        // Act — the literal's text changes and nothing else does.
+        RewriteBackdated(solution.PathOf("A", "A.cs"), ClassWithLiteral("A", "after"));
+        CacheReadResult result = store.ReadAndValidate();
+
+        // Assert — an edit inside a token is an ordinary content change, so the dependent goes with it.
+        result.Outcome.ShouldBe(CacheOutcome.Partial);
+        result.DirtyProjects.ShouldBe(["A", "B"], true);
+    }
+
+    [Fact]
+    public void ReadAndValidate_PragmaInserted_PartialWithDependents()
+    {
+        // Arrange
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", TwoFieldClass("A")));
+        solution.AddProject("B", ["A"], ("B.cs", TwoFieldClass("B")));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.Write(store.CaptureFingerprint(solution.Projects), SitedExtraction(solution, ("A", "A.cs", [3, 4])))
+            .ShouldBeTrue();
+
+        // Act — a directive, not a comment. It changes what the compiler sees, so it changes the shape.
+        PrependLines(solution.PathOf("A", "A.cs"), "#pragma warning disable CS0169");
+        CacheReadResult result = store.ReadAndValidate();
+
+        // Assert
+        result.Outcome.ShouldBe(CacheOutcome.Partial);
+        result.DirtyProjects.ShouldBe(["A", "B"], true);
+    }
+
+    [Fact]
+    public void ReadAndValidate_SiteOnATokenlessLine_DirtiesThatProjectOnly()
+    {
+        // Arrange — A's fragment claims a site on the blank line between its two fields. A blank line starts
+        // no token, so the map that a comment edit yields has no entry for it.
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", TwoFieldClassWithGap("A")));
+        solution.AddProject("B", ["A"], ("B.cs", TwoFieldClass("B")));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        ExtractionResult extraction = SitedExtraction(solution, ("A", "A.cs", [4]), ("B", "B.cs", [3, 4]));
+        store.Write(store.CaptureFingerprint(solution.Projects), extraction)
+            .ShouldBeTrue();
+
+        // Act
+        PrependLines(solution.PathOf("A", "A.cs"), "// a note", "// and another");
+        CacheReadResult result = store.ReadAndValidate();
+
+        // Assert — A alone re-extracts. B is left clean because the equivalence it relies on — what A's
+        // compilation exposes — is exactly what a trivia-only edit cannot have moved.
+        result.Outcome.ShouldBe(CacheOutcome.Partial);
+        result.DirtyProjects.ShouldBe(["A"]);
+        result.ReusableFragments.Select(fragment => fragment.ProjectName)
+            .ShouldBe(["B"]);
+    }
+
+    [Fact]
+    public void ReadAndValidate_TokenBearingLineSplit_PartialWithDependents()
+    {
+        // Arrange
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", TwoFieldClass("A")));
+        solution.AddProject("B", ["A"], ("B.cs", TwoFieldClass("B")));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.Write(store.CaptureFingerprint(solution.Projects), SitedExtraction(solution, ("A", "A.cs", [3, 4])))
+            .ShouldBeTrue();
+
+        // Act — the same tokens, on more lines: `int x;` becomes `int` and `x;`. The shape is unchanged, but
+        // one old line's tokens now sit on two, so no line map can say where that line went.
+        RewriteBackdated(solution.PathOf("A", "A.cs"), "class A\n{\n    int\n        x;\n    int y;\n}\n");
+        CacheReadResult result = store.ReadAndValidate();
+
+        // Assert
+        result.Outcome.ShouldBe(CacheOutcome.Partial);
+        result.DirtyProjects.ShouldBe(["A", "B"], true);
+    }
+
+    [Fact]
+    public void CaptureFingerprint_StampsEachDocumentWithItsShape()
+    {
+        // Arrange
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", TwoFieldClass("A")), ("B.cs", TwoFieldClassWithGap("B")));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+
+        // Act
+        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
+            .ShouldBeTrue();
+
+        // Assert — the shape is the half of a document stamp that tells a trivia-only edit from a real one,
+        // so every document carries one: a digest in the same lowercase-hex form as the content hash beside
+        // it, and one token count per line of the file.
+        IReadOnlyList<JsonObject> documents = solution.CacheDocumentStamps();
+        documents.Count.ShouldBe(2);
+        foreach (JsonObject document in documents)
+        {
+            var path = document["Path"]!.GetValue<string>();
+            JsonNode shape = document["Shape"].ShouldNotBeNull();
+            shape["Hash"]!.GetValue<string>()
+                .ShouldMatch("^[0-9a-f]{64}$");
+            shape["TokensPerLine"]!.AsArray()
+                .Count.ShouldBe(File.ReadAllText(path)
+                    .Split('\n')
+                    .Length);
+        }
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────────────────────────────────────
+
+    // Real C# whose every named line starts with a token, so a site on one is a site a line map can move.
+    private static string TwoFieldClass(string name)
+    {
+        return $"class {name}\n{{\n    int x;\n    int y;\n}}\n";
+    }
+
+    // The same, with a blank line 4 — a line no token starts, and so one no map has an entry for.
+    private static string TwoFieldClassWithGap(string name)
+    {
+        return $"class {name}\n{{\n    int x;\n\n    int y;\n}}\n";
+    }
+
+    private static string ClassWithLiteral(string name, string literal)
+    {
+        return $"class {name}\n{{\n    string s = \"{literal}\";\n    int y;\n}}\n";
+    }
+
+    // The trivial fragments carry no sites at all, so nothing in them can be seen to move. Each placement
+    // gives one project's fragment a single edge whose sites sit on the named lines of the named file — an
+    // edge is three strings and a site list, so no compilation is needed to mint a real one.
+    private static ExtractionResult SitedExtraction(
+        SyntheticSolution solution, params (string Project, string File, int[] Lines)[] placements)
+    {
+        List<CodebaseFragment> fragments = solution.Projects
+            .Select(project => new CodebaseFragment(
+                project.ProjectName, null, project.ProjectReferences, [], [],
+                EdgesFor(solution, project.ProjectName, placements), [], [], [], [], [], [], []))
+            .ToList();
+        return new ExtractionResult(fragments, [], new WorkspaceDiagnostics(["diag"], [], [], [], [], [], []));
+    }
+
+    private static IReadOnlyList<FragmentEdge> EdgesFor(
+        SyntheticSolution solution, string projectName, IReadOnlyList<(string Project, string File, int[] Lines)> placements)
+    {
+        return placements
+            .Where(placement => string.Equals(placement.Project, projectName, StringComparison.Ordinal))
+            .Select(placement => new FragmentEdge(
+                $"N.{placement.Project}.Source",
+                "N.Target",
+                placement.Lines.Select(line => new FragmentSite(Path.GetFullPath(solution.PathOf(placement.Project, placement.File)), line))
+                    .ToList()))
+            .ToList();
+    }
+
+    private static IReadOnlyList<int> SiteLinesOf(CacheReadResult result, string projectName)
+    {
+        return result.ReusableFragments
+            .Single(fragment => string.Equals(fragment.ProjectName, projectName, StringComparison.Ordinal))
+            .Edges.Single()
+            .Sites.Select(site => site.Line)
+            .ToList();
+    }
+
+    // Rewrites a document and puts its mtime an hour into the past, so the next capture stamps it promoted
+    // and the sweep that follows takes the stat fast path rather than re-reading it for the racy window.
+    private static void RewriteBackdated(string path, string content)
+    {
+        File.WriteAllText(path, content);
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddHours(-1));
+    }
+
+    private static void PrependLines(string path, params string[] lines)
+    {
+        string prefix = string.Concat(lines.Select(line => line + "\n"));
+        RewriteBackdated(path, prefix + File.ReadAllText(path));
+    }
 
     private static ExtractionResult TrivialExtraction(SyntheticSolution solution)
     {
@@ -572,6 +839,17 @@ public sealed class ExtractionCacheStoreTests
         public string DefaultLayoutAssetsPathOf(string name)
         {
             return Path.GetFullPath(Path.Combine(Root, "src", name, "obj", "project.assets.json"));
+        }
+
+        // Every document stamp the written manifest carries, across all its projects, as the raw JSON the
+        // store wrote — the level a claim about a persisted slot has to be read at.
+        public IReadOnlyList<JsonObject> CacheDocumentStamps()
+        {
+            var root = (JsonObject)JsonNode.Parse(File.ReadAllText(CacheFilePath))!;
+            return root["Projects"]!.AsArray()
+                .SelectMany(project => project!["Documents"]!.AsArray())
+                .Select(document => (JsonObject)document!)
+                .ToList();
         }
 
         // Every structural stamp the written manifest carries, path -> whether the file existed at capture.

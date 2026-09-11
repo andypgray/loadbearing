@@ -20,10 +20,10 @@ internal sealed class TempGitRepo : IDisposable
 
     /// <param name="callerFilePath">
     ///     Compiler-supplied; never passed explicitly. Threaded through to <see cref="TempFixtureWorkspace" />
-    ///     so the lease is keyed on the <em>consumer's</em> source file rather than on this one. Six
-    ///     consumers across four classes used to collide on the single key <c>TempGitRepo.cs</c> minted, and
-    ///     since a lease is exclusive, five of the six silently fell through to a private copy — each paying
-    ///     a fresh <c>dotnet restore</c> and a permanently cold extraction cache.
+    ///     so the lease is keyed on the <em>consumer's</em> source file rather than on this one. Without it
+    ///     every consumer shares the one key this file would mint, and since a lease is exclusive, all but
+    ///     one silently falls through to a private copy — each paying a fresh <c>dotnet restore</c> and a
+    ///     permanently cold extraction cache.
     /// </param>
     public TempGitRepo([CallerFilePath] string callerFilePath = "")
     {

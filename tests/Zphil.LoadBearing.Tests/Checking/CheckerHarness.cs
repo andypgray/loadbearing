@@ -50,9 +50,9 @@ internal static class Checker
     }
 
     /// <summary>
-    ///     Checks over a run a solution filter narrowed — the internal overload the CLI and the adapter
-    ///     reach through <c>ArchCheckSequence</c>, so a test can put a rule's empty subject in front of a
-    ///     universe that is smaller than the solution.
+    ///     Checks over a run a solution filter narrowed — the same internal overload a narrowed production
+    ///     run takes — so a test can put a rule's empty subject in front of a universe that is smaller than
+    ///     the solution.
     /// </summary>
     public static CheckReport Run(
         CodebaseModel codebase, BaselineIndex baselines, NarrowedUniverse? narrowing, Action<Arch> define)
@@ -188,9 +188,9 @@ internal static class Checker
     ///         moving it would make the harness depend on the assertions rather than the other way round.
     ///     </para>
     ///     <para>
-    ///         What survives here after the sweep is the deliberate remainder: the rows whose subject is the
-    ///         projection itself — report order, an arbitrary slot no named reader offers, or two reads
-    ///         cross-compared. No row calls both a reader and an outcome verb.
+    ///         What stays here is the rows whose subject is the projection itself — report order, an
+    ///         arbitrary slot no named reader offers, or two reads cross-compared. No row calls both a
+    ///         reader and an outcome verb.
     ///     </para>
     /// </remarks>
     public static IReadOnlyList<string> Violators(

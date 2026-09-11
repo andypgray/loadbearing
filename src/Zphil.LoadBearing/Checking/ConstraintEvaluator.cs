@@ -614,14 +614,13 @@ internal sealed class ConstraintEvaluator
     ///     because it lies on no circle.
     /// </summary>
     /// <remarks>
-    ///     A violation's identity is the type pair, never the cycle. That is what keeps the baseline, the
-    ///     ratchet, the human report and SARIF untouched by this verb: a baseline keyed on circles would
-    ///     churn by dozens of entries the moment one new arrow closed another circle, and enumerating the
-    ///     circles of a component is exponential in its size where the arrows are linear. The consequence
-    ///     is that the intended direction is blamed beside the stray back-reference — both arrows of a
-    ///     two-cell circle red — by design: this verb says only that a circle exists, and the author who
-    ///     knows which way the cells should point writes an ordering rule instead. The circle's cell names
-    ///     ride on <see cref="Violation.Detail" />, which the JSON channel alone reads.
+    ///     A violation's identity is the type pair, never the cycle: a baseline keyed on circles would churn
+    ///     as arrows close new circles and enumerating a component's circles is exponential, so the pair is
+    ///     what keeps the baseline, the ratchet, the human report and SARIF untouched by this verb. The
+    ///     consequence is that the intended direction is blamed beside the stray back-reference — both
+    ///     arrows of a two-cell circle red — by design: this verb says only that a circle exists, and the
+    ///     author who knows which way the cells should point writes an ordering rule instead. The circle's
+    ///     cell names ride on <see cref="Violation.Detail" />, which the JSON channel alone reads.
     ///     <para>
     ///         A family of layers is required by spec-build item 29, so both throws below fail closed
     ///         rather than describing a shape a built model can carry — the projects arm doubly so, since

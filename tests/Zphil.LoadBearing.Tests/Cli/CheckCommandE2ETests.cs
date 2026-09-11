@@ -7,10 +7,12 @@ namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
 ///     End-to-end <c>check</c> runs against the real MyApp fixture solution (each loads a fresh
-///     workspace). The violated spec is the acceptance box — one failing rule showing ID, because,
+///     workspace). The violated spec is the acceptance test — one failing rule showing ID, because,
 ///     fix, and <c>file:line</c> together — plus the quarantine containment (uncaptured hard red + facade
 ///     green + tripwire skip), the JSON golden pin, and the SARIF golden pin (with its <c>--json</c>
 ///     stdout-purity guard); the clean spec exits 0.
+/// </summary>
+/// <remarks>
 ///     <para>
 ///         The <c>--rules</c> rows pin the narrowing knob: it decides what <em>runs</em>, so the report, the
 ///         summary counts and the 0/1 verdict are all the subset's, and the human stamp (or the document's
@@ -26,7 +28,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///         <c>violationCount</c> and per-violation <c>siteCount</c> ride every rung, so the keys a consumer
 ///         scripts against never depend on the grain the report landed on.
 ///     </para>
-/// </summary>
+/// </remarks>
 [Collection("Serial")]
 public sealed class CheckCommandE2ETests
 {

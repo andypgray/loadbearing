@@ -135,10 +135,9 @@ internal static class ModelDump
         return builder.ToString();
     }
 
-    // Every fact a project node carries, including the two that went unrendered until the artifact facts
-    // arrived beside them: a dump comparison can only see a dropped field if the dump prints it, and
-    // solutionMember and factsFollow were both round-tripping unwatched. A site renders as its own file:line
-    // or <null>, so a fact that loses its declaration is a visible diff rather than a silent one.
+    // Every fact a project node carries: a dump comparison can only see a dropped field if the dump prints
+    // it. A site renders as its own file:line or <null>, so a fact that loses its declaration is a visible
+    // diff rather than a silent one.
     private static void RenderProject(StringBuilder builder, ProjectNode project)
     {
         builder.Append(project.Name)

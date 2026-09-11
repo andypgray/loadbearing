@@ -54,8 +54,8 @@ internal static class RuleResultAssertions
     ///     matched no types is a warning, never a failure (GRAMMAR §4.1).
     /// </summary>
     /// <remarks>
-    ///     Holds the warning's pinned wording, which is why the sites that call this no longer spell it
-    ///     out. One site still does, so the string keeps a literal pin that does not run through here.
+    ///     Holds the warning's pinned wording, which one row also spells out as a literal of its own —
+    ///     the two must agree.
     /// </remarks>
     internal static RuleResult ShouldHaveWarnedInertTarget(this RuleResult result)
     {

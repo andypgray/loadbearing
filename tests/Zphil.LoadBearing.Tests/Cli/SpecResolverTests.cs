@@ -9,8 +9,8 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
-///     The spec-resolution convention core (ratified decision 1) over plain tuples — no workspace
-///     needed: the unique <em>declared</em> solution member referencing <c>Zphil.LoadBearing.dll</c> wins;
+///     The spec-resolution convention core over plain tuples — no workspace needed: the unique
+///     <em>declared</em> solution member referencing <c>Zphil.LoadBearing.dll</c> wins;
 ///     zero and many are loud errors; a missing built output is a loud error pointing at <c>dotnet build</c>.
 /// </summary>
 public sealed class SpecResolverTests
@@ -281,12 +281,12 @@ public sealed class SpecResolverTests
     public void ResolveConventionProject_LoadDiagnosticsButNothingFailed_StillBlamesTheLoad()
     {
         // The residual arm: the load reported a problem about this solution while blaming no project, so
-        // neither gate cause fired and there is nothing to name but the diagnostic itself. It is no longer
-        // the locked-mode shape — that lands on the restore block above, and this comment went on calling it
-        // the locked-mode shape for as long as the field message was broken, because the arm it guards is
-        // hand-built from lists a test can leave empty. Keying this arm on the diagnostics is legitimate
-        // exactly because it gates nothing — it chooses between two spellings of one refusal, and the reader
-        // is sent to repair the load rather than to write an argument that cannot help.
+        // neither gate cause fired and there is nothing to name but the diagnostic itself. It is not the
+        // locked-mode shape — that lands on the restore block above — and nothing reds if this comment
+        // drifts from the arm, which is hand-built from lists a test can leave empty. Keying this arm on the
+        // diagnostics is legitimate exactly because it gates nothing — it chooses between two spellings of
+        // one refusal, and the reader is sent to repair the load rather than to write an argument that
+        // cannot help.
         var diagnostics = new WorkspaceDiagnostics([LockFileFailure], [], [], [], [], [], []);
 
         var error = Should.Throw<UserErrorException>(() =>

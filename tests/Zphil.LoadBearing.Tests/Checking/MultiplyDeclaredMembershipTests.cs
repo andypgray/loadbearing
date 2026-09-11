@@ -41,13 +41,10 @@ namespace Zphil.LoadBearing.Tests.Checking;
 ///         So <c>Shared.Widget</c> and <c>Shared.WidgetPart</c> are each one node declared by Core, Stub and
 ///         Tool, and the four reference edges around them span every case the attribution rule parts:
 ///         <c>Shared.Widget → Shared.WidgetPart</c> (both ends multiply declared),
-///         <c>
-///             Core.User →
-///             Shared.Widget
-///         </c>
-///         and <c>Tool.Command → Shared.Widget</c> (a declarer reaching its own compiled-in
-///         copy, from the winner and from a loser), and <c>Client.Consumer → Shared.Widget</c> (a project
-///         that declares nothing shared reaching the winner's declaration).
+///         <c>Core.User → Shared.Widget</c> and <c>Tool.Command → Shared.Widget</c> (a declarer reaching
+///         its own compiled-in copy, from the winner and from a loser), and
+///         <c>Client.Consumer → Shared.Widget</c> (a project that declares nothing shared reaching the
+///         winner's declaration).
 ///     </para>
 /// </remarks>
 internal static class MultiplyDeclaredCodebase

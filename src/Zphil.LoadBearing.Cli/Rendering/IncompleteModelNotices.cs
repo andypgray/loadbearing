@@ -8,12 +8,12 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Four verbs wrote the same three steps — ask <see cref="WorkspaceDiagnostics.Gates" /> whether the
-///         model is incomplete and the operator did not opt out, write the verb's refusal to stderr as a line
-///         block, exit 2 — and only the wording that followed differed. The wording stays in
-///         <see cref="IncompleteModelGate" />, because the xUnit adapter and the MCP surface state the same
-///         condition and have no writer to hand; what lives here is the CLI's half, which is the part that
-///         had four copies.
+///         Every refusing verb takes the same three steps — ask <see cref="WorkspaceDiagnostics.Gates" />
+///         whether the model is incomplete and the operator did not opt out, write the verb's refusal to
+///         stderr as a line block, exit 2 — and differs only in the wording that follows. That wording stays
+///         in <see cref="IncompleteModelGate" />, because the xUnit adapter and the MCP surface state the
+///         same condition and have no writer to hand; what lives here is the CLI's half, the part every verb
+///         would otherwise spell for itself.
 ///     </para>
 ///     <para>
 ///         The exit code stays with the caller, as it does for <see cref="NarrowingNotices.Refusal" />: this

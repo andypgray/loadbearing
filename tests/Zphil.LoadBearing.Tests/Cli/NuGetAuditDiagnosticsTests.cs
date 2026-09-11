@@ -8,19 +8,16 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     Pins the audit-family boundary that <see cref="NuGetAuditDiagnostics.IsAudit" /> draws over raw
 ///     diagnostic message strings. The matching arm leads with the shapes that actually reach a host —
 ///     captured from MSBuildWorkspace runs over solutions carrying real advisories, where Roslyn has
-///     already dropped the NU19xx code — because the code-only matcher this replaced never fired on one
-///     (issue #19). A neighbouring restore code, a truncated token, an ordinary load failure, and text that
-///     merely mentions a vulnerability all still miss. No workspace is involved, so this is a fast,
-///     non-<c>Serial</c> unit pin.
+///     already dropped the NU19xx code, so a code-only matcher never fires on one. A neighbouring restore
+///     code, a truncated token, an ordinary load failure, and text that merely mentions a vulnerability all
+///     still miss. No workspace is involved, so this is a fast, non-<c>Serial</c> unit pin.
 /// </summary>
 /// <remarks>
-///     <b>What a wrong answer here now costs.</b> This classifier used to be a gate input, so a miss refused
-///     a healthy solution and a false hit let a broken one through. It decides no verdict any more — the
-///     fail-closed gate reads which projects failed to load, off the loaded solution's structure — so what
-///     turns on these cases is only which of two spellings a refusal that was going to happen anyway uses,
-///     and the order a bounded quote puts its evidence in. The boundary stays narrow and stays pinned
-///     because a message that offers the load as an explanation should not be triggered by an advisory
-///     published this morning; it is no longer load-bearing for any exit code.
+///     This classifier decides no verdict: the fail-closed gate reads which projects failed to load, off the
+///     loaded solution's structure, so what turns on these cases is only which of two spellings a refusal
+///     that was going to happen anyway uses, and the order a bounded quote puts its evidence in. The
+///     boundary stays narrow and stays pinned because a message that offers the load as an explanation
+///     should not be triggered by an advisory published this morning.
 /// </remarks>
 public sealed class NuGetAuditDiagnosticsTests
 {

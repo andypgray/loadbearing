@@ -14,9 +14,13 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 ///     normalization) to the CLI verb it shells over — parity by construction (each tool runs the same
 ///     runner into a captured writer). One method per solution+spec combo; the explain rows ride the DLL
 ///     fast path (no workspace), <c>arch_context</c> is pinned against the render card text, and the
-///     <c>diffBase</c> row mirrors <see cref="TripwireDiffE2ETests" /> over a real git repo. Serialized
-///     with the watchdog suites — the filter brackets each call with the shared
-///     <see cref="Zphil.LoadBearing.Cli.Mcp.Infrastructure.IdleTimeoutWatchdog" /> in-flight counter.
+///     <c>diffBase</c> row mirrors <see cref="TripwireDiffE2ETests" /> over a real git repo.
+/// </summary>
+/// <remarks>
+///     <para>
+///         Serialized with the watchdog suites — the filter brackets each call with the shared
+///         <see cref="Zphil.LoadBearing.Cli.Mcp.Infrastructure.IdleTimeoutWatchdog" /> in-flight counter.
+///     </para>
 ///     <para>
 ///         The narrowing rows extend the same contract to the knobs — each tool argument produces exactly
 ///         what its CLI option produces — and the two budget rows cover the one behaviour with no CLI
@@ -26,12 +30,12 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 ///         rungs returns the coarser one's own document, down to the floor. That identity is the whole
 ///         claim, because it is what makes a degraded answer a complete document rather than a cut one.
 ///     </para>
-/// </summary>
-/// <remarks>
-///     The CLI side of every row runs <see cref="CliRunner.InvokeColdAsync(string[])" />, not the warm-by-default
-///     <see cref="CliRunner.InvokeAsync" />. The harness these rows compare against is warm, so this is the
-///     suite's warm-against-cold net; serving both sides from one pooled workspace would make it compare
-///     the warm path with itself.
+///     <para>
+///         The CLI side of every row runs <see cref="CliRunner.InvokeColdAsync(string[])" />, not the warm-by-default
+///         <see cref="CliRunner.InvokeAsync" />. The harness these rows compare against is warm, so this is
+///         the suite's warm-against-cold net; serving both sides from one pooled workspace would make it
+///         compare the warm path with itself.
+///     </para>
 /// </remarks>
 [Collection("Serial")]
 public sealed class CliMcpParityTests
@@ -381,7 +385,6 @@ public sealed class CliMcpParityTests
     ///     is byte-identical to the CLI document for the grain it landed on: over a budget between two
     ///     adjacent <paramref name="rungs" /> the tool must return the whole coarser document — nothing cut,
     ///     so the JSON still parses and the client reads a whole answer rather than half of one.
-    ///     <paramref name="verdict" /> is the exit contract every CLI leg must meet.
     /// </summary>
     /// <remarks>
     ///     Every budget is derived from the CLI documents either side of the rung under test rather than

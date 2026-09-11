@@ -7,7 +7,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 /// <summary>
 ///     End-to-end acceptance for the derive flow, driven against the golden post-curation
 ///     artifact (<c>MyAppDerivedSpec</c>) over a private, restored copy of the MyApp fixture
-///     (<see cref="TempFixtureWorkspace" />). The one fact walks the acceptance box end to end: a derived
+///     (<see cref="TempFixtureWorkspace" />). The one fact walks the whole flow end to end: a derived
 ///     proposal <c>check</c>s red on a virgin estate, one <c>baseline --init</c> grandfathers the debt into
 ///     conventional baselines, the re-check is green, and <c>render</c> emits the agent context. Batched
 ///     into a single fact because each workspace costs a restore.
@@ -16,7 +16,7 @@ namespace Zphil.LoadBearing.Tests.Cli;
 public sealed class DeriveFlowE2ETests
 {
     /// <summary>
-    ///     Mechanizes the acceptance box on the golden derived spec: derive proposal ->
+    ///     Mechanizes the derive flow on the golden derived spec: derive proposal ->
     ///     <c>check</c> runs red with violations (evidence, not failure) -> <c>baseline --init</c> turns
     ///     them into the team's grandfathered baseline -> re-check is green -> <c>render</c> writes the
     ///     managed AGENTS.md context. The checked-in fixture ships two baseline files that would partially

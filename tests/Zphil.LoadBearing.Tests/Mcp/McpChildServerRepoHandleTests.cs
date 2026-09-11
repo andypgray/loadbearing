@@ -9,10 +9,9 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 
 /// <summary>
 ///     The property no architecture rule can express: a long-lived host must not retain a handle on this
-///     repository's build outputs. Twice that property was broken and found live rather than by a gate — a
-///     diff child inheriting the server's JSON-RPC stdin, and path-loaded spec assemblies pinning the build
-///     output for the server's whole lifetime — so here it is checked, against a real child process over real
-///     stdio.
+///     repository's build outputs. Its two known failure shapes — a diff child inheriting the server's
+///     JSON-RPC stdin, and path-loaded spec assemblies pinning the build output for the server's whole
+///     lifetime — are checked here against a real child process over real stdio.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -33,24 +32,18 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 ///         behind it regresses.
 ///     </para>
 ///     <para>
-///         <b>Acquired, not handed.</b> Both tests exclude the handles this test process already held when it
-///         started the child (see <see cref="LauncherHandlesUnderRepo" />) — redirecting a child's streams
-///         creates it with handle inheritance on, so it is handed a copy of the launcher's own
-///         current-directory handle, which is inside the repository whenever the suite is run from it. That
-///         is a handle the server was given, not one it opened, and no change to the server could release it.
-///         The exclusion is exact-path and handle-only; the negative control proves it does not gut the scan,
-///         because the in-repo server's own working-directory handle survives it.
+///         <b>Acquired, not handed.</b> Both tests exclude the handles this process already held when it
+///         started the child — see <see cref="LauncherHandlesUnderRepo" />. The exclusion is exact-path and
+///         handle-only, and the negative control proves it does not gut the scan, because the in-repo
+///         server's own working-directory handle survives it.
 ///     </para>
 ///     <para>
-///         <b>Injected, not chosen.</b> A profiler is the same story on the mapped-view side, which is the
-///         side inheritance cannot reach. Under a coverage run the child inherits the environment naming
-///         the CLR profiler and maps it — measured 2026-09-01: the instrumentation engine and covrun64.dll,
-///         both out of the collector's redistributable directory inside the test output, and therefore
-///         under this repository. Nothing the server does can decline them, so both tests discount whatever
-///         sits under <see cref="ProcessFileFootprint.InjectedProfilerDirectory" />; with no profiler
-///         attached that is null and nothing is excused. Worth keeping sharp, because this test exists to
-///         catch the server pinning the build tree, and a profiler the harness forced in is not the server
-///         doing that.
+///         <b>Injected, not chosen.</b> A profiler is the same story on the mapped-view side, which
+///         inheritance cannot reach: under a coverage run the child inherits the environment naming the CLR
+///         profiler and maps the collector's engine out of the test output, under this repository
+///         (measured), and nothing the server does can decline it. So both tests discount whatever sits
+///         under <see cref="ProcessFileFootprint.InjectedProfilerDirectory" /> — null, excusing nothing,
+///         with no profiler attached. A profiler the harness forced in is not the server pinning the tree.
 ///     </para>
 /// </remarks>
 [Collection("Serial")]

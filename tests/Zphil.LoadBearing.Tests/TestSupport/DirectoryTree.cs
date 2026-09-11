@@ -6,10 +6,6 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Three near-identical walks stood here before, each having separately decided the same three
-///         questions. Deciding them once, out loud, is the point of there being one:
-///     </para>
-///     <para>
 ///         <b>A directory link is copied, never descended.</b> The recursion is by hand rather than
 ///         <see cref="SearchOption.AllDirectories" />, whose enumeration walks into link targets, and these
 ///         trees contain links — the symlinked-root tripwire test leaves one beside its repo.
@@ -17,14 +13,12 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 ///         descended where the delete will not would build trees nothing can take down again.
 ///     </para>
 ///     <para>
-///         <b>Files overwrite.</b> The union of the three: the fixture copy already passed
-///         <c>overwrite: true</c>, and the other two only survived without it because their callers cleared
-///         the destination first — a property of those callers, not of the walk.
+///         <b>Files overwrite.</b> A destination that already holds a file of the same name is written over
+///         rather than left alone, so no caller has to clear the destination first.
 ///     </para>
 ///     <para>
 ///         <b>Destination directories are created per copied file</b>, so a source directory whose every
-///         file <c>include</c> withholds leaves no empty directory behind. The two withholding walks used to
-///         reproduce every source directory whatever survived in it. Nothing reads those — git does not
+///         file <c>include</c> withholds leaves no empty directory behind. Nothing needs them — git does not
 ///         track empty directories, and assembly resolution does not enumerate them — but the result is not
 ///         a directory-for-directory mirror and should not be read as one.
 ///     </para>

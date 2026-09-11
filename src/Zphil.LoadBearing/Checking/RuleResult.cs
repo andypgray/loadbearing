@@ -15,9 +15,8 @@ public sealed class RuleResult
 
     // Both the subject coverage and the ratchet measure arrive whole rather than as loose ints, and that
     // is a correctness matter rather than a tidiness one: they land next to each other, and same-typed
-    // positionals in a row are a transposition no compiler can catch. Folding the ratchet's three is the
-    // cure this comment named when there was one of them. The properties below stay ints, because that is
-    // what every renderer reads.
+    // positionals in a row are a transposition no compiler can catch. The properties below stay ints,
+    // because that is what every renderer reads.
     internal RuleResult(
         ArchRule rule,
         RuleStatus status,

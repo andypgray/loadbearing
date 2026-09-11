@@ -43,7 +43,9 @@ public sealed record WorkspaceSnapshot(Solution Solution, IReadOnlyList<string> 
     ///     bytes the sweep actually rewrote, not <see cref="Solution.GetChanges" /> or a semantic version:
     ///     extracted fragments carry <c>file:line</c> sites, so a comment-only edit that shifts line numbers
     ///     without changing any symbol must still dirty its project — and the sweep already knows that delta at
-    ///     zero extra I/O. A semantic-version identity would miss the line shift and strand stale sites.
+    ///     zero extra I/O. A semantic-version identity would miss the line shift and strand stale sites. What
+    ///     a dirty project then costs is the consumer's decision, not this map's: the fragment store reads the
+    ///     changed documents and either re-walks the project or, when only trivia moved, remaps its sites.
     /// </remarks>
     internal IReadOnlyDictionary<string, int> ProjectEditVersions { get; init; } = NoEditVersions;
 

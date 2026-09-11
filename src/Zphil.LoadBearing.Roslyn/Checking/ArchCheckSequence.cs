@@ -24,10 +24,8 @@ namespace Zphil.LoadBearing.Roslyn.Checking;
 ///         precondition to check, not a cost to pay twice.
 ///     </para>
 ///     <para>
-///         It lives in the extraction assembly because that is the one project both the CLI host and the
-///         adapter reference — the route <see cref="IncompleteModelGate" /> took for the same reason. What
-///         stays with each caller is the part that is genuinely theirs: the CLI owns the persisted cache and
-///         git, the adapter owns the cold one-shot workspace.
+///         What stays with each caller is the part that is genuinely theirs: the CLI owns the persisted
+///         cache and git, the adapter owns the cold one-shot workspace.
 ///     </para>
 /// </remarks>
 internal static class ArchCheckSequence

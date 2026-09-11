@@ -12,8 +12,7 @@ namespace Zphil.LoadBearing.Tests;
 ///     The end-to-end spec-loading proof: load the fixture DLL — built by a
 ///     separate csproj with no compile-time visibility here — in an isolated ALC, discover its spec
 ///     by reflection, assert type identity across the boundary, build the model, and enumerate a
-///     known rule. The ALC now lives in the CLI; this test re-targets it. The fixture's
-///     path is baked into this assembly's metadata by the build.
+///     known rule. The fixture's path is baked into this assembly's metadata by the build.
 /// </summary>
 public class SpecLoadingTests
 {

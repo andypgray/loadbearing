@@ -1,6 +1,9 @@
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
 using Zphil.LoadBearing.Roslyn.Solutions;
 
 namespace Zphil.LoadBearing.Roslyn.Caching;
@@ -60,12 +63,63 @@ internal static class FileStamping
     }
 
     /// <summary>
-    ///     Rebuilds a stamp from a fresh <see cref="FileFreshness" /> capture and an already-computed hash — a promotion
-    ///     after a bare touch.
+    ///     Stamps <paramref name="path" /> as a source document: everything <see cref="StampOf" /> records
+    ///     plus the <see cref="SourceShape" /> of the bytes it hashed.
     /// </summary>
-    internal static FileStamp RefreshStamp(string path, FileFreshness current, string? sha)
+    /// <remarks>
+    ///     The <see cref="FileFreshness.Capture" /> comes first, exactly as in <see cref="StampOf" />, so the
+    ///     racy-window verdict is never made against a stat taken after the read. The hash and the shape come
+    ///     from <see cref="TryReadDocument" /> — the one routine validation reads through too, which is what
+    ///     makes the two hashes and the two shapes comparable at all.
+    /// </remarks>
+    internal static FileStamp StampDocument(string path)
     {
-        return new FileStamp(path, current.Exists, current.LastWriteTimeUtc.Ticks, current.Length, sha, current.IsPromoted);
+        string full = Path.GetFullPath(path);
+        FileFreshness fresh = FileFreshness.Capture(full);
+        if (!fresh.Exists) return new FileStamp(full, false, 0, 0, null, false);
+
+        (string Sha256, SourceShape Shape)? read = TryReadDocument(full);
+        return new FileStamp(
+            full, true, fresh.LastWriteTimeUtc.Ticks, fresh.Length, read?.Sha256, fresh.IsPromoted, read?.Shape);
+    }
+
+    /// <summary>
+    ///     One read of a C# document: the lowercase-hex SHA-256 of its bytes and the
+    ///     <see cref="SourceShape" /> of the text they parse to, or null when it is unreadable — an I/O
+    ///     failure degrades exactly as <see cref="TryHashFile" /> does.
+    /// </summary>
+    /// <remarks>
+    ///     Both halves must come from the same bytes and the same parse options on the capture side and the
+    ///     validation side, or a shape comparison would be answering about two different texts. That is the
+    ///     whole reason this is one routine rather than a hash call beside a parse call.
+    /// </remarks>
+    internal static (string Sha256, SourceShape Shape)? TryReadDocument(string path)
+    {
+        try
+        {
+            byte[] bytes = File.ReadAllBytes(path);
+            string sha = Convert.ToHexStringLower(SHA256.HashData(bytes));
+
+            using var stream = new MemoryStream(bytes);
+            SourceText text = SourceText.From(stream);
+            SyntaxTree tree = CSharpSyntaxTree.ParseText(text, path: path);
+            return (sha, SourceShape.Of(tree));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    ///     Rebuilds a stamp from a fresh <see cref="FileFreshness" /> capture and an already-computed hash — a promotion
+    ///     after a bare touch. <paramref name="shape" /> is the shape to carry forward, and stays null for a
+    ///     structural input, which has none.
+    /// </summary>
+    internal static FileStamp RefreshStamp(string path, FileFreshness current, string? sha, SourceShape? shape = null)
+    {
+        return new FileStamp(
+            path, current.Exists, current.LastWriteTimeUtc.Ticks, current.Length, sha, current.IsPromoted, shape);
     }
 
     /// <summary>

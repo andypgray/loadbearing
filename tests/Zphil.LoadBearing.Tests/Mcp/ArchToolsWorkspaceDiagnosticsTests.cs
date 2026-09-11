@@ -10,17 +10,16 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Mcp;
 
 /// <summary>
-///     The MSBuild-selection note on the MCP surface, which is the one line this surface used to destroy —
-///     and the incomplete-model verdict beside it, which is the whole refusal a surface with no exit code has.
+///     The MSBuild-selection note on the MCP surface, and the incomplete-model verdict beside it, which is
+///     the whole refusal a surface with no exit code has.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <c>ArchTools</c> hands every runner <see cref="TextWriter.Null" /> as the error writer, and its
-///         claim that "everything the error writer would carry is in the document" was true of all of it
-///         but this: the note was appended at <em>write</em> time, to stderr, and nothing else.
-///         Composing it into the list both surfaces read makes the claim true, and this is where that is
-///         held — a client that sees a load failure also sees which MSBuild produced it, which is nearly
-///         always the next question.
+///         <c>ArchTools</c> hands every runner <see cref="TextWriter.Null" /> as the error writer on the
+///         claim that everything the error writer would carry is in the document. The note is composed into
+///         the list both surfaces read rather than appended to stderr at write time, and this is where that
+///         claim is held — a client that sees a load failure also sees which MSBuild produced it, which is
+///         nearly always the next question.
 ///     </para>
 ///     <para>
 ///         The tool is constructed directly rather than driven through <see cref="McpPipelineHarness" />,

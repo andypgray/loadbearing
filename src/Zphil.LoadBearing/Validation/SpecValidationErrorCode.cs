@@ -94,9 +94,10 @@ public enum SpecValidationErrorCode
     MemberExpressionUnresolvable,
 
     /// <summary>
-    ///     An <c>arch.Registered</c> noun used by a rule carries a <see cref="Lifetime" /> value outside the
-    ///     defined set — a cast such as <c>(Lifetime)7</c> names no lifetime (§8 item 19). Reported in the
-    ///     same all-at-once pass; membership resolution never sees it because the build throws first.
+    ///     An <c>arch.Registered</c> noun used by a rule, a scope, or a layer's definition carries a
+    ///     <see cref="Lifetime" /> value outside the defined set — a cast such as <c>(Lifetime)7</c> names no
+    ///     lifetime (§8 item 19). Reported in the same all-at-once pass; membership resolution never sees it
+    ///     because the build throws first.
     /// </summary>
     UndefinedLifetime,
 

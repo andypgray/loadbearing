@@ -11,12 +11,10 @@ namespace Zphil.LoadBearing.Cli.Pipeline;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Why a search rather than arithmetic.</b> An evaluated output path can name a directory no
-///         build ever writes: a parent props file can set the output path before the SDK defaults the
-///         properties it interpolates (evaluating to a flat <c>bin\</c>), <c>UseArtifactsOutput</c>
-///         relocates the whole tree, and a solution built in one configuration evaluates in another.
-///         Fixed hop counting over such a path climbs past the project or re-appends a segment that is
-///         not a target framework, because it assumes a shape it did not construct.
+///         The probe searches because an evaluated output path can name a directory no build ever writes —
+///         a parent props file, <c>UseArtifactsOutput</c>, or a solution built in one configuration and
+///         evaluated in another — and fixed hop counting over such a path assumes a shape it did not
+///         construct.
 ///     </para>
 ///     <para>
 ///         <b>The named output root is the ceiling of the walk, never the anchor.</b> The walk starts at the
@@ -29,12 +27,10 @@ namespace Zphil.LoadBearing.Cli.Pipeline;
 ///         subtree holds any candidate, instead of making it a ranking problem.
 ///     </para>
 ///     <para>
-///         <b>Why the intermediate refusal is not already implied by that.</b> Under the SDK's own layouts
-///         the anchor rule alone keeps <c>obj</c> out of scope — it is never under <c>bin</c> or
-///         <c>artifacts/bin</c>. The refusal is what makes "never an intermediate assembly" hold
-///         structurally in <em>any</em> layout rather than incidentally in those: it demonstrably fires
-///         when <c>BaseIntermediateOutputPath</c> is redirected under the output root, which is the tree
-///         the negative-control test builds.
+///         The intermediate refusal is not implied by the anchor rule: under the SDK's own layouts
+///         <c>obj</c> is never under <c>bin</c> or <c>artifacts/bin</c>, and the refusal is what makes
+///         "never an intermediate assembly" hold in <em>any</em> layout — the negative-control test
+///         redirects <c>BaseIntermediateOutputPath</c> under the output root to prove it.
 ///     </para>
 /// </remarks>
 internal static class BuiltOutputProbe

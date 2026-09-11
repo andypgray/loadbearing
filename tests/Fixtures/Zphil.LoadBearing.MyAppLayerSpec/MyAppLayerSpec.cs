@@ -6,14 +6,18 @@ namespace Zphil.LoadBearing.MyAppLayerSpec;
 ///     The layer-card render fixture, and the fixture where all three definition forms stand side by side:
 ///     Web is its project, Billing is a namespace glob, and Reporting is a refinement of Web. Each carries
 ///     one anchored Enforce rule, and the canonical billing quarantine sits over the Billing layer.
-///     Rendered against the MyApp solution it produces the root block, a merged block in <c>MyApp.Web/</c>
-///     whose Web card precedes the Reporting card (declaration order), and — in
-///     <c>MyApp.Legacy.Billing/</c> — a merged block whose Billing layer card precedes the
-///     quarantined-scope card (layer key before quarantine key). That Billing directory is the
-///     layer-and-scope acceptance surface; the quarantined layer's desugared containment is
-///     layer-anchored yet Quarantine-posture, so it renders only as the quarantine card and is never
-///     double-emitted as a layer bullet. Web carries a purpose and Billing does not, so the Web card's lede
-///     carries the sentence and the Billing card's does not.
+/// </summary>
+/// <remarks>
+///     <para>
+///         Rendered against the MyApp solution it produces the root block, a merged block in
+///         <c>MyApp.Web/</c> whose Web card precedes the Reporting card (declaration order), and — in
+///         <c>MyApp.Legacy.Billing/</c> — a merged block whose Billing layer card precedes the
+///         quarantined-scope card (layer key before quarantine key). That Billing directory is the
+///         layer-and-scope acceptance surface; the quarantined layer's desugared containment is
+///         layer-anchored yet Quarantine-posture, so it renders only as the quarantine card and is never
+///         double-emitted as a layer bullet. Web carries a purpose and Billing does not, so the Web card's
+///         lede carries the sentence and the Billing card's does not.
+///     </para>
 ///     <para>
 ///         It is also where <em>family</em> rules are rendered: <c>layering/leaves-independent</c> and
 ///         <c>layering/leaves-not-circular</c> are two laws over the same Reporting and Billing cells, and
@@ -21,13 +25,13 @@ namespace Zphil.LoadBearing.MyAppLayerSpec;
 ///         both bullets appear on the Reporting card in <c>MyApp.Web/</c> and on the Billing card in
 ///         <c>MyApp.Legacy.Billing/</c>. Both pass, which is what keeps this fixture's every rule green.
 ///     </para>
-/// </summary>
-/// <remarks>
-///     Web is anchored on its project rather than on <c>MyApp.Web.*</c> deliberately: the two name the same
-///     types here, so every card, sentence and verdict below is a byte-for-byte statement that a layer
-///     checks and renders as whatever defines it. Reporting is the refinement — the shape a cone nested
-///     inside another needs — and it narrows Web to the four <c>Report*</c> types, none of which touches
-///     billing, so the Reporting rule holds where Web's does not.
+///     <para>
+///         Web is anchored on its project rather than on <c>MyApp.Web.*</c> deliberately: the two name the
+///         same types here, so every card, sentence and verdict below is a byte-for-byte statement that a
+///         layer checks and renders as whatever defines it. Reporting is the refinement — the shape a cone
+///         nested inside another needs — and it narrows Web to the four <c>Report*</c> types, none of which
+///         touches billing, so the Reporting rule holds where Web's does not.
+///     </para>
 /// </remarks>
 public sealed class MyAppLayerSpec : IArchitectureSpec
 {

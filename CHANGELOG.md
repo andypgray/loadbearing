@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The library packages ship their XML documentation.** Every public type and member across the
+  packages has a doc comment, and until now none of it left the repository: no project wrote the
+  documentation file, so a consumer's editor showed nothing for the fluent surface or the adapter.
+  `Zphil.LoadBearing`, `.Roslyn` and `.Xunit` now carry the file beside the assembly, and the build
+  holds the comments complete and well-formed rather than a sweep doing it: in the shipping
+  projects, a public member without a comment, a malformed comment, or a `cref` that no longer
+  resolves is a compile error.
+
 - **Every page a rule cites is held to a live answer.** The URLs `.Citation(uri)` renders into the
   committed context blocks are HEADed by a doc-hygiene gate, and one that answers 404 or 410 fails
   the suite naming the file, the line and the rule behind it. The rendered blocks are the authority
@@ -263,6 +271,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   read.
 
 ### Changed
+
+- **A comment-only edit no longer re-extracts its project, on either hook leg.** The warm MCP
+  server and the persisted CLI cache both used to re-walk a whole project whenever any byte of one
+  of its files changed, because a fragment's sites carry line numbers and a comment can move them.
+  Each changed document is now compared by shape: its tokens, its directives and the generated-source
+  banner, never its comments or whitespace. When the shape is unchanged the stored sites are moved
+  through a line map instead, so red sites, grandfathered sites and every context render report the
+  new lines, and the verdict is the one a cold run gives. Anything else still re-walks: a string
+  literal, a `#pragma`, a `#region`, an `#if`, a banner, or a line that split so its tokens no
+  longer sit together. The persisted cache stores each document's shape beside its hash, so its
+  schema moves and an existing cache file is rebuilt once. Measured on this repository's own hook
+  with a comment-only edit, alternating the two builds in one sitting: the CLI leg went from about
+  40 s to 3 s and the warm MCP server from 17–21 s to under 1 s, while a cache hit and a cold run
+  cost what they did before.
+
+- **This repository's own ratchet is paid off, and `mcp/env-through-seam` is law.** The rule banned
+  every reference to `System.Environment` from the MCP infrastructure, but its counter-prior prose,
+  its reason and its fix were all about environment-variable reads going through the `IEnvironment`
+  seam, whose only member is `GetVariable`. The real environment reads were migrated in August; what
+  stayed on the baseline was a folder lookup and a process exit, two calls the seam cannot take — so
+  the boy-scout policy was sending an agent to migrate a site to a seam with nowhere to put it, and
+  the ratchet could never reach zero. The law is now the four environment-variable members it was
+  always about (`GetEnvironmentVariable`, `GetEnvironmentVariables`, `ExpandEnvironmentVariables`,
+  `SetEnvironmentVariable`), which has no violations, so the rule is `Enforce` and
+  `arch/baselines/mcp/env-through-seam.json` is deleted. The self-check still reports 37 rules, 35
+  passed and 2 skipped tripwires; the managed block loses its Migrations section, and the law diagram
+  loses the grandfathered arrow along with the legend row that explained it. The README's `As SARIF`
+  and `check --json` fences are re-cut from the Meridian example's `data-access/no-inline-sql`, which
+  still has twelve sites to work off, because showing a ratchet needs live debt.
+
+- **The self-spec reads in areas, cites its pages, and renames two rules into the area they belong
+  to.** Rules are declared in reading order — layering, the API front doors, the model nodes,
+  packaging, DI, the CLI, the MCP server, Roslyn, the adapter, exceptions, static state, naming, then
+  the two scopes — which is the order the managed block and every scoped card render in, so both read
+  as a document rather than as the order the rules happened to be written. `packs/depends-on-core-only`
+  is now `layering/pack-depends-on-core-only` and `xunit/leaf-adapter` is `layering/adapter-is-a-leaf`:
+  both state a layering law and neither had a baseline to move. The adapter rule also drops Host and
+  Pack from its target list, which `layering/leaves-independent` already holds off it, so it names only
+  what sits below the adapter. Nine rules gained a `.Citation` — the MCP transport and cancellation
+  specs, the framework design guidelines for exceptions and interface names, the NuGet lock-file page,
+  the DI guidelines, and the two async pages — so the rendered bullet, `explain`, the check block and
+  the SARIF descriptor all carry the page each reason rests on. Reviewer-facing mechanics moved out of
+  four `Because` sentences into a comment above the rule they belong to, the class doc's verb ledger
+  is a list rather than one unbroken paragraph, and its anchor-doctrine paragraph is gone: since
+  `SpecExclusion` drops the spec project from the checked universe, no expression anchor in a spec can
+  mint an edge the checker sees.
 
 - **The pack's three async rules say what the TAP page says.** `naming/async-suffix` and
   `async/accept-cancellation` name `ValueTask` and `ValueTask<TResult>` beside `Task` and
