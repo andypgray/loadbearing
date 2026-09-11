@@ -43,7 +43,7 @@ public static class ScopedContextResolver
 
             placements.Add(directory is null
                 ? new ScopePlacement(scope.ScopeId, rule, null,
-                    $"scope '{scope.ScopeId}' matched no types; no scoped context emitted")
+                    DirectoryPlacement.NoTypesSkipReason("scope", scope.ScopeId))
                 : new ScopePlacement(scope.ScopeId, rule, directory, null));
         }
 

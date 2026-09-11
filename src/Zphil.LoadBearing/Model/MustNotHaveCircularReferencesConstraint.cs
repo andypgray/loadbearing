@@ -17,7 +17,6 @@ namespace Zphil.LoadBearing.Model;
 /// </remarks>
 internal sealed class MustNotHaveCircularReferencesConstraint(Selection subject) : Constraint(subject)
 {
-    internal override string VerbPhrase => SentenceRenderer.FamilyCellWord(Subject!) is { } cell
-        ? $"must not have circular references with the other {cell}s"
-        : "must not have circular references with the others";
+    internal override string VerbPhrase =>
+        "must not have circular references with " + SentenceRenderer.OtherCells(Subject!);
 }

@@ -50,4 +50,20 @@ internal sealed class TempGitRepo : IDisposable
     {
         return _workspace.PathOf(relativeSegments);
     }
+
+    /// <summary>
+    ///     Writes the brand-new, still-untracked file inside the quarantined billing project that arms
+    ///     the <c>legacy/billing</c> tripwire — the agent-hook case every diff-aware suite stages. SDK
+    ///     globs compile it in. Returns the path it wrote.
+    /// </summary>
+    /// <remarks>
+    ///     Held here rather than per suite because the file NAME is quoted inside the pinned warning
+    ///     text: a rename in one caller would leave the others compiling and silently wrong.
+    /// </remarks>
+    public string WriteQuarantineNote()
+    {
+        string path = PathOf("MyApp.Legacy.Billing", "LegacyNote.cs");
+        File.WriteAllText(path, "namespace MyApp.Legacy.Billing;\n\npublic class LegacyNote;\n");
+        return path;
+    }
 }

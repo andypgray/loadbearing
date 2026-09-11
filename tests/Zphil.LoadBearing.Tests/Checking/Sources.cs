@@ -214,6 +214,45 @@ internal static class Sources
                                        }
                                        """;
 
+    /// <summary>
+    ///     A controller opening the data layer directly — one forbidden edge
+    ///     (<c>OldController -&gt; App.Data.Db</c>).
+    /// </summary>
+    public const string OneController = """
+                                        namespace App.Web { public class OldController { public App.Data.Db Load() => new App.Data.Db(); } }
+                                        namespace App.Data { public class Db {} }
+                                        """;
+
+    /// <summary>
+    ///     The same forbidden edge reached from two distinct lines. Sites are deduped per
+    ///     <c>file:line</c>, so this is two sites under one identity — the shape the measure counts.
+    /// </summary>
+    public const string TwoSiteController = """
+                                            namespace App.Web
+                                            {
+                                                public class OldController
+                                                {
+                                                    public App.Data.Db A() => new App.Data.Db();
+                                                    public App.Data.Db B() => new App.Data.Db();
+                                                }
+                                            }
+                                            namespace App.Data { public class Db {} }
+                                            """;
+
+    /// <summary>
+    ///     The Migrate rule the controller scenes are checked against: Web controllers must not
+    ///     reference the data layer. It omits <c>.Baseline</c>, so its conventional path is
+    ///     <c>arch/baselines/data/x.json</c> (GRAMMAR §4.4).
+    /// </summary>
+    public static void NoDataAccess(Arch arch)
+    {
+        arch.Rule("data/x")
+            .Migrate(
+                "Controllers open the data layer directly (legacy Active Record style).",
+                arch.Namespace("App.Web.*").WithSuffix("Controller").MustNotReference(arch.Namespace("App.Data.*")))
+            .Because("Repository pattern for testability.");
+    }
+
     /// <summary>The one extracted model of <see cref="Layered" />.</summary>
     public static readonly CodebaseModel LayeredModel = CompilationFactory.Extract(Layered);
 
@@ -234,4 +273,10 @@ internal static class Sources
 
     /// <summary>The one extracted model of <see cref="CatchRatchet" />.</summary>
     public static readonly CodebaseModel CatchRatchetModel = CompilationFactory.Extract(CatchRatchet);
+
+    /// <summary>The one extracted model of <see cref="OneController" />.</summary>
+    public static readonly CodebaseModel OneControllerModel = CompilationFactory.Extract(OneController);
+
+    /// <summary>The one extracted model of <see cref="TwoSiteController" />.</summary>
+    public static readonly CodebaseModel TwoSiteControllerModel = CompilationFactory.Extract(TwoSiteController);
 }

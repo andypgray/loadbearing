@@ -344,7 +344,7 @@ public sealed class CheckCommandTests
 
     private static CheckRequest Request(DocumentGrain grain = DocumentGrain.Full)
     {
-        string workingDirectory = Path.GetDirectoryName(Path.GetFullPath(CliRunner.MyAppSolution))!;
+        string workingDirectory = SolutionPaths.SolutionDirectoryOf(CliRunner.MyAppSolution);
         return new CheckRequest(
             CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll, true, false, null, workingDirectory, false, null,
             false, null, null, grain);

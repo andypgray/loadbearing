@@ -4,6 +4,7 @@ using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Tests.Checking;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;
 
@@ -112,13 +113,6 @@ public sealed class RatchetSurveyNoticeTests
 
     private static RuleResult Result(ArchRule rule, RuleStatus status, int violations = 0, bool captured = false)
     {
-        return new RuleResult(rule, status, Dummies(violations), [], null, [], default, captured);
-    }
-
-    private static IReadOnlyList<Violation> Dummies(int count)
-    {
-        return Enumerable.Range(0, count)
-            .Select(_ => Violation.RuleError("x"))
-            .ToList();
+        return new RuleResult(rule, status, SyntheticNodes.RuleErrors(violations), [], null, [], default, captured);
     }
 }

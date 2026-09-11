@@ -1,10 +1,6 @@
 using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Checking;
-using Zphil.LoadBearing.Codebase;
-using Zphil.LoadBearing.Roslyn;
-using Zphil.LoadBearing.Roslyn.Extraction;
-using Zphil.LoadBearing.Tests.Extraction;
 
 namespace Zphil.LoadBearing.Tests.Checking;
 
@@ -17,26 +13,12 @@ namespace Zphil.LoadBearing.Tests.Checking;
 /// </summary>
 public sealed class LayerDefinitionSemanticsTests
 {
-    // Two projects' worth of types under three namespaces, so a project definition and a namespace glob
-    // name provably different sets: Sales.Reports sits in the Sales project and outside the Sales.* cone
-    // no glob spelled `Sales.*` reaches, which is the field's generated-type case in miniature.
-    private const string SalesFile = """
-                                     namespace Sales { public class Order {} }
-                                     namespace Sales.Reports { public class Ledger {} }
-                                     """;
-
-    private const string WebFile = """
-                                   namespace Web { public class Controller { public Sales.Order O; } }
-                                   """;
-
-    private static readonly CodebaseModel TwoProjects = Extract();
-
     [Fact]
     public void ADefinedLayer_NamesWhatItsDefinitionNames()
     {
         // Act — the layer and the bare project noun, resolved over the same codebase.
-        IReadOnlyList<string> viaLayer = Checker.Selects(TwoProjects, arch => arch.Layer("Sales", arch.Project("Sales")));
-        IReadOnlyList<string> viaProject = Checker.Selects(TwoProjects, arch => arch.Project("Sales"));
+        IReadOnlyList<string> viaLayer = Checker.Selects(TwoProjectsCodebase.Model, arch => arch.Layer("Sales", arch.Project("Sales")));
+        IReadOnlyList<string> viaProject = Checker.Selects(TwoProjectsCodebase.Model, arch => arch.Project("Sales"));
 
         // Assert — transparency: the same types in the same order, including the one no `Sales.*` glob
         // would have reached.
@@ -48,7 +30,7 @@ public sealed class LayerDefinitionSemanticsTests
     public void ADefinedLayer_AppliesItsOwnAdjectivesAfterTheDefinition()
     {
         // Act — a refinement of a layer: the head names the project, the adjective narrows it to one cone.
-        IReadOnlyList<string> refined = Checker.Selects(TwoProjects, arch =>
+        IReadOnlyList<string> refined = Checker.Selects(TwoProjectsCodebase.Model, arch =>
         {
             Layer sales = arch.Layer("Sales", arch.Project("Sales"));
             return arch.Layer("Reports", sales.InNamespace("Sales.Reports.*"));
@@ -62,7 +44,7 @@ public sealed class LayerDefinitionSemanticsTests
     public void ADefinedLayer_AsARuleSubject_ChecksLikeItsDefinition()
     {
         // Act + Assert — the layer stands where the project noun would, and reds on the same edge.
-        Checker.Run(TwoProjects, arch =>
+        Checker.Run(TwoProjectsCodebase.Model, arch =>
                 arch.Rule("layering/web-not-sales")
                     .Enforce(arch.Layer("Web", arch.Project("Web"))
                         .MustNotReference(arch.Layer("Sales", arch.Project("Sales"))))
@@ -119,7 +101,7 @@ public sealed class LayerDefinitionSemanticsTests
         // The glob form is one scan, not a union: a glob nothing matches contributes nothing and the layer
         // is what the others found. Desugaring it would put the empty glob under GRAMMAR §5.1's
         // per-operand emptiness gate and red the rule, which is the verdict change the glob form declines.
-        Checker.Run(TwoProjects, arch =>
+        Checker.Run(TwoProjectsCodebase.Model, arch =>
                 arch.Rule("layering/sales-not-web")
                     .Enforce(arch.Layer("Sales", "Sales.*", "Invoicing.*")
                         .MustNotReference(arch.Namespace("Web.*")))
@@ -133,7 +115,7 @@ public sealed class LayerDefinitionSemanticsTests
     {
         // The same two cones spelled as the union the glob form is not: the empty operand fails the rule in
         // its own right, which is what a desugared multi-glob layer would have started doing.
-        Checker.Run(TwoProjects, arch =>
+        Checker.Run(TwoProjectsCodebase.Model, arch =>
                 arch.Rule("layering/sales-not-web")
                     .Enforce(arch.AnyOf(arch.Namespace("Sales.*"), arch.Namespace("Invoicing.*"))
                         .MustNotReference(arch.Namespace("Web.*")))
@@ -149,21 +131,12 @@ public sealed class LayerDefinitionSemanticsTests
     {
         // A definition is a selection like any other, so a closed generic inside one is the rule error the
         // evaluator raises anywhere else — contained per rule, named in the report, not a crash.
-        Checker.Run(TwoProjects, arch =>
+        Checker.Run(TwoProjectsCodebase.Model, arch =>
                 arch.Rule("layering/no-lists")
                     .Enforce(arch.Layer("Lists", arch.Type(typeof(List<int>)))
                         .MustNotReference(arch.Namespace("Web.*")))
                     .Because("A closed construction has no definition-level node."))
             .Single()
             .ShouldHaveFailedWithDetailContaining(ViolationKind.RuleError, "closed generic construction");
-    }
-
-    private static CodebaseModel Extract()
-    {
-        CompilationInput sales = CompilationFactory.Compile("Sales", ("Sales.cs", SalesFile));
-        CompilationInput web = CompilationFactory.CompileReferencing(
-            "Web", sales.Compilation, "Sales", ("Web.cs", WebFile));
-
-        return CodebaseExtractor.ExtractFromCompilations([sales, web]);
     }
 }

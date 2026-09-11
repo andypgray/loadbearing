@@ -4,6 +4,7 @@ using Zphil.LoadBearing.Cli.Mcp.Infrastructure;
 using Zphil.LoadBearing.Cli.Pipeline;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
+using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.Baselines;
@@ -153,9 +154,8 @@ internal sealed class BaselineRunner(
         if (request.Rule is null)
             throw new UserErrorException("--add requires --rule <id>.");
 
-        bool blankOrMultiline = string.IsNullOrWhiteSpace(request.Because)
-                                || request.Because.IndexOf('\r') >= 0
-                                || request.Because.IndexOf('\n') >= 0;
+        bool blankOrMultiline =
+            string.IsNullOrWhiteSpace(request.Because) || SingleLineProse.IsMultiLine(request.Because);
         if (blankOrMultiline)
             throw new UserErrorException("--add requires a non-blank, single-line --because.");
 
@@ -199,9 +199,7 @@ internal sealed class BaselineRunner(
         BaselineEntry recorded = current.First(entry => entry.Equals(identity));
         BaselineEntry attributed = recorded.WithBecause(request.Because!);
 
-        var sections = new Dictionary<string, IReadOnlyList<BaselineEntry>>(StringComparer.Ordinal);
-        foreach (KeyValuePair<string, IReadOnlyList<BaselineEntry>> section in existing.Sections)
-            sections[section.Key] = section.Value; // co-resident foreign sections ride through untouched
+        Dictionary<string, IReadOnlyList<BaselineEntry>> sections = MutableSections(existing);
 
         if (existingEntries.FirstOrDefault(entry => entry.Equals(identity)) is { } stored)
         {
@@ -234,6 +232,20 @@ internal sealed class BaselineRunner(
         return $"attribution updated and site count re-recorded ({from} → {observed}).";
     }
 
+    // A read document's sections as a map this run may write into: every section rides through untouched,
+    // including the ones for rules this run is not visiting (a co-resident rule, or one that was removed).
+    // Null-tolerant because --init and --accept-reductions reach a file that may not exist yet, while --add
+    // has already refused an absent one.
+    private static Dictionary<string, IReadOnlyList<BaselineEntry>> MutableSections(BaselineDocument? existing)
+    {
+        var sections = new Dictionary<string, IReadOnlyList<BaselineEntry>>(StringComparer.Ordinal);
+        if (existing is not null)
+            foreach (KeyValuePair<string, IReadOnlyList<BaselineEntry>> section in existing.Sections)
+                sections[section.Key] = section.Value;
+
+        return sections;
+    }
+
     // --init and --accept-reductions, one baseline file at a time: ordinal grouping in first-appearance order,
     // so two rules sharing a file are read, spliced and written once between them. Internal so the fast-tier
     // runner tests can drive both modes over an in-memory report the way they drive --add — no workspace.
@@ -250,10 +262,7 @@ internal sealed class BaselineRunner(
     {
         // Read + verify once (tamper throws here — --init cannot distinguish tamper from corruption).
         BaselineDocument? existing = BaselineStore.TryReadDocument(group.Key);
-        var sections = new Dictionary<string, IReadOnlyList<BaselineEntry>>(StringComparer.Ordinal);
-        if (existing is not null)
-            foreach (KeyValuePair<string, IReadOnlyList<BaselineEntry>> section in existing.Sections)
-                sections[section.Key] = section.Value; // sections for rules not in this run (e.g. a removed rule) ride through untouched
+        Dictionary<string, IReadOnlyList<BaselineEntry>> sections = MutableSections(existing);
 
         var rewrote = false;
         foreach (RuleResult result in group) rewrote |= ApplyRule(request, result, sections);

@@ -88,9 +88,7 @@ public sealed class McpChildServerRepoHandleTests
         using var repo = new TempGitRepo();
         // The same untracked file in dragon territory the stdio suite uses, so arch_check's report can only
         // carry the tripwire if git actually ran — proof the whole diff path executed, not just the handshake.
-        File.WriteAllText(
-            repo.PathOf("MyApp.Legacy.Billing", "LegacyNote.cs"),
-            "namespace MyApp.Legacy.Billing;\n\npublic class LegacyNote;\n");
+        repo.WriteQuarantineNote();
 
         // Deployment shape: the server staged outside the repository and its working directory outside too —
         // but the spec left at its build-output path *inside* the repository, because that is the half the

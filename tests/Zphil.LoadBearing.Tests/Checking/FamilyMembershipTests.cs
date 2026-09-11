@@ -2,9 +2,6 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Codebase;
-using Zphil.LoadBearing.Roslyn;
-using Zphil.LoadBearing.Roslyn.Extraction;
-using Zphil.LoadBearing.Tests.Extraction;
 
 namespace Zphil.LoadBearing.Tests.Checking;
 
@@ -20,17 +17,6 @@ public sealed class FamilyMembershipTests
     // Two projects, three types: Sales declares two, Web declares one that references Sales, so a
     // family over the two projects and a union of the two project nouns name the same three types at the
     // same declarers, and a Sales.Reports exclusion has exactly one type to drop.
-    private const string SalesFile = """
-                                     namespace Sales { public class Order {} }
-                                     namespace Sales.Reports { public class Ledger {} }
-                                     """;
-
-    private const string WebFile = """
-                                   namespace Web { public class Controller { public Sales.Order O; } }
-                                   """;
-
-    private static readonly CodebaseModel TwoProjects = Extract();
-
     private static readonly string[] AllThree = ["Sales.Order", "Sales.Reports.Ledger", "Web.Controller"];
 
     // The position is a bool at the theory's surface because SelectionPosition is internal and a public
@@ -40,16 +26,9 @@ public sealed class FamilyMembershipTests
     [InlineData(false)]
     public void AFamilyOfLayers_EvaluatesToTheUnionOfItsCells(bool asSubject)
     {
-        var arch = new Arch();
-        Selection family = arch.Each(arch.Layer("Sales", arch.Project("Sales")), arch.Layer("Web", arch.Project("Web")));
-        Selection union = arch.AnyOf(arch.Project("Sales"), arch.Project("Web"));
-        SelectionPosition position = PositionOf(asSubject);
-
-        IReadOnlyList<string> viaFamily = Names(family, position);
-        IReadOnlyList<string> viaUnion = Names(union, position);
-
-        viaFamily.ShouldBe(AllThree);
-        viaFamily.ShouldBe(viaUnion);
+        ShouldNameWhatTheUnionNames(
+            arch => arch.Each(arch.Layer("Sales", arch.Project("Sales")), arch.Layer("Web", arch.Project("Web"))),
+            asSubject);
     }
 
     [Theory]
@@ -57,21 +36,27 @@ public sealed class FamilyMembershipTests
     [InlineData(false)]
     public void AFamilyOfProjects_EvaluatesToWhatItsProjectsDeclare(bool asSubject)
     {
-        var arch = new Arch();
-        Selection family = arch.Each(arch.Projects.Named("Sales", "Web"));
-        Selection union = arch.AnyOf(arch.Project("Sales"), arch.Project("Web"));
-        SelectionPosition position = PositionOf(asSubject);
-
-        IReadOnlyList<string> viaFamily = Names(family, position);
-        IReadOnlyList<string> viaUnion = Names(union, position);
-
-        viaFamily.ShouldBe(AllThree);
-        viaFamily.ShouldBe(viaUnion);
+        ShouldNameWhatTheUnionNames(arch => arch.Each(arch.Projects.Named("Sales", "Web")), asSubject);
     }
 
     private static SelectionPosition PositionOf(bool asSubject)
     {
         return asSubject ? SelectionPosition.Subject : SelectionPosition.Target;
+    }
+
+    // The one claim both forms make: a family names exactly what a union of the same project nouns names,
+    // in either position. Asserts, so it is named for the claim rather than for what it builds.
+    private static void ShouldNameWhatTheUnionNames(Func<Arch, Selection> family, bool asSubject)
+    {
+        var arch = new Arch();
+        Selection union = arch.AnyOf(arch.Project("Sales"), arch.Project("Web"));
+        SelectionPosition position = PositionOf(asSubject);
+
+        IReadOnlyList<string> viaFamily = Names(family(arch), position);
+        IReadOnlyList<string> viaUnion = Names(union, position);
+
+        viaFamily.ShouldBe(AllThree);
+        viaFamily.ShouldBe(viaUnion);
     }
 
     [Fact]
@@ -89,20 +74,11 @@ public sealed class FamilyMembershipTests
 
     private static IReadOnlyList<string> Names(Selection selection, SelectionPosition position)
     {
-        var evaluator = new SelectionEvaluator(TwoProjects);
+        var evaluator = new SelectionEvaluator(TwoProjectsCodebase.Model);
         HashSet<TypeNode> members = evaluator.Evaluate(selection, position);
         return members
             .Select(type => type.FullName)
             .Order(StringComparer.Ordinal)
             .ToList();
-    }
-
-    private static CodebaseModel Extract()
-    {
-        CompilationInput sales = CompilationFactory.Compile("Sales", ("Sales.cs", SalesFile));
-        CompilationInput web = CompilationFactory.CompileReferencing(
-            "Web", sales.Compilation, "Sales", ("Web.cs", WebFile));
-
-        return CodebaseExtractor.ExtractFromCompilations([sales, web]);
     }
 }

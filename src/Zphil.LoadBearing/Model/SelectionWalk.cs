@@ -57,14 +57,29 @@ internal static class SelectionWalk
     }
 
     /// <summary>
+    ///     The noun head of a selection, or null for a <see cref="UnionSelection" /> and for null — the
+    ///     one place the union guard is stated, because reading <see cref="Selection.Noun" /> on a union
+    ///     throws by design (GRAMMAR §5.1). Every question about a selection's noun goes through it, so a
+    ///     union answers "not that noun" rather than throwing, at every asker.
+    /// </summary>
+    internal static SelectionNoun? NounOf(Selection? selection)
+    {
+        return selection is null or UnionSelection ? null : selection.Noun;
+    }
+
+    /// <summary>The family noun of a family subject, or null for every other selection (GRAMMAR §5.1).</summary>
+    internal static EachNoun? FamilyNoun(Selection? selection)
+    {
+        return NounOf(selection) as EachNoun;
+    }
+
+    /// <summary>
     ///     The project selection inside a family-of-projects subject, or null for every other selection —
     ///     the one place the type stratum reaches the artifact stratum (GRAMMAR §5.1).
     /// </summary>
     internal static ProjectSelection? FamilyProjects(Selection? selection)
     {
-        if (selection is null or UnionSelection) return null;
-
-        return (selection.Noun as EachNoun)?.Projects;
+        return FamilyNoun(selection)?.Projects;
     }
 
     /// <summary>The project selection itself, then the payloads of its own <c>Except</c> adjectives.</summary>

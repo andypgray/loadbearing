@@ -113,7 +113,7 @@ public sealed class AdapterTests
     [Fact]
     public async Task Tripwire_WithoutDiff_Skips()
     {
-        Exception? exception = await CaughtAsync(() => new InlineQuarantinedArchTests().Rule_Holds("legacy/billing/tripwire"));
+        Exception? exception = await CaughtAsync(() => new InlineScopedArchTests().Rule_Holds("legacy/billing/tripwire"));
 
         var skip = exception.ShouldBeOfType<SkipException>();
         // SkipException.ForSkip prefixes the reason with an internal dynamic-skip marker; the reason is the suffix.
@@ -127,7 +127,7 @@ public sealed class AdapterTests
         // permanent skip here: present in the explorer, naming the scope, never firing. That is the
         // adapter's nature and not a defect — the verdict a caution wants is `check --diff-base`'s, which
         // is a pull-request concern.
-        Exception? exception = await CaughtAsync(() => new InlineCautionedArchTests().Rule_Holds("domain/retry-budget/tripwire"));
+        Exception? exception = await CaughtAsync(() => new InlineScopedArchTests().Rule_Holds("domain/retry-budget/tripwire"));
 
         var skip = exception.ShouldBeOfType<SkipException>();
         skip.Message.ShouldEndWith(ArchChecker.CautionTripwireSkipReason);
@@ -318,8 +318,12 @@ public sealed class AdapterTests
         }
     }
 
-    // A quarantined scope over MyApp.Legacy.Billing — its desugared tripwire skips without a --diff-base.
-    private sealed class MyAppQuarantinedInlineSpec : IArchitectureSpec
+    // Both scope postures over MyApp, in one spec so the adapter loads the solution once: a quarantined
+    // scope over MyApp.Legacy.Billing and a cautioned one over MyApp.Domain. Their desugared tripwires
+    // both skip without a --diff-base, which is what the two rows below read. Disjoint namespaces, and a
+    // Caution desugars to its tripwire alone, so neither scope can move the other's verdict — the shape
+    // MyAppRenderSpec already ships.
+    private sealed class MyAppScopedInlineSpec : IArchitectureSpec
     {
         public void Define(Arch arch)
         {
@@ -327,21 +331,7 @@ public sealed class AdapterTests
                 .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
                 .Dragons("Banker's rounding happens at line-item level, NOT invoice level. Do not normalize.")
                 .Because("Replacement scheduled; not worth stabilizing.");
-        }
-    }
 
-    private sealed class InlineQuarantinedArchTests : ArchRuleTests<MyAppQuarantinedInlineSpec>
-    {
-        protected override string SolutionPath => CliRunner.MyAppSolution;
-        protected override string? ExcludeProjectName => null;
-    }
-
-    // A cautioned scope over MyApp.Domain — its one and only child is the tripwire, so on this adapter the
-    // whole scope is a skip.
-    private sealed class MyAppCautionedInlineSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
             arch.Scope("domain/retry-budget")
                 .Caution(arch.Namespace("MyApp.Domain.*"))
                 .Dragons("The back-off table is tuned against production, not first principles. Keep the timings.")
@@ -349,7 +339,7 @@ public sealed class AdapterTests
         }
     }
 
-    private sealed class InlineCautionedArchTests : ArchRuleTests<MyAppCautionedInlineSpec>
+    private sealed class InlineScopedArchTests : ArchRuleTests<MyAppScopedInlineSpec>
     {
         protected override string SolutionPath => CliRunner.MyAppSolution;
         protected override string? ExcludeProjectName => null;

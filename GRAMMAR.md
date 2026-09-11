@@ -1140,7 +1140,7 @@ partition. Pinned semantics:
 | `.Implementing(typeof(IHandler<>))` / `.Implementing("MyApp.Web.IHandler<T>")` | "implementing `IHandler<T>`" — the string form renders byte-identically (string anchors, below) |
 | `.DerivedFrom(typeof(ControllerBase))` / `.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")` | "derived from `ControllerBase`" |
 | `.AttributedWith(typeof(ApiControllerAttribute))` / `.AttributedWith("ModelContextProtocol.Server.McpServerToolAttribute")` | "attributed with `[ApiController]`" — `Attribute` suffix stripped, bracketed; the string form renders byte-identically (string anchors, below) |
-| `.Except(selection, …)` / `.Except(typeof(X), …)` | ", except {ref}" — a parenthetical canonicalized to sentence-final and closed by the composer (§6). Several operands are the union `AnyOf` mints (§5.1): `.Except(a, b)` ≡ `.Except(arch.AnyOf(a, b))`, ", except types in `A.*` or `B.*`". The `typeof` form is the dependency verbs' sugar (§3.3): `.Except(typeof(X))` ≡ `.Except(arch.Type<X>())` |
+| `.Except(selection, …)` / `.Except(typeof(X), …)` | ", except {ref}" — a parenthetical canonicalized to sentence-final, after any `Where`, and closed by the composer (§6). Several operands are the union `AnyOf` mints (§5.1): `.Except(a, b)` ≡ `.Except(arch.AnyOf(a, b))`, ", except types in `A.*` or `B.*`". The `typeof` form is the dependency verbs' sugar (§3.3): `.Except(typeof(X))` ≡ `.Except(arch.Type<X>())` |
 | `.Where(pred, description:)` | description verbatim — canonicalized to sentence-final (§6) |
 | `.Authored()` | head premodifier: "authored types", "authored interfaces" (§6) |
 
@@ -1502,7 +1502,7 @@ carries its sugar overload too, or the verb silently stops compiling after the s
 | `.Named("Zphil.LoadBearing")` | the head itself: "project `Zphil.LoadBearing`" for one name, "projects `A` or `B`" for several |
 | `.Matching("Zphil.*")` | head becomes "projects matching `Zphil.*`" ("matching `A` or `B`" over several globs) |
 | `.Packable()` | head prefix: "packable" — premodifies the head ("packable projects", "packable project `A`"), the set named by the evaluated fact that admits membership (§4.10) |
-| `.Except(...)` | ", except project `X`" (", except projects `A` or `B`") — the same parenthetical as the type-side clause, closed by the composer (§6). Single-operand by design: `.Named(a, b)` already says "either of these", and the stratum has no `AnyOf` to desugar a list to (§10) |
+| `.Except(...)` | ", except project `X`" (", except projects `A` or `B`") — the same parenthetical as the type-side clause, sentence-final after any `Where` and closed by the composer (§6). Single-operand by design: `.Named(a, b)` already says "either of these", and the stratum has no `AnyOf` to desugar a list to (§10) |
 | `.Where(pred, description:)` | description verbatim — canonicalized to sentence-final (§6), over `IProjectInfo` (§5.6) |
 
 **Project modal verbs** (turn a `ProjectSelection` into a terminal `Constraint`):
@@ -1540,7 +1540,12 @@ carries its sugar overload too, or the verb silently stops compiling after the s
   subject is one layer, and "themselves" in types voice, where the head is the plural "types".
 - **Canonicalization**: `Except` and `Where` clauses render sentence-final regardless of
   chain position. Safe because selection algebra commutes — (T∖X)∩S = (T∩S)∖X — and it
-  prevents garden-path sentences ("types, except `Foo`, named `*Service`").
+  prevents garden-path sentences ("types, except `Foo`, named `*Service`"). Among the
+  sentence-final clauses themselves, `Except` renders last: every `Where` first in the order it
+  was written, then every `Except`, so the parenthetical is the last thing before the junction
+  that closes it. *"Types in `MyApp.*` whose name contains a digit, except `SqlConnection`, must
+  be sealed."* A `Where` written after an `Except` therefore stops reading as a description of
+  the exception.
 - **The Except clause is a parenthetical, and the composer closes it.** Its fragment opens with
   a comma (", except `Foo`") and never closes itself: one phrase serves subject and reference
   position alike, so only the junction that follows knows whether text follows. Wherever running
@@ -1552,9 +1557,9 @@ carries its sugar overload too, or the verb silently stops compiling after the s
   when its last operand ends open, and before a verb phrase's tail (*"…, except
   `TimeoutException`, without a `when` filter"*). A sentence-final period closes it by itself
   (*"must not reference types in `Y`, except `Z`."*), and so does a bracketed tail (*"…, except
-  `SqlConnection` (external packages are not constrained by this rule)"*). A `Where` after an
-  `Except` closes nothing and is not open either — the description reads as attached to the
-  exception, a recorded residue (§11).
+  `SqlConnection` (external packages are not constrained by this rule)"*). A `Where` never
+  follows an `Except` in the rendered sentence (above), so a phrase ends open exactly when it
+  carries an `Except`.
 - **Head premodification**: `.Authored()` prefixes the current head rather than replacing it or
   trailing the phrase — "authored types in `MyApp.*`", and "authored interfaces in `MyApp.*`" where
   `OfKind` has substituted the head. Chain position does not matter, and the prefix distributes
@@ -2181,8 +2186,7 @@ baseline where a partition's cells do not);
 type-side shape adjectives (`.ThatAreSealed()`, `.ThatAreStatic()`, …) — the constraint-side
 verbs and the `ITypeInfo` flags exist (§5.3, §5.6); only the adjective position is missing; a
 `.MayMatchNothing()` opt-out from the fail-on-empty default (§4.1); a `MustBeOfKind` constraint
-twin; canonicalizing `Except` last among the sentence-final adjectives, so a `Where` written after
-one stops reading as attached to the exception (§6).
+twin.
 
 ## 12. Canonical sample spec
 

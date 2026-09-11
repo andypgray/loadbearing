@@ -75,9 +75,7 @@ internal sealed class CheckRunner(
     private async Task<(int Code, int Warnings)> ExecuteAsync(
         CheckRequest request, TextWriter stdout, TextWriter stderr, CancellationToken ct)
     {
-        // This run's human channel. --json owns stdout, where the document is the only thing written, so
-        // under it every stamp and notice below goes nowhere.
-        TextWriter human = request.Json ? TextWriter.Null : stdout;
+        TextWriter human = HumanChannel(request, stdout);
 
         using var source = await CodebaseSource.CreateWithSpecAsync(
             SolutionSource, Environment, request.Solution, request.Spec, request.WorkingDirectory, request.NoCache, ct);
@@ -113,7 +111,7 @@ internal sealed class CheckRunner(
         bool gated = diagnostics.Gates(request.AllowWorkspaceDiagnostics);
 
         Render(
-            request, stdout, stderr, human, report, source.SolutionDirectory, source.SolutionName,
+            request, stdout, stderr, report, source.SolutionDirectory, source.SolutionName,
             Path.GetFileName(source.Resolution.DllPath), renderedDiagnostics, diagnostics, !gated, ruleGlobs);
 
         // The incomplete-model gate: exit 2 overrides the 0/1 verdict. SARIF (if requested) was already
@@ -159,11 +157,13 @@ internal sealed class CheckRunner(
     }
 
     private void Render(
-        CheckRequest request, TextWriter stdout, TextWriter stderr, TextWriter human, CheckReport report,
+        CheckRequest request, TextWriter stdout, TextWriter stderr, CheckReport report,
         string solutionDirectory, string solutionName,
         string specAssembly, IReadOnlyList<string> renderedDiagnostics, WorkspaceDiagnostics diagnostics,
         bool executionSuccessful, IReadOnlyList<string> ruleGlobs)
     {
+        TextWriter human = HumanChannel(request, stdout);
+
         // --json purity: only the JSON document reaches stdout; diagnostics go to stderr and ride
         // inside the document's workspaceDiagnostics array.
         WorkspaceDiagnosticsRenderer.Render(stderr, renderedDiagnostics, request.Json);
@@ -183,6 +183,13 @@ internal sealed class CheckRunner(
                 sarifPath, report, solutionDirectory, executionSuccessful, renderedDiagnostics, diagnostics);
             human.WriteLine($"wrote {PathFormat.Relative(solutionDirectory, sarifPath)}");
         }
+    }
+
+    // This run's human channel. --json owns stdout, where the document is the only thing written, so under
+    // it every stamp and notice goes nowhere.
+    private static TextWriter HumanChannel(CheckRequest request, TextWriter stdout)
+    {
+        return request.Json ? TextWriter.Null : stdout;
     }
 
     // The JSON report, degraded rather than cut. The runner offers every grain from the requested floor down

@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Hosting;
+using Zphil.LoadBearing.Internal;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn.Caching;
 
@@ -243,7 +244,7 @@ internal static class BaselineStore
     private static string ReadBecause(string path, string ruleId, JsonElement value)
     {
         string text = RequireNonEmptyString(path, ruleId, "because", value);
-        bool blankOrMultiline = string.IsNullOrWhiteSpace(text) || text.IndexOf('\r') >= 0 || text.IndexOf('\n') >= 0;
+        bool blankOrMultiline = string.IsNullOrWhiteSpace(text) || SingleLineProse.IsMultiLine(text);
         if (blankOrMultiline) throw Malformed(path, $"rule '{ruleId}' has a blank or multi-line 'because'.");
         return text;
     }

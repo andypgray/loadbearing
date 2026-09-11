@@ -758,10 +758,7 @@ public sealed class MemberSubjectVerbTests
 
         // Grandfather Save through an in-memory BaselineIndex — the shape-verb identity substrate, zero
         // baseline format changes (GRAMMAR §4.6).
-        var index = new BaselineIndex(new Dictionary<string, RuleBaseline>(StringComparer.Ordinal)
-        {
-            ["naming/async-suffix"] = new([identity.WithBecause("INC-1")])
-        });
+        BaselineIndex index = Checker.Baselines("naming/async-suffix", identity.WithBecause("INC-1"));
         RuleResult grandfathered = ArchChecker.Check(model, AsyncModel, index)
             .Single();
         grandfathered.ShouldHavePassed();
@@ -824,10 +821,7 @@ public sealed class MemberSubjectVerbTests
 
         // Grandfather Poll through an in-memory BaselineIndex carrying an attribution — the shape-verb
         // identity substrate, zero baseline-format changes (GRAMMAR §4.6).
-        var index = new BaselineIndex(new Dictionary<string, RuleBaseline>(StringComparer.Ordinal)
-        {
-            ["async/accept-cancellation"] = new([identity.WithBecause("INC-1")])
-        });
+        BaselineIndex index = Checker.Baselines("async/accept-cancellation", identity.WithBecause("INC-1"));
         RuleResult grandfathered = ArchChecker.Check(model, beforeModel, index)
             .Single();
         grandfathered.ShouldHavePassed();
@@ -869,8 +863,7 @@ public sealed class MemberSubjectVerbTests
         var arch = new Arch();
         Constraint constraint = arch.Namespace("App.Async.*").Methods.Returning(typeof(Task<int>))
             .MustHaveSuffix("Async");
-        var model = new ArchitectureModel(
-            [new ArchRule("naming/x", Posture.Enforce, "b", null, "sentence", constraint, null, null)], []);
+        ArchitectureModel model = Checker.HandBuilt("naming/x", constraint);
 
         RuleResult result = ArchChecker.Check(model, AsyncModel)
             .Single();
@@ -890,8 +883,7 @@ public sealed class MemberSubjectVerbTests
         // the closed construction surfaces as a RuleError, not a crash.
         var arch = new Arch();
         Constraint constraint = arch.Namespace("App.Parameters.*").Methods.MustAcceptParameter(typeof(IProgress<int>));
-        var model = new ArchitectureModel(
-            [new ArchRule("async/x", Posture.Enforce, "b", null, "sentence", constraint, null, null)], []);
+        ArchitectureModel model = Checker.HandBuilt("async/x", constraint);
 
         RuleResult result = ArchChecker.Check(model, ParametersModel)
             .Single();

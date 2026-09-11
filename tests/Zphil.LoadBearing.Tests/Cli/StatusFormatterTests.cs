@@ -242,12 +242,12 @@ public sealed class StatusFormatterTests
     {
         IReadOnlyList<Violation> remaining = sitesEach > 0
             ? SitedDummies(grandfathered, sitesEach)
-            : Dummies(grandfathered);
+            : SyntheticNodes.RuleErrors(grandfathered);
 
         return new RuleResult(
             rule,
             status,
-            Dummies(violations),
+            SyntheticNodes.RuleErrors(violations),
             Enumerable.Range(0, warnings)
                 .Select(_ => new CheckWarning(CheckWarningKind.InertTarget, "w"))
                 .ToList(),
@@ -255,18 +255,6 @@ public sealed class StatusFormatterTests
             remaining,
             new RatchetMeasure(stale, shrunk, uncounted),
             captured);
-    }
-
-    /// <summary>
-    ///     Stand-in violations carrying no site at all, which is what makes them the right default: the site
-    ///     total prints only when it exceeds the pair count, so a rule built from these prints the line it
-    ///     printed before the measure existed and every pre-measure row keeps its pin unchanged.
-    /// </summary>
-    private static IReadOnlyList<Violation> Dummies(int count)
-    {
-        return Enumerable.Range(0, count)
-            .Select(_ => Violation.RuleError("x"))
-            .ToList();
     }
 
     /// <summary>

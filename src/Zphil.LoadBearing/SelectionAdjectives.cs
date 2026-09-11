@@ -156,9 +156,9 @@ public static class SelectionAdjectives
 
     /// <summary>
     ///     Excludes one or more selections — several are the union <c>arch.AnyOf</c> would mint, so
-    ///     <c>.Except(a, b)</c> ≡ <c>.Except(arch.AnyOf(a, b))</c>. The clause renders sentence-final as a
-    ///     parenthetical, ", except {ref}", that the sentence closes with a comma wherever text follows it
-    ///     (GRAMMAR §5.2, §6).
+    ///     <c>.Except(a, b)</c> ≡ <c>.Except(arch.AnyOf(a, b))</c>. The clause renders sentence-final, after
+    ///     any <c>Where</c> on the same selection, as a parenthetical, ", except {ref}", that the sentence
+    ///     closes with a comma wherever text follows it (GRAMMAR §5.2, §6).
     /// </summary>
     public static Selection Except(this Selection selection, Selection first, params Selection[] more)
     {

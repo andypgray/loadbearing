@@ -30,6 +30,8 @@ public sealed class Layer : Selection
         return this;
     }
 
+    internal string Name => _noun.Name;
+
     internal override SelectionNoun Noun => _noun;
 
     internal override IReadOnlyList<SelectionAdjective> Adjectives => Array.Empty<SelectionAdjective>();

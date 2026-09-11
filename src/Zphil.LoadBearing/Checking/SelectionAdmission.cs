@@ -117,15 +117,12 @@ internal sealed class SelectionAdmission
     internal static SelectionAdmission Operands(
         SelectionEvaluator selections, IReadOnlyList<Selection> operands, SelectionPosition position)
     {
-        var collected = new List<SelectionAdmission>(operands.Count);
-        foreach (Selection operand in operands) collected.Add(Collect(selections, operand, position));
-
-        return Merged(collected);
+        return Merged(CollectAll(selections, operands, position));
     }
 
     /// <summary>
     ///     One selection resolved in one position, carrying the heads that admitted each conflated node it
-    ///     matched. A union is collected part by part and folded through <see cref="United" />, so the
+    ///     matched. A union is collected part by part and folded through <see cref="Folded" />, so the
     ///     heads survive a level of nesting the union's own noun could never state.
     /// </summary>
     internal static SelectionAdmission Collect(
@@ -134,12 +131,7 @@ internal sealed class SelectionAdmission
         // The union arm comes first because a union has no single noun — reading Selection.Noun on one
         // throws by design (GRAMMAR §5.1) — and because its heads are its parts'.
         if (selection is UnionSelection union)
-        {
-            var parts = new List<SelectionAdmission>(union.Parts.Count);
-            foreach (Selection part in union.Parts) parts.Add(Collect(selections, part, position));
-
-            return United(selections, union, parts);
-        }
+            return Folded(selections, union, CollectAll(selections, union.Parts, position));
 
         // A layer takes its definition's stance (GRAMMAR §4.1): the definition is collected in this same
         // position and its heads are kept, so a project-defined layer names its nodes at that project
@@ -153,41 +145,19 @@ internal sealed class SelectionAdmission
             return new SelectionAdmission(layerMembers, Merge([defined], layerMembers));
         }
 
-        // A family takes each cell's stance (GRAMMAR §5.1), which is the union arm's shape one stratum
-        // up: the cells are collected in this same position and folded, so a project cell stages its
-        // project head and a file compiled into two cells is judged at each. Spec-build item 27 keeps a
-        // family out of every position but the rule subject, and the subject path collects its cells
-        // itself (it has emptiness and the partition to report on the way) — so this arm exists to keep
-        // the fold total over the noun hierarchy rather than because some caller reaches it. Without it a
-        // family would fall through to the leaf below and lose its cells' heads, which is the silent
-        // wrong answer rather than a loud one.
+        // A family takes each cell's stance (GRAMMAR §5.1), which is why it shares the union arm's fold:
+        // the cells are collected in this same position and folded, so a project cell stages its project
+        // head and a file compiled into two cells is judged at each. Spec-build item 27 keeps a family out
+        // of every position but the rule subject, and the subject path collects its cells itself (it has
+        // emptiness and the partition to report on the way) — so this arm exists to keep the fold total
+        // over the noun hierarchy rather than because some caller reaches it. Without it a family would
+        // fall through to the leaf below and lose its cells' heads, which is the silent wrong answer
+        // rather than a loud one.
         if (selection.Noun is EachNoun)
-        {
-            IReadOnlyList<Selection> cells = selections.Cells(selection);
-            var collected = new List<SelectionAdmission>(cells.Count);
-            foreach (Selection cell in cells) collected.Add(Collect(selections, cell, position));
-
-            return Family(selections, selection, collected);
-        }
+            return Folded(selections, selection, CollectAll(selections, selections.Cells(selection), position));
 
         HashSet<TypeNode> members = selections.Evaluate(selection, position);
         return new SelectionAdmission(members, Stage(selections, selection, members));
-    }
-
-    /// <summary>
-    ///     A family folded from cells already collected in the same position — the family's own adjectives
-    ///     applied to the united membership (GRAMMAR §5.1), and the cells' heads gated on what survives
-    ///     them. The family twin of <see cref="United" />, exposed for the same reason: the subject path
-    ///     reports per-cell emptiness (GRAMMAR §9) before the fold.
-    /// </summary>
-    internal static SelectionAdmission Family(
-        SelectionEvaluator selections, Selection family, IReadOnlyList<SelectionAdmission> cells)
-    {
-        var united = new HashSet<TypeNode>();
-        foreach (SelectionAdmission cell in cells) united.UnionWith(cell.Members);
-
-        HashSet<TypeNode> members = selections.Narrow(family, united);
-        return new SelectionAdmission(members, Merge(cells, members));
     }
 
     /// <summary>
@@ -226,16 +196,34 @@ internal sealed class SelectionAdmission
     }
 
     /// <summary>
-    ///     A union folded from parts already collected in the same position — the union's own adjectives
-    ///     applied to the unioned membership (GRAMMAR §5.1), and the parts' heads gated on what survives
-    ///     them. Exposed so the subject path can report per-operand emptiness (GRAMMAR §9) before the fold.
+    ///     A union or a family folded from parts already collected in the same position — the enclosing
+    ///     selection's own adjectives applied to the united membership (GRAMMAR §5.1), and the parts' heads
+    ///     gated on what survives them. Exposed so the subject path can report per-part emptiness
+    ///     (GRAMMAR §9) before the fold.
     /// </summary>
-    internal static SelectionAdmission United(
-        SelectionEvaluator selections, UnionSelection union, IReadOnlyList<SelectionAdmission> parts)
+    /// <remarks>
+    ///     One fold for both, because a union's operands and a family's cells differ in what they mean and
+    ///     not in how they combine. A family folded separately could drift from the union it is defined to
+    ///     equal.
+    /// </remarks>
+    internal static SelectionAdmission Folded(
+        SelectionEvaluator selections, Selection enclosing, IReadOnlyList<SelectionAdmission> parts)
     {
-        List<HashSet<TypeNode>> sets = parts.Select(part => part.Members).ToList();
-        HashSet<TypeNode> members = selections.Unite(union, sets);
+        var united = new HashSet<TypeNode>();
+        foreach (SelectionAdmission part in parts) united.UnionWith(part.Members);
+
+        HashSet<TypeNode> members = selections.Narrow(enclosing, united);
         return new SelectionAdmission(members, Merge(parts, members));
+    }
+
+    // Every part of a compound selection, collected in the same position — a union's operands, a family's cells.
+    private static IReadOnlyList<SelectionAdmission> CollectAll(
+        SelectionEvaluator selections, IReadOnlyList<Selection> parts, SelectionPosition position)
+    {
+        var collected = new List<SelectionAdmission>(parts.Count);
+        foreach (Selection part in parts) collected.Add(Collect(selections, part, position));
+
+        return collected;
     }
 
     /// <summary>

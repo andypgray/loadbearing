@@ -1,6 +1,5 @@
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Tests.Checking;
 
 namespace Zphil.LoadBearing.Tests;
@@ -11,14 +10,9 @@ namespace Zphil.LoadBearing.Tests;
 /// </summary>
 public class ProseSentenceTests
 {
-    private static ArchitectureModel BuildCanonical()
-    {
-        return ArchModelBuilder.Build(new ArchSpec());
-    }
-
     private static string SentenceFor(string id)
     {
-        return BuildCanonical()
+        return Checker.Canonical
             .Rule(id)
             .Sentence;
     }

@@ -116,6 +116,10 @@ public sealed class MustHaveExactlyOneCounterpartVerbTests
 
     private static readonly CodebaseModel SceneModel = CompilationFactory.Extract(Scene);
 
+    private static readonly CodebaseModel AmbiguousModel = CompilationFactory.Extract(AmbiguousScene);
+
+    private static readonly CodebaseModel ArityModel = CompilationFactory.Extract(ArityScene);
+
     [Fact]
     public void MustHaveExactlyOneCounterpart_OneMatchingName_PassesClean()
     {
@@ -149,7 +153,7 @@ public sealed class MustHaveExactlyOneCounterpartVerbTests
         // The ambiguous arm inverts the evidence: the subject is lawful where it stands and the edit that
         // resolves the collision happens at one of the counterparts, so those are the sites. Ordered by
         // (file, line), which is the order a report prints them in.
-        Checker.Run(CompilationFactory.Extract(AmbiguousScene), arch =>
+        Checker.Run(AmbiguousModel, arch =>
                 arch.Rule("naming/one-interface-per-service")
                     .Enforce(arch.Types.OfKind(TypeKind.Class)
                         .MustHaveExactlyOneCounterpart(among: arch.Types.OfKind(TypeKind.Interface), named: "I{Name}"))
@@ -179,7 +183,7 @@ public sealed class MustHaveExactlyOneCounterpartVerbTests
     {
         // The subject's simple name is Roslyn's — arity-free — so `Repository<T>` derives `IRepository` and
         // an author never spells the backtick arity a metadata name would carry.
-        Checker.Run(CompilationFactory.Extract(ArityScene), arch =>
+        Checker.Run(ArityModel, arch =>
                 arch.Rule("naming/interface-per-repository")
                     .Enforce(arch.Types.WithNameMatching("Repository")
                         .MustHaveExactlyOneCounterpart(among: arch.Types.OfKind(TypeKind.Interface), named: "I{Name}"))
@@ -195,7 +199,7 @@ public sealed class MustHaveExactlyOneCounterpartVerbTests
         // `Handler<T>` are two subjects that derive one name, and the single `IHandler` satisfies both. A
         // pairing reading would have to red one of them, and the subject count is asserted so the row
         // cannot pass by sweeping only one.
-        RuleResult result = Checker.Run(CompilationFactory.Extract(ArityScene), arch =>
+        RuleResult result = Checker.Run(ArityModel, arch =>
                 arch.Rule("naming/interface-per-handler")
                     .Enforce(arch.Types.WithNameMatching("Handler")
                         .MustHaveExactlyOneCounterpart(among: arch.Types.OfKind(TypeKind.Interface), named: "I{Name}"))
@@ -282,7 +286,7 @@ public sealed class MustHaveExactlyOneCounterpartVerbTests
         BaselineIndex index = Checker.Baselines("naming/one-interface-per-service", blessed);
 
         RuleResult missing = Run(SceneModel, index);
-        RuleResult ambiguous = Run(CompilationFactory.Extract(AmbiguousScene), index);
+        RuleResult ambiguous = Run(AmbiguousModel, index);
 
         missing.ShouldHaveGrandfathered(1);
         ambiguous.ShouldHaveGrandfathered(1);
@@ -291,7 +295,7 @@ public sealed class MustHaveExactlyOneCounterpartVerbTests
         Run(SceneModel, BaselineIndex.Empty)
             .Violations.Select(violation => violation.BaselineIdentity())
             .ShouldBe([blessed]);
-        Run(CompilationFactory.Extract(AmbiguousScene), BaselineIndex.Empty)
+        Run(AmbiguousModel, BaselineIndex.Empty)
             .Violations.Select(violation => violation.BaselineIdentity())
             .ShouldBe([blessed]);
     }
@@ -304,14 +308,7 @@ public sealed class MustHaveExactlyOneCounterpartVerbTests
         BaselineIndex index = Checker.Baselines(
             "naming/one-interface-per-service", BaselineEntry.ForSubject("T:App.Invoice"));
 
-        RuleResult result = Checker.Run(CompilationFactory.Extract(StraysScene), index, arch =>
-                arch.Rule("naming/one-interface-per-service")
-                    .Migrate(
-                        "Some types predate the one-interface-per-service convention.",
-                        arch.Types.OfKind(TypeKind.Class)
-                            .MustHaveExactlyOneCounterpart(among: arch.Types.OfKind(TypeKind.Interface), named: "I{Name}"))
-                    .Because("A service with no interface cannot be substituted in a test."))
-            .Single();
+        RuleResult result = Run(CompilationFactory.Extract(StraysScene), index);
 
         result.ShouldHaveFailedWithSubjects(["App.Receipt"]);
         result.ShouldHaveGrandfathered(1);

@@ -13,15 +13,10 @@ namespace Zphil.LoadBearing.Tests;
 /// </summary>
 public class LayerDefinitionTests
 {
-    private static ArchitectureModel BuildCanonical()
-    {
-        return ArchModelBuilder.Build(new ArchSpec());
-    }
-
     [Fact]
     public void Domain_RendersDefinitionFragment()
     {
-        LayerDefinition domain = BuildCanonical()
+        LayerDefinition domain = Checker.Canonical
             .Layers.Single(layer => layer.Name == "Domain");
 
         domain.DefinitionFragment.ShouldBe("**Domain** — `MyApp.Domain.*`. Domain holds the order and customer model.");
@@ -32,7 +27,7 @@ public class LayerDefinitionTests
     [Fact]
     public void Layers_ExposedInAuthoringOrder()
     {
-        BuildCanonical()
+        Checker.Canonical
             .Layers.Select(layer => layer.Name)
             .ShouldBe(["Domain", "Web"]);
     }
@@ -70,7 +65,7 @@ public class LayerDefinitionTests
     [Fact]
     public void Web_HasNoPurpose_WhenTheSpecGivesItNone()
     {
-        BuildCanonical()
+        Checker.Canonical
             .Layers.Single(layer => layer.Name == "Web")
             .Purpose.ShouldBeNull();
     }

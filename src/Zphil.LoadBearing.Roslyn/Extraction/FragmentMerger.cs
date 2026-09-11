@@ -1,4 +1,5 @@
 using Zphil.LoadBearing.Codebase;
+using Zphil.LoadBearing.Prose;
 using Zphil.LoadBearing.Roslyn.Caching;
 
 namespace Zphil.LoadBearing.Roslyn.Extraction;
@@ -371,8 +372,8 @@ internal static class FragmentMerger
             string winner = _nodes[NodeKey.Unshadowed(fqn)].ProjectName;
             SortedSet<string> losers = _conflatedLosers[fqn];
 
-            string declarers = JoinWithAnd([$"'{winner}'", .. losers.Select(loser => $"'{loser}'")]);
-            string selections = JoinWithAnd([.. losers.Select(loser => $"arch.Project('{loser}')")]);
+            string declarers = ProseFormat.JoinReferencesAnd([$"'{winner}'", .. losers.Select(loser => $"'{loser}'")]);
+            string selections = ProseFormat.JoinReferencesAnd([.. losers.Select(loser => $"arch.Project('{loser}')")]);
 
             return $"Type '{fqn}' is declared by projects {declarers}; its facts and "
                    + $"project attribution follow '{winner}' (the first declarer), but {selections} "
@@ -388,7 +389,7 @@ internal static class FragmentMerger
         {
             SortedSet<string> frameworks = _frameworksByProject[projectName];
             string winner = _multiFrameworkWinners[projectName];
-            string targeted = JoinWithAnd([.. frameworks.Select(framework => $"'{framework}'")]);
+            string targeted = ProseFormat.JoinReferencesAnd([.. frameworks.Select(framework => $"'{framework}'")]);
 
             return $"Project '{projectName}' targets {targeted}; the types they share take their facts from "
                    + $"'{winner}' (the first extracted), so a rule about them is checked against that "
@@ -424,22 +425,14 @@ internal static class FragmentMerger
         // declaring project does not reach every use of the name.
         private static string ShadowedNamesNote(string projectName, (SortedSet<string> Types, SortedSet<string> Assemblies) shadowed)
         {
-            string types = JoinWithAnd([.. shadowed.Types.Select(type => $"'{type}'")]);
-            string assemblies = JoinWithAnd([.. shadowed.Assemblies.Select(assembly => $"'{assembly}'")]);
+            string types = ProseFormat.JoinReferencesAnd([.. shadowed.Types.Select(type => $"'{type}'")]);
+            string assemblies = ProseFormat.JoinReferencesAnd([.. shadowed.Assemblies.Select(assembly => $"'{assembly}'")]);
             string noun = shadowed.Assemblies.Count == 1 ? "assembly" : "assemblies";
             string verb = shadowed.Assemblies.Count == 1 ? "supplies" : "supply";
 
             return $"Project '{projectName}' declares {types}, which referenced {noun} {assemblies} also {verb}; "
                    + "every reference resolves to whichever of the two the referencing compilation bound, so "
                    + $"a selection over project '{projectName}' reaches the declared one alone.";
-        }
-
-        // "A", "A and B", "A, B and C" — each caller formats its own items, so this only joins.
-        private static string JoinWithAnd(IReadOnlyList<string> items)
-        {
-            if (items.Count == 1) return items[0];
-
-            return string.Join(", ", items.Take(items.Count - 1)) + " and " + items[^1];
         }
 
         // Either nothing in the merge declares this FQN — an ordinary external, one node for it, facts from

@@ -55,7 +55,7 @@ internal sealed class EachNoun : SelectionNoun
     {
         if (cells.Count == 1) return cells[0].Noun.ReferenceFragment;
 
-        List<string> names = cells.Select(cell => ((LayerNoun)cell.Noun).Name).ToList();
+        List<string> names = cells.Select(cell => cell.Name).ToList();
         return $"each of the {ProseFormat.JoinReferencesAnd(names)} layers";
     }
 

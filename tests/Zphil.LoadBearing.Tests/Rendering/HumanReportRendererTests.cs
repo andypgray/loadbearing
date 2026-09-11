@@ -49,8 +49,7 @@ public sealed class HumanReportRendererTests
         var arch = new Arch();
         Constraint constraint = arch.Namespace("App.Async.*").Methods.Returning(typeof(Task<int>))
             .MustHaveSuffix("Async");
-        var model = new ArchitectureModel(
-            [new ArchRule("naming/x", Posture.Enforce, "b", null, "sentence", constraint, null, null)], []);
+        ArchitectureModel model = Checker.HandBuilt("naming/x", constraint);
         RuleResult result = ArchChecker.Check(model, AsyncModel)
             .Single();
 
@@ -286,23 +285,12 @@ public sealed class HumanReportRendererTests
         // A grandfathered pair carrying one site more than its entry records. Every site is red, not just the
         // new one — which site is new is a diff question the count cannot answer — and the trailer is what
         // says why a pair the baseline names is red at all: the allowance beside what the run measured.
-        const string source = """
-                              namespace App.Web
-                              {
-                                  public class OldController
-                                  {
-                                      public App.Data.Db A() => new App.Data.Db();
-                                      public App.Data.Db B() => new App.Data.Db();
-                                  }
-                              }
-                              namespace App.Data { public class Db {} }
-                              """;
         BaselineIndex index = Checker.Baselines(
             "data/x",
             BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db")
                 .WithSiteCount(1));
 
-        RuleResult result = Checker.Run(source, index, arch =>
+        RuleResult result = Checker.Run(Sources.TwoSiteController, index, arch =>
                 arch.Rule("data/x")
                     .Migrate(
                         "Controllers open the data layer directly (legacy Active Record style).",

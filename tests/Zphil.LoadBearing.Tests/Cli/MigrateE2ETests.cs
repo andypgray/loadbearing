@@ -4,13 +4,11 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.Cli;
 
 /// <summary>
-///     The growth acceptance: a baseline entry records how many sites it grandfathers, so a second helping
-///     of the old pattern inside an already-grandfathered pair is new code and red. Against a private copy
-///     of the fixture whose two <c>DataTable</c> pairs are fully grandfathered at two sites apiece (the
-///     clean spec's <c>arch/clean-baseline.json</c>), adding a third <c>DataTable</c> use to
-///     <c>InvoiceController</c> takes that pair over its recorded count: <c>check</c> exits 1 listing all
-///     three sites and naming the allowance, while the untouched <c>HomeController</c> pair stays
-///     grandfathered.
+///     The migrate posture's two acceptances, against one private copy of the fixture whose
+///     <c>DataTable</c> pairs are fully grandfathered (the clean spec's <c>arch/clean-baseline.json</c>):
+///     a baseline entry keys on stable symbol IDs, so it survives a file move; and it records how many
+///     sites it grandfathers, so a second helping of the old pattern inside an already-grandfathered pair
+///     is new code and red. One class, so the fixture copy and its restore are paid once.
 /// </summary>
 /// <remarks>
 ///     A copy rather than the committed fixture, and that is the point rather than mere hygiene: the four
@@ -18,11 +16,35 @@ namespace Zphil.LoadBearing.Tests.Cli;
 ///     committed, so growing it in place would move every one of them for a fact none of them is about.
 /// </remarks>
 [Collection("Serial")]
-public sealed class MigrateGrowthE2ETests
+public sealed class MigrateE2ETests
 {
     // A third inline DataTable, written where the surrounding code already does it — the exact shape the
     // measure exists to catch, and the one a pair-grained ratchet passed.
     private const string ThirdSite = "\n    public System.Data.DataTable ExportDrafts() => new System.Data.DataTable();\n";
+
+    [Fact]
+    public async Task Check_AfterFileMove_GrandfatheredEntriesStillMatch()
+    {
+        using var workspace = new TempFixtureWorkspace();
+
+        // Plain move within the project: the SDK glob still compiles it, and `namespace MyApp.Web;`
+        // (declared in the file, not folder-derived) is unchanged — so T:MyApp.Web.InvoiceController holds.
+        string source = workspace.PathOf("MyApp.Web", "InvoiceController.cs");
+        string destination = workspace.PathOf("MyApp.Web", "Controllers", "InvoiceController.cs");
+        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        File.Move(source, destination);
+
+        // The clean spec grandfathers both DataTable sites via arch/clean-baseline.json. The DocID
+        // survived the move, so the Migrate rule stays fully grandfathered and the whole spec is clean.
+        CliResult check = await CliRunner.InvokeAsync("check", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll);
+        check.ShouldSucceed();
+
+        // Belt-and-braces: the burndown confirms both remain grandfathered and none went stale.
+        CliResult status = await CliRunner.InvokeAsync(
+            "status", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--json");
+        status.Out.ShouldContain("\"remaining\": 2");
+        status.Out.ShouldContain("\"stale\": 0");
+    }
 
     [Fact]
     public async Task Check_ExtraSiteInsideGrandfatheredPair_ExitsOneWithTheGrownTrailer()

@@ -185,7 +185,7 @@ internal static class SarifReportRenderer
     // different exit code, not a different truth about the model.
     private static SarifNotification LoadFailureNotification(IReadOnlyList<string> failedProjects)
     {
-        string subject = ProjectSubject(failedProjects);
+        string subject = ProjectSubject(failedProjects.Count);
 
         return new SarifNotification(
             new SarifMessage(
@@ -201,7 +201,7 @@ internal static class SarifReportRenderer
     // consequence are identical and this channel has no room to say which.
     private static SarifNotification RestoreFailureNotification(IReadOnlyList<string> restoreFailedProjects)
     {
-        string subject = ProjectSubject(restoreFailedProjects);
+        string subject = ProjectSubject(restoreFailedProjects.Count);
 
         return new SarifNotification(
             new SarifMessage(
@@ -215,10 +215,17 @@ internal static class SarifReportRenderer
     // from the human stamp or the narrowing notice, per the convention that each renderer composes its own
     // messages; what every sentence here does borrow is the inflection, which is a rule about English rather
     // than a sentence about this log.
-    private static string ProjectSubject(IReadOnlyList<string> projects)
+    private static string ProjectSubject(int count)
     {
-        int count = projects.Count;
         return $"{count} {Plurals.Noun(count, "project")}";
+    }
+
+    // The subject both partial-coverage notifications open with: the counted head, then what the solution
+    // declares but this run did not do to it. One sentence shape, the participle apart, so the narrowed and
+    // the unsupported halves of "these results cover part of the solution" cannot drift in wording or number.
+    private static string DeclaredSubject(int count, string participle)
+    {
+        return $"{ProjectSubject(count)} the solution declares {Plurals.PastVerb(count)} not {participle}";
     }
 
     // A narrowed run's results describe part of the solution, and code scanning has no exit code to read
@@ -230,9 +237,7 @@ internal static class SarifReportRenderer
     // it cannot be written by hand into disagreement.
     private static SarifNotification NarrowingNotification(IReadOnlyList<string> uncheckedProjects)
     {
-        int count = uncheckedProjects.Count;
-        var subject =
-            $"{count} {Plurals.Noun(count, "project")} the solution declares {Plurals.PastVerb(count)} not checked";
+        string subject = DeclaredSubject(uncheckedProjects.Count, "checked");
 
         return new SarifNotification(
             new SarifMessage(
@@ -250,9 +255,7 @@ internal static class SarifReportRenderer
     // disagree about what the run could read.
     private static SarifNotification UnsupportedNotification(IReadOnlyList<UnsupportedProjectStamp> unsupportedProjects)
     {
-        int count = unsupportedProjects.Count;
-        var subject =
-            $"{count} {Plurals.Noun(count, "project")} the solution declares {Plurals.PastVerb(count)} not surveyed";
+        string subject = DeclaredSubject(unsupportedProjects.Count, "surveyed");
         IEnumerable<string> entries = unsupportedProjects
             .Select(project => $"{project.Project} ({project.Reason})");
 

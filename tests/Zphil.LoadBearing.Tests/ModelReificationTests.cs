@@ -57,14 +57,9 @@ public class ModelReificationTests
             .Enforce(arch.Types.MustNotConstruct(typeof(SqlConnection)))
             .Because("Services are DI-resolved; direct construction bypasses the container."));
 
-    private static ArchitectureModel BuildCanonical()
-    {
-        return ArchModelBuilder.Build(new ArchSpec());
-    }
-
     private static ArchRule Rule(string id)
     {
-        return BuildCanonical()
+        return Checker.Canonical
             .Rule(id);
     }
 
@@ -89,7 +84,7 @@ public class ModelReificationTests
     public void Build_CanonicalSample_ReifiesNineRulesInPinnedOrder()
     {
         // Nine post-desugar rules from eight statements: the quarantine mints two children, the caution one.
-        BuildCanonical()
+        Checker.Canonical
             .Rules.Select(rule => rule.Id)
             .ShouldBe(
             [

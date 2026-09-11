@@ -15,11 +15,15 @@ namespace Zphil.LoadBearing.Tests.Cli;
 /// </summary>
 public sealed class ExplainFormatterTests
 {
-    private static readonly ArchitectureModel Canonical = ArchModelBuilder.Build(new ArchSpec());
-
     private static string Dump(string id)
     {
-        return string.Join("\n", ExplainFormatter.Lines(Canonical.Rule(id)));
+        return Dump(Checker.Canonical, id);
+    }
+
+    /// <summary>The same dump over a model the row built for itself.</summary>
+    private static string Dump(ArchitectureModel model, string id)
+    {
+        return string.Join("\n", ExplainFormatter.Lines(model.Rule(id)));
     }
 
     [Fact]
@@ -45,7 +49,7 @@ public sealed class ExplainFormatterTests
                 .Citation("https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines")
                 .Fix("Inject IHttpClientFactory."));
 
-        string.Join("\n", ExplainFormatter.Lines(model.Rule("http/reuse-httpclient")))
+        Dump(model, "http/reuse-httpclient")
             .ShouldBe(
                 "http/reuse-httpclient (enforce)\n" +
                 "  sentence: Types in `MyApp.*` must be named `*Client`.\n" +
@@ -126,7 +130,7 @@ public sealed class ExplainFormatterTests
                 .Dragons("Argument order is load-bearing: every caller passes them positionally.")
                 .Because("The helpers are public API for the whole solution."));
 
-        string.Join("\n", ExplainFormatter.Lines(model.Rule("shared/utilities/tripwire")))
+        Dump(model, "shared/utilities/tripwire")
             .ShouldBe(
                 "shared/utilities/tripwire (caution/tripwire)\n" +
                 "  because: The helpers are public API for the whole solution.\n" +
@@ -145,7 +149,7 @@ public sealed class ExplainFormatterTests
                 .BoundaryOnlyVia(arch.Types.Named("BillingFacade"), arch.Namespace("MyApp.Legacy.Billing.Contracts.*"))
                 .Dragons("Rounding is load-bearing.")
                 .Because("Replacement scheduled."));
-        string dump = string.Join("\n", ExplainFormatter.Lines(model.Rule("legacy/billing/containment")));
+        string dump = Dump(model, "legacy/billing/containment");
 
         dump.ShouldContain("  boundary: types named `BillingFacade`, types in `MyApp.Legacy.Billing.Contracts.*`");
         dump.ShouldContain("  fix: use types named `BillingFacade`");
@@ -160,7 +164,7 @@ public sealed class ExplainFormatterTests
                 .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
                 .DragonsDoc("arch/billing-dragons.md")
                 .Because("Replacement scheduled; see the linked doc."));
-        string dump = string.Join("\n", ExplainFormatter.Lines(model.Rule("legacy/billing/containment")));
+        string dump = Dump(model, "legacy/billing/containment");
 
         dump.ShouldContain("  dragons-doc: arch/billing-dragons.md");
         dump.ShouldNotContain("  dragons:");

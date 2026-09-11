@@ -146,11 +146,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         CheckReport report = Check(TwoSiteSource);
         string path = WriteBaseline(BaselineComposer.Compose(RuleId, Pair.WithBecause("INC-1")));
 
-        var output = new StringWriter();
-        Runner(output)
-            .AddEntry(AddRequest("INC-2"), report, _temp.Path);
-
-        output.ToString()
+        AddEntry("INC-2", report)
             .ShouldContain(
                 "data-access/ledger-behind-repository: entry already baselined — attribution updated and site count re-recorded (uncounted → 2).");
         Read(path)
@@ -171,11 +167,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
             Pair.WithSiteCount(2)
                 .WithBecause("INC-1")));
 
-        var output = new StringWriter();
-        Runner(output)
-            .AddEntry(AddRequest("INC-2"), report, _temp.Path);
-
-        output.ToString()
+        AddEntry("INC-2", report)
             .ShouldContain(
                 "data-access/ledger-behind-repository: entry already baselined — attribution updated and site count re-recorded (2 → 3).");
         Read(path)
@@ -397,6 +389,16 @@ public sealed class BaselineRunnerCountTests : IDisposable
         var output = new StringWriter();
         Runner(output)
             .ApplyFiles(request, results, _temp.Path);
+        return output.ToString();
+    }
+
+    // --add through its own seam, handing back what the runner said — the exit code is dropped here as it
+    // is in Apply; the one row that claims it keeps its own writer.
+    private string AddEntry(string because, CheckReport report)
+    {
+        var output = new StringWriter();
+        Runner(output)
+            .AddEntry(AddRequest(because), report, _temp.Path);
         return output.ToString();
     }
 

@@ -540,16 +540,7 @@ internal sealed class ConstraintEvaluator
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyReference(
         SelectionAdmission subject, IReadOnlyList<Selection> allowedTargets, FamilySubject? family)
     {
-        SelectionAdmission operands = ResolveOperands(allowedTargets);
-        if (family is null) return (Outbound(subject, operands.IncludingSelf(subject), wantHit: false), NoWarnings);
-
-        IReadOnlyList<SelectionAdmission> declared = DeclaredCells(family);
-        var violations = new List<Violation>();
-        for (var cell = 0; cell < declared.Count; cell++)
-            violations.AddRange(
-                Outbound(family.Subjects[cell], operands.IncludingSelf(declared[cell]), wantHit: false));
-
-        return (Deduplicated(violations), NoWarnings);
+        return AllowList(subject, allowedTargets, family, (cell, allowed) => Outbound(cell, allowed, wantHit: false));
     }
 
     /// <summary>
@@ -568,13 +559,23 @@ internal sealed class ConstraintEvaluator
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyBeReferencedBy(
         SelectionAdmission subject, IReadOnlyList<Selection> allowedSources, FamilySubject? family)
     {
-        SelectionAdmission operands = ResolveOperands(allowedSources);
-        if (family is null) return (Inbound(subject, operands.IncludingSelf(subject)), NoWarnings);
+        return AllowList(subject, allowedSources, family, Inbound);
+    }
+
+    // The allow-list shape both directions take (GRAMMAR §4.1, §5.1): the operands resolved once, the
+    // subject allowed implicitly, and — over a family — one walk per cell whose allow-set is the operands
+    // plus that cell as declared. Only the walk differs, which is what `walk` carries.
+    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) AllowList(
+        SelectionAdmission subject, IReadOnlyList<Selection> allowed, FamilySubject? family,
+        Func<SelectionAdmission, SelectionAdmission, List<Violation>> walk)
+    {
+        SelectionAdmission operands = ResolveOperands(allowed);
+        if (family is null) return (walk(subject, operands.IncludingSelf(subject)), NoWarnings);
 
         IReadOnlyList<SelectionAdmission> declared = DeclaredCells(family);
         var violations = new List<Violation>();
         for (var cell = 0; cell < declared.Count; cell++)
-            violations.AddRange(Inbound(family.Subjects[cell], operands.IncludingSelf(declared[cell])));
+            violations.AddRange(walk(family.Subjects[cell], operands.IncludingSelf(declared[cell])));
 
         return (Deduplicated(violations), NoWarnings);
     }
@@ -633,7 +634,7 @@ internal sealed class ConstraintEvaluator
             throw new RuleEvaluationException(
                 "`MustNotHaveCircularReferences` needs a family of layers (`arch.Each`); this subject declares no cells.");
 
-        if (family.Cells.Any(cell => cell is UnionSelection || cell.Noun is not LayerNoun))
+        if (family.LayerCells is not { } layerCells)
             throw new RuleEvaluationException(
                 "`MustNotHaveCircularReferences` needs a family of layers (`arch.Each`); this subject's cells are projects, which cannot have circular references.");
 
@@ -650,7 +651,7 @@ internal sealed class ConstraintEvaluator
                 : OutboundEdges(family.Subjects[source], declared[target], wantHit: true);
 
         int[] components = CellComponents.Of(cellCount, (source, target) => arrows[source, target].Count > 0);
-        Dictionary<int, string> circles = CircleDetails(family, components);
+        Dictionary<int, string> circles = CircleDetails(layerCells, components);
 
         var violations = new List<Violation>();
         for (var source = 0; source < cellCount; source++)
@@ -671,7 +672,7 @@ internal sealed class ConstraintEvaluator
     // the order the rule's own sentence names them in, so the finding and the law read alike. A component of
     // one cell holds no circle and mints nothing, which is why the caller skips an empty arrow before
     // reaching in here: a cell IS in its own component, and arrows[i, i] is empty by construction.
-    private static Dictionary<int, string> CircleDetails(FamilySubject family, int[] components)
+    private static Dictionary<int, string> CircleDetails(IReadOnlyList<Layer> cells, int[] components)
     {
         var names = new Dictionary<int, List<string>>();
         for (var cell = 0; cell < components.Length; cell++)
@@ -683,8 +684,7 @@ internal sealed class ConstraintEvaluator
                 names[component] = members;
             }
 
-            var layer = (LayerNoun)family.Cells[cell].Noun;
-            members.Add(layer.Name);
+            members.Add(cells[cell].Name);
         }
 
         return names
@@ -792,7 +792,7 @@ internal sealed class ConstraintEvaluator
         Selection subject)
     {
         if (subject is UnionSelection union) return ResolveUnionSubject(union);
-        if (subject.Noun is EachNoun) return ResolveFamilySubject(subject);
+        if (subject.Noun is EachNoun family) return ResolveFamilySubject(subject, family);
 
         SelectionAdmission whole = SelectionAdmission.Collect(_selections, subject, SelectionPosition.Subject);
         return (Array.Empty<Violation>(), whole, null);
@@ -800,59 +800,60 @@ internal sealed class ConstraintEvaluator
 
     private (IReadOnlyList<Violation>, SelectionAdmission?, FamilySubject?) ResolveUnionSubject(UnionSelection union)
     {
-        var operands = new List<SelectionAdmission>(union.Parts.Count);
-        var violations = new List<Violation>();
-        foreach (Selection operand in union.Parts)
-        {
-            SelectionAdmission matched = SelectionAdmission.Collect(_selections, operand, SelectionPosition.Subject);
-            operands.Add(matched);
-            if (matched.Count == 0)
-                violations.Add(Violation.EmptySubject(EmptyOperandMessage(SentenceRenderer.Reference(operand))));
-        }
-
+        (List<SelectionAdmission> operands, List<Violation> violations) = CollectSubjectParts(union.Parts);
         if (violations.Count > 0) return (violations, null, null);
 
-        return (Array.Empty<Violation>(), SelectionAdmission.United(_selections, union, operands), null);
+        return (Array.Empty<Violation>(), SelectionAdmission.Folded(_selections, union, operands), null);
+    }
+
+    // Each part collected in subject position with the §9 emptiness verdict beside it, in part order: a
+    // union's operands and a family's cells are loud for the same reason and must report alike.
+    private (List<SelectionAdmission> Collected, List<Violation> Empty) CollectSubjectParts(
+        IReadOnlyList<Selection> parts)
+    {
+        var collected = new List<SelectionAdmission>(parts.Count);
+        var violations = new List<Violation>();
+        foreach (Selection part in parts)
+        {
+            SelectionAdmission matched = SelectionAdmission.Collect(_selections, part, SelectionPosition.Subject);
+            collected.Add(matched);
+            if (matched.Count == 0)
+                violations.Add(Violation.EmptySubject(EmptyOperandMessage(SentenceRenderer.Reference(part))));
+        }
+
+        return (collected, violations);
     }
 
     // A family subject, resolved once for the whole rule (GRAMMAR §5.1): its cells, their memberships, and
-    // the partition discipline. The cells are collected in subject position exactly as a union's operands
-    // are, so a cell matching nothing fails the rule in its own right with the cell named — the same §9
-    // loudness, for the same reason. Overlap is fail-closed rather than silently double-judged: a type in
-    // two cells has two selves and the rule cannot say which it meant.
-    private (IReadOnlyList<Violation>, SelectionAdmission?, FamilySubject?) ResolveFamilySubject(Selection subject)
+    // the partition discipline. Overlap is fail-closed rather than silently double-judged: a type in two
+    // cells has two selves and the rule cannot say which it meant.
+    private (IReadOnlyList<Violation>, SelectionAdmission?, FamilySubject?) ResolveFamilySubject(
+        Selection subject, EachNoun noun)
     {
         IReadOnlyList<Selection> cells = _selections.Cells(subject);
-        RequireDistinctLayerCells(cells);
+        RequireDistinctLayerCells(noun.Layers);
 
-        var collected = new List<SelectionAdmission>(cells.Count);
-        var violations = new List<Violation>();
-        foreach (Selection cell in cells)
-        {
-            SelectionAdmission matched = SelectionAdmission.Collect(_selections, cell, SelectionPosition.Subject);
-            collected.Add(matched);
-            if (matched.Count == 0)
-                violations.Add(Violation.EmptySubject(EmptyOperandMessage(SentenceRenderer.Reference(cell))));
-        }
-
+        (List<SelectionAdmission> collected, List<Violation> violations) = CollectSubjectParts(cells);
         if (violations.Count > 0) return (violations, null, null);
 
-        SelectionAdmission whole = SelectionAdmission.Family(_selections, subject, collected);
-        RequireDisjointLayerCells(cells, collected, whole.Members);
+        SelectionAdmission whole = SelectionAdmission.Folded(_selections, subject, collected);
+        RequireDisjointLayerCells(noun.Layers, collected, whole.Members);
 
         List<SelectionAdmission> perCell = collected.Select(cell => cell.Restricted(whole.Members)).ToList();
-        return (Array.Empty<Violation>(), whole, new FamilySubject(cells, perCell));
+        return (Array.Empty<Violation>(), whole, new FamilySubject(cells, perCell, noun.Layers));
     }
 
     // The degenerate overlap, caught on the names alone before any type is resolved: a layer listed twice
     // is one cell wearing two, which no membership answer could untangle. A project family cannot reach
     // this — its cells come from a resolved project list, which holds each project once.
-    private static void RequireDistinctLayerCells(IReadOnlyList<Selection> cells)
+    private static void RequireDistinctLayerCells(IReadOnlyList<Layer>? cells)
     {
+        if (cells is null) return;
+
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (Selection cell in cells)
-            if (cell.Noun is LayerNoun layer && !seen.Add(layer.Name))
-                throw new RuleEvaluationException($"The {layer.Name} layer is listed twice in the family.");
+        foreach (Layer cell in cells)
+            if (!seen.Add(cell.Name))
+                throw new RuleEvaluationException($"The {cell.Name} layer is listed twice in the family.");
     }
 
     // Partition discipline over the cells as declared (GRAMMAR §5.1): a subject type in two layer cells has
@@ -860,9 +861,9 @@ internal sealed class ConstraintEvaluator
     // — a multiply-declared type sits in every declarer's cell and is judged per instance (§4.1). The
     // report is ordinal by type then by cell pair so one overlapping type always names the same one.
     private static void RequireDisjointLayerCells(
-        IReadOnlyList<Selection> cells, IReadOnlyList<SelectionAdmission> declared, HashSet<TypeNode> members)
+        IReadOnlyList<Layer>? cells, IReadOnlyList<SelectionAdmission> declared, HashSet<TypeNode> members)
     {
-        if (cells.Count < 2 || cells[0].Noun is not LayerNoun) return;
+        if (cells is null || cells.Count < 2) return;
 
         var owner = new Dictionary<TypeNode, int>();
         List<(string Type, string First, string Second)>? overlaps = null;
@@ -877,7 +878,7 @@ internal sealed class ConstraintEvaluator
                 }
 
                 overlaps ??= [];
-                overlaps.Add((node.FullName, LayerNameOf(cells[first]), LayerNameOf(cells[cell])));
+                overlaps.Add((node.FullName, cells[first].Name, cells[cell].Name));
             }
 
         if (overlaps is null) return;
@@ -891,11 +892,6 @@ internal sealed class ConstraintEvaluator
         throw new RuleEvaluationException(
             $"Type `{type}` sits in both the {firstCell} and {secondCell} cells of the family; "
             + "a family's cells must not overlap.");
-    }
-
-    private static string LayerNameOf(Selection cell)
-    {
-        return ((LayerNoun)cell.Noun).Name;
     }
 
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) Shape(HashSet<TypeNode> subjects, Func<TypeNode, bool> holds)
@@ -1215,12 +1211,18 @@ internal sealed class ConstraintEvaluator
     // family narrows what every cell governs. Held rather than recomputed because four verbs read it and
     // a project family resolves its cells against the project list to find them. The cells as DECLARED are
     // not held here: only the verbs that read the cells as declared need them, and they resolve them themselves.
-    private sealed class FamilySubject(IReadOnlyList<Selection> cells, IReadOnlyList<SelectionAdmission> subjects)
+    private sealed class FamilySubject(
+        IReadOnlyList<Selection> cells,
+        IReadOnlyList<SelectionAdmission> subjects,
+        IReadOnlyList<Layer>? layerCells)
     {
         /// <summary>The cells, in declaration order for a layer family and project order for a project one.</summary>
         internal IReadOnlyList<Selection> Cells { get; } = cells;
 
         /// <summary>Each cell intersected with the family's membership, positionally aligned with <see cref="Cells" />.</summary>
         internal IReadOnlyList<SelectionAdmission> Subjects { get; } = subjects;
+
+        /// <summary>The declared layer cells, or null for a project family — the partition's own kind.</summary>
+        internal IReadOnlyList<Layer>? LayerCells { get; } = layerCells;
     }
 }

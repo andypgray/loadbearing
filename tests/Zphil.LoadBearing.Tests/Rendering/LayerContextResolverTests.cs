@@ -22,10 +22,10 @@ public class LayerContextResolverTests
 {
     // A Web layer with one bare-subject Enforce rule anchored on it — saying what it is for when given a
     // purpose, which is the sentence the card lede carries.
-    private static readonly IArchitectureSpec WebLayerSpec = WebLayer();
+    private static readonly IArchitectureSpec WebLayerSpec = ContextFixtures.WebLayer();
 
     private static readonly IArchitectureSpec DescribedWebLayerSpec =
-        WebLayer("The HTTP surface: controllers and the views they serve.");
+        ContextFixtures.WebLayer("The HTTP surface: controllers and the views they serve.");
 
     // A Web layer whose only rule has a web.Except(...) subject — a refinement that preserves the noun head.
     private static readonly IArchitectureSpec ExceptRefinedSpec = new InlineSpec(arch =>
@@ -117,18 +117,6 @@ public class LayerContextResolverTests
             .Dragons("Banker's rounding is load-bearing.")
             .Because("Every caller depends on the exact rounding.");
     });
-
-    private static IArchitectureSpec WebLayer(string? purpose = null)
-    {
-        return new InlineSpec(arch =>
-        {
-            Layer web = arch.Layer("Web", "MyApp.Web.*");
-            if (purpose is not null) web.Purpose(purpose);
-            arch.Rule("layering/web-not-billing")
-                .Enforce(web.MustNotReference(arch.Namespace("MyApp.Legacy.Billing.*")))
-                .Because("Web reaches billing only through the facade.");
-        });
-    }
 
     [Fact]
     public void Resolve_LayerWithAnchoredRule_PicksDeepestCommonDirectory()

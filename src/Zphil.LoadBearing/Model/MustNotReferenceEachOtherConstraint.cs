@@ -16,7 +16,5 @@ namespace Zphil.LoadBearing.Model;
 /// </remarks>
 internal sealed class MustNotReferenceEachOtherConstraint(Selection subject) : Constraint(subject)
 {
-    internal override string VerbPhrase => SentenceRenderer.FamilyCellWord(Subject!) is { } cell
-        ? $"must not reference the other {cell}s"
-        : "must not reference the others";
+    internal override string VerbPhrase => "must not reference " + SentenceRenderer.OtherCells(Subject!);
 }

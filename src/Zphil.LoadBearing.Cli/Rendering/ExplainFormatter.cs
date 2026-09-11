@@ -1,4 +1,5 @@
 using Zphil.LoadBearing.Hosting;
+using Zphil.LoadBearing.Prose;
 
 namespace Zphil.LoadBearing.Cli.Rendering;
 
@@ -33,7 +34,7 @@ internal static class ExplainFormatter
             // — no boundary, no baseline — prints the scope and its dragons and nothing else.
             case Posture.Quarantine or Posture.Caution when rule.Scope is { } scope:
                 lines.Add($"  scope: {scope.ScopeId}");
-                if (scope.Surface.Count > 0) lines.Add($"  boundary: {BoundaryList(scope.Surface)}");
+                if (scope.Surface.Count > 0) lines.Add($"  boundary: {ProseFormat.JoinInventory(scope.Surface)}");
                 if (scope.BaselinePath is { } scopeBaseline) lines.Add($"  baseline: {scopeBaseline}");
                 if (scope.Dragons is { } dragons) lines.Add($"  dragons: {dragons}");
                 if (scope.DragonsDoc is { } dragonsDoc) lines.Add($"  dragons-doc: {dragonsDoc}");
@@ -51,13 +52,5 @@ internal static class ExplainFormatter
         if (rule.Scope is { } scope) posture += "/" + scope.Role.ToString().ToLowerInvariant();
 
         return $"{rule.Id} ({posture})";
-    }
-
-    // The already-rendered surface fragments, comma-joined. Reading the same pre-rendered list the
-    // scope card reads is what makes the two agree structurally rather than by coincidence — the CLI
-    // cannot reach Core's prose helpers to re-derive them.
-    private static string BoundaryList(IReadOnlyList<string> surface)
-    {
-        return string.Join(", ", surface);
     }
 }

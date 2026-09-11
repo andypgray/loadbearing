@@ -20,13 +20,7 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 public class ContextFileComposerTests
 {
     // A Web layer with one bare-subject Enforce rule anchored on it.
-    private static readonly IArchitectureSpec WebLayerSpec = new InlineSpec(arch =>
-    {
-        Layer web = arch.Layer("Web", "MyApp.Web.*");
-        arch.Rule("layering/web-not-billing")
-            .Enforce(web.MustNotReference(arch.Namespace("MyApp.Legacy.Billing.*")))
-            .Because("Web reaches billing only through the facade.");
-    });
+    private static readonly IArchitectureSpec WebLayerSpec = ContextFixtures.WebLayer();
 
     // A Web layer that says what it is for and that no rule anchors on: the rule ranges over the same types
     // through a NamespaceNoun subject, so the layer earns a module-map row and no card.
@@ -39,13 +33,7 @@ public class ContextFileComposerTests
     });
 
     // A Billing layer anchored by a rule, over a codebase that holds no billing type.
-    private static readonly IArchitectureSpec BillingLayerSpec = new InlineSpec(arch =>
-    {
-        Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
-        arch.Rule("layering/billing-not-web")
-            .Enforce(billing.MustNotReference(arch.Namespace("MyApp.Web.*")))
-            .Because("Billing is downstream of the web layer.");
-    });
+    private static readonly IArchitectureSpec BillingLayerSpec = new InlineSpec(BillingLayer);
 
     // A quarantined scope over a namespace no type in the codebase occupies.
     private static readonly IArchitectureSpec AbsentScopeSpec = new InlineSpec(QuarantineBilling);
@@ -67,13 +55,17 @@ public class ContextFileComposerTests
     {
         return new InlineSpec(arch =>
         {
-            Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
-            arch.Rule("layering/billing-not-web")
-                .Enforce(billing.MustNotReference(arch.Namespace("MyApp.Web.*")))
-                .Because("Billing is downstream of the web layer.");
-
+            BillingLayer(arch);
             declareScope(arch);
         });
+    }
+
+    private static void BillingLayer(Arch arch)
+    {
+        Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
+        arch.Rule("layering/billing-not-web")
+            .Enforce(billing.MustNotReference(arch.Namespace("MyApp.Web.*")))
+            .Because("Billing is downstream of the web layer.");
     }
 
     private static void QuarantineBilling(Arch arch)

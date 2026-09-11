@@ -54,9 +54,7 @@ public sealed class McpStdioChildServerTests
         using var repo = new TempGitRepo();
         // A brand-new untracked file in dragon territory, so the report can only carry the tripwire if git
         // actually ran and produced a diff — the assertion the wedge fails.
-        File.WriteAllText(
-            repo.PathOf("MyApp.Legacy.Billing", "LegacyNote.cs"),
-            "namespace MyApp.Legacy.Billing;\n\npublic class LegacyNote;\n");
+        repo.WriteQuarantineNote();
 
         ProcessStartInfo startInfo = McpChildHarness.ServerStartInfo(
             TestsBinCli.Dll(),

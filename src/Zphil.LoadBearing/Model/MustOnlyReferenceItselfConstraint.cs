@@ -25,8 +25,6 @@ namespace Zphil.LoadBearing.Model;
 /// </remarks>
 internal sealed class MustOnlyReferenceItselfConstraint(Selection subject) : Constraint(subject)
 {
-    private const string ExternalCaveat = " (external packages are not constrained by this rule)";
-
     internal override string VerbPhrase =>
-        $"must reference only {SentenceRenderer.SelfReference(Subject!)}{ExternalCaveat}";
+        $"must reference only {SentenceRenderer.SelfReference(Subject!)}{MustOnlyReferenceConstraint.ExternalCaveat}";
 }

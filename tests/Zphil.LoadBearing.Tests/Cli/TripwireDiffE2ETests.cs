@@ -39,29 +39,47 @@ public sealed class TripwireDiffE2ETests
         "green under the unfiltered-catch rule, and it is the fixture's one sanctioned broad handler. " +
         "Keep the filter; add cases beside it, never inside it.";
 
-    // The one touched Domain file every caution row runs against; the three channels differ only in the
-    // flags they add, which is the claim those rows are making.
-    private static async Task<CliResult> CautionRunAsync(params string[] extraArgs)
+    // The one touched Domain file every caution row runs against, read on three channels. The rows differ
+    // only in the flags they add and none of them mutates further, so the leased tree, its reset and its git
+    // commit are the class's rather than each row's. The repo is disposed inside the lambda, so the lease is
+    // released before the class's other rows ask for one.
+    private static readonly Lazy<Task<(CliResult Human, CliResult Json, CliResult Hook)>> Caution = new(async () =>
     {
         using var repo = new TempGitRepo();
         File.AppendAllText(repo.PathOf("MyApp.Domain", "RetryPolicy.cs"), CautionTouch);
 
         string[] args =
-            ["check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD", .. extraArgs];
-        return await CliRunner.InvokeAsync(args);
-    }
+            ["check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD"];
+        return (
+            await CliRunner.InvokeAsync(args),
+            await CliRunner.InvokeAsync([.. args, "--json"]),
+            await CliRunner.InvokeAsync([.. args, "--hook-json"]));
+    });
+
+    private const string QuarantineWarning =
+        "Changed file 'MyApp.Legacy.Billing/LegacyNote.cs' is inside quarantined scope 'legacy/billing'";
+
+    private const string QuarantineDragons =
+        "  dragons: Banker's rounding happens at line-item level, NOT invoice level. Do not normalize.";
+
+    // One untracked file in dragon territory, read on two channels. The rows differ only in the flag they
+    // add and neither mutates further, so the leased tree — and the wholesale workspace reload a new source
+    // file forces on it — is paid once for the pair rather than once per row.
+    private static readonly Lazy<Task<(CliResult Human, CliResult Hook)>> Untracked = new(async () =>
+    {
+        using var repo = new TempGitRepo();
+        // A brand-new, still-untracked file in the quarantined billing project — SDK globs compile it in.
+        repo.WriteQuarantineNote();
+
+        string[] args =
+            ["check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD"];
+        return (await CliRunner.InvokeAsync(args), await CliRunner.InvokeAsync([.. args, "--hook-json"]));
+    });
 
     [Fact]
     public async Task CheckDiffBase_UntrackedFileInQuarantinedScope_WarnsAndExitsZero()
     {
-        using var repo = new TempGitRepo();
-        // A brand-new, still-untracked file in the quarantined billing project — SDK globs compile it in.
-        File.WriteAllText(
-            repo.PathOf("MyApp.Legacy.Billing", "LegacyNote.cs"),
-            "namespace MyApp.Legacy.Billing;\n\npublic class LegacyNote;\n");
-
-        CliResult result = await CliRunner.InvokeAsync(
-            "check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD");
+        CliResult result = (await Untracked.Value).Human;
 
         result.ShouldSucceed("warn legacy/billing/tripwire");
         result.Out.ShouldContain(
@@ -69,8 +87,7 @@ public sealed class TripwireDiffE2ETests
             "does the task actually require editing dragon territory? Dragons: loadbearing explain legacy/billing/tripwire.");
         // The dragons ride under the warning that fired, so the agent mid-edit reads them here rather than
         // paying a round trip to `explain` for prose the rule already carries.
-        result.Out.ShouldContain(
-            "  dragons: Banker's rounding happens at line-item level, NOT invoice level. Do not normalize.");
+        result.Out.ShouldContain(QuarantineDragons);
     }
 
     [Fact]
@@ -91,8 +108,7 @@ public sealed class TripwireDiffE2ETests
         result.Out.ShouldContain("MyApp.Web.HomeController references MyApp.Legacy.Billing.BillingCalculator");
         result.Out.ShouldContain("warn legacy/billing/tripwire");
         result.Out.ShouldContain("Changed file 'MyApp.Legacy.Billing/BillingCalculator.cs' is inside quarantined scope 'legacy/billing'");
-        result.Out.ShouldContain(
-            "  dragons: Banker's rounding happens at line-item level, NOT invoice level. Do not normalize.");
+        result.Out.ShouldContain(QuarantineDragons);
     }
 
     [Fact]
@@ -102,7 +118,7 @@ public sealed class TripwireDiffE2ETests
         // containment-driven and this spec's containment holds, so exit 0 here is not "the warning did not
         // gate" but "there was never anything else to gate on" — which is what makes a caution's whole
         // verdict a warning, and this the only spec in the suite that can prove it.
-        CliResult result = await CautionRunAsync();
+        CliResult result = (await Caution.Value).Human;
 
         result.ShouldSucceed("warn domain/retry-budget/tripwire");
         // A different question from the quarantine's wording: not whether the task belongs here at all, only
@@ -117,16 +133,13 @@ public sealed class TripwireDiffE2ETests
     [Fact]
     public async Task CheckDiffBaseJson_TouchedFileInCautionedScope_CarriesTheKindAndTheSameMessage()
     {
-        CliResult result = await CautionRunAsync("--json");
+        CliResult result = (await Caution.Value).Json;
 
         // The machine channel names the posture in the warning's own kind rather than leaving a reader to
         // parse the prose for it — an additive enum value within schemaVersion 3, beside the quarantine's.
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        JsonElement warning = document.RootElement.GetProperty("rules")
-            .EnumerateArray()
-            .Single(rule => rule.GetProperty("id")
-                .GetString() == "domain/retry-budget/tripwire")
+        JsonElement warning = CheckJson.Rule(document, "domain/retry-budget/tripwire")
             .GetProperty("warnings")
             .EnumerateArray()
             .ShouldHaveSingleItem();
@@ -142,14 +155,7 @@ public sealed class TripwireDiffE2ETests
     [Fact]
     public async Task CheckHookJson_CleanRunWithATripwireWarning_WritesTheHookDocumentAndNothingElse()
     {
-        using var repo = new TempGitRepo();
-        File.WriteAllText(
-            repo.PathOf("MyApp.Legacy.Billing", "LegacyNote.cs"),
-            "namespace MyApp.Legacy.Billing;\n\npublic class LegacyNote;\n");
-
-        CliResult result = await CliRunner.InvokeAsync(
-            "check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD",
-            "--hook-json");
+        CliResult result = (await Untracked.Value).Hook;
 
         // Exit 0 exactly as without the flag — a warning never moves the verdict — and stdout is the one
         // document, whole: the parse below rejects trailing content, so a leaked report line cannot hide
@@ -158,10 +164,8 @@ public sealed class TripwireDiffE2ETests
         result.ShouldSucceed();
         string context = result.ShouldHaveHookAdditionalContext();
         context.ShouldContain("warn legacy/billing/tripwire");
-        context.ShouldContain(
-            "Changed file 'MyApp.Legacy.Billing/LegacyNote.cs' is inside quarantined scope 'legacy/billing'");
-        context.ShouldContain(
-            "  dragons: Banker's rounding happens at line-item level, NOT invoice level. Do not normalize.");
+        context.ShouldContain(QuarantineWarning);
+        context.ShouldContain(QuarantineDragons);
     }
 
     [Fact]
@@ -170,7 +174,7 @@ public sealed class TripwireDiffE2ETests
         // The caution's third channel, and the one it was built for: a rule that only ever warns has only
         // exit 0 to travel on, and an every-edit agent hook is exactly the reader the dragons are addressed
         // to. Same two lines as the human run, inside the document the wrapper hands to Claude Code.
-        CliResult result = await CautionRunAsync("--hook-json");
+        CliResult result = (await Caution.Value).Hook;
 
         result.ShouldSucceed();
         string context = result.ShouldHaveHookAdditionalContext();
@@ -191,7 +195,7 @@ public sealed class TripwireDiffE2ETests
             "check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD",
             "--hook-json");
 
-        result.Exit.ShouldBe(0);
+        result.ShouldSucceed();
         result.Out.ShouldBeEmpty();
         result.Err.ShouldBeEmpty();
     }
@@ -220,11 +224,10 @@ public sealed class TripwireDiffE2ETests
     public async Task CheckHookJsonWithJson_IsRefused()
     {
         // Two documents, one stdout. Refused rather than silently ranked, because either winner would hand a
-        // caller the other one's shape on a flag they did pass.
-        using var repo = new TempGitRepo();
-
+        // caller the other one's shape on a flag they did pass. Decided on the flags alone, before the
+        // solution is opened, so this row takes the shared fixture path and copies no tree.
         CliResult result = await CliRunner.InvokeAsync(
-            "check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--json", "--hook-json");
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.QuarantinedSpecDll, "--json", "--hook-json");
 
         result.ShouldRefuseWith("--json and --hook-json both own stdout");
     }
@@ -245,16 +248,13 @@ public sealed class TripwireDiffE2ETests
         try
         {
             // A brand-new untracked file in dragon territory (the agent-hook case).
-            File.WriteAllText(
-                repo.PathOf("MyApp.Legacy.Billing", "LegacyNote.cs"),
-                "namespace MyApp.Legacy.Billing;\n\npublic class LegacyNote;\n");
+            repo.WriteQuarantineNote();
 
             CliResult result = await CliRunner.InvokeAsync(
                 "check", Path.Combine(linkRoot, "MyApp.sln"), "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD");
 
             result.ShouldSucceed("warn legacy/billing/tripwire");
-            result.Out.ShouldContain(
-                "Changed file 'MyApp.Legacy.Billing/LegacyNote.cs' is inside quarantined scope 'legacy/billing'");
+            result.Out.ShouldContain(QuarantineWarning);
         }
         finally
         {

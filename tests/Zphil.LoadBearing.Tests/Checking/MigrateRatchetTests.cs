@@ -2,7 +2,9 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
+using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Tests.Checking.Targets;
+using Zphil.LoadBearing.Tests.Extraction;
 
 namespace Zphil.LoadBearing.Tests.Checking;
 
@@ -19,26 +21,6 @@ namespace Zphil.LoadBearing.Tests.Checking;
 /// </summary>
 public sealed class MigrateRatchetTests
 {
-    // A controller opening the data layer directly — one forbidden edge (OldController -> App.Data.Db).
-    private const string OneController = """
-                                         namespace App.Web { public class OldController { public App.Data.Db Load() => new App.Data.Db(); } }
-                                         namespace App.Data { public class Db {} }
-                                         """;
-
-    // The same forbidden edge (OldController -> App.Data.Db) reached from two distinct lines. Sites are
-    // deduped per file:line, so this is two sites under one identity — the shape the measure counts.
-    private const string TwoSiteController = """
-                                             namespace App.Web
-                                             {
-                                                 public class OldController
-                                                 {
-                                                     public App.Data.Db A() => new App.Data.Db();
-                                                     public App.Data.Db B() => new App.Data.Db();
-                                                 }
-                                             }
-                                             namespace App.Data { public class Db {} }
-                                             """;
-
     // One (source, caught) edge caught three times in one type: unfiltered once and behind a `when` filter
     // twice. MustNotCatch reports all three sites as evidence; MustNotCatchUnfiltered reports the one.
     private const string ThreeCatchHandler = """
@@ -60,20 +42,34 @@ public sealed class MigrateRatchetTests
                                              }
                                              """;
 
+    // One misnamed type beside one conforming one — the shape the subject-keyed ratchet rows read.
+    private const string MixedNames = "namespace App { public class GoodHandler {} public class BadThing {} }";
+
     // A stand-in for the reason a filtered run composes; its wording is pinned where it is minted.
     private const string NarrowingSkipReason = "'BillingOnly.slnf' narrowed this run: 2 projects were not checked.";
 
     // The one forbidden edge every controller fixture carries, as the baseline keys it.
     private static readonly BaselineEntry OldControllerToDb = BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db");
 
-    // The same source's rule: Web controllers must not reference the data layer.
-    private static void NoDataAccess(Arch arch)
+    private static readonly CodebaseModel ThreeCatchHandlerModel = CompilationFactory.Extract(ThreeCatchHandler);
+
+    // The same source's rule: every type in App must carry the Handler suffix.
+    private static void HandlerNaming(Arch arch)
+    {
+        arch.Rule("naming/x")
+            .Migrate("Types are inconsistently named.", arch.Namespace("App.*").MustHaveSuffix("Handler"))
+            .Because("Handler discovery is convention-based.");
+    }
+
+    // The empty-subject spec both no-match rows run: a controller cone no type occupies.
+    private static void NoDataAccessFromNowhere(Arch arch)
     {
         arch.Rule("data/x")
             .Migrate(
-                "Controllers open the data layer directly (legacy Active Record style).",
-                arch.Namespace("App.Web.*").WithSuffix("Controller").MustNotReference(arch.Namespace("App.Data.*")))
-            .Because("Repository pattern for testability.");
+                "old",
+                arch.Namespace("App.Nowhere.*").WithSuffix("Controller")
+                    .MustNotReference(arch.Namespace("App.Data.*")))
+            .Because("b");
     }
 
     [Fact]
@@ -81,7 +77,7 @@ public sealed class MigrateRatchetTests
     {
         BaselineIndex index = Checker.Baselines("data/x", OldControllerToDb);
 
-        RuleResult result = Checker.Run(OneController, index, NoDataAccess)
+        RuleResult result = Checker.Run(Sources.OneControllerModel, index, Sources.NoDataAccess)
             .Single();
 
         result.ShouldHavePassed();
@@ -94,7 +90,7 @@ public sealed class MigrateRatchetTests
     public void Check_MigrateViolationNotInBaseline_FailsRed()
     {
         // Captured section, but this edge is not in it — new code in the old pattern is red.
-        RuleResult result = Checker.Run(OneController, Checker.Baselines("data/x"), NoDataAccess)
+        RuleResult result = Checker.Run(Sources.OneControllerModel, Checker.Baselines("data/x"), Sources.NoDataAccess)
             .Single();
 
         result.ShouldHaveFailed();
@@ -120,7 +116,7 @@ public sealed class MigrateRatchetTests
                               """;
         BaselineIndex index = Checker.Baselines("data/x", OldControllerToDb);
 
-        RuleResult result = Checker.Run(source, index, NoDataAccess)
+        RuleResult result = Checker.Run(source, index, Sources.NoDataAccess)
             .Single();
 
         result.ShouldHaveFailedWithEdges(ViolationKind.Reference, ["App.Web.OldController -> App.Data.Cache"]);
@@ -135,7 +131,7 @@ public sealed class MigrateRatchetTests
         // baseline-format change. (OneController's Load() does `new App.Data.Db()`.)
         BaselineIndex index = Checker.Baselines("data/x", OldControllerToDb);
 
-        RuleResult result = Checker.Run(OneController, index, arch =>
+        RuleResult result = Checker.Run(Sources.OneControllerModel, index, arch =>
                 arch.Rule("data/x")
                     .Migrate(
                         "Controllers `new` the data layer directly (legacy Active Record style).",
@@ -153,13 +149,9 @@ public sealed class MigrateRatchetTests
     [Fact]
     public void Check_MigrateShapeViolation_GrandfathersBySubjectId()
     {
-        const string source = "namespace App { public class GoodHandler {} public class BadThing {} }";
         BaselineIndex index = Checker.Baselines("naming/x", BaselineEntry.ForSubject("T:App.BadThing"));
 
-        RuleResult result = Checker.Run(source, index, arch =>
-                arch.Rule("naming/x")
-                    .Migrate("Types are inconsistently named.", arch.Namespace("App.*").MustHaveSuffix("Handler"))
-                    .Because("Handler discovery is convention-based."))
+        RuleResult result = Checker.Run(MixedNames, index, HandlerNaming)
             .Single();
 
         result.ShouldHavePassed();
@@ -177,7 +169,7 @@ public sealed class MigrateRatchetTests
             "data/x",
             OldControllerToDb.WithSiteCount(1));
 
-        RuleResult result = Checker.Run(TwoSiteController, index, NoDataAccess)
+        RuleResult result = Checker.Run(Sources.TwoSiteControllerModel, index, Sources.NoDataAccess)
             .Single();
 
         result.ShouldHaveFailedWithEdges(ViolationKind.Reference, ["App.Web.OldController -> App.Data.Db"]);
@@ -196,7 +188,7 @@ public sealed class MigrateRatchetTests
             "data/x",
             OldControllerToDb.WithSiteCount(2));
 
-        RuleResult result = Checker.Run(TwoSiteController, index, NoDataAccess)
+        RuleResult result = Checker.Run(Sources.TwoSiteControllerModel, index, Sources.NoDataAccess)
             .Single();
 
         result.ShouldHavePassed();
@@ -215,7 +207,7 @@ public sealed class MigrateRatchetTests
             "data/x",
             OldControllerToDb.WithSiteCount(3));
 
-        RuleResult result = Checker.Run(OneController, index, NoDataAccess)
+        RuleResult result = Checker.Run(Sources.OneControllerModel, index, Sources.NoDataAccess)
             .Single();
 
         result.ShouldHavePassed();
@@ -234,7 +226,7 @@ public sealed class MigrateRatchetTests
         BaselineIndex index = Checker.Baselines(
             "data/x", OldControllerToDb);
 
-        RuleResult result = Checker.Run(TwoSiteController, index, NoDataAccess)
+        RuleResult result = Checker.Run(Sources.TwoSiteControllerModel, index, Sources.NoDataAccess)
             .Single();
 
         result.ShouldHavePassed();
@@ -249,13 +241,9 @@ public sealed class MigrateRatchetTests
         // A subject entry's sites are declarations, so there is no measure to record and nothing to report:
         // counting it as uncounted would leave a naming rule's whole section nagging forever with nothing
         // an author could do about it.
-        const string source = "namespace App { public class GoodHandler {} public class BadThing {} }";
         BaselineIndex index = Checker.Baselines("naming/x", BaselineEntry.ForSubject("T:App.BadThing"));
 
-        RuleResult result = Checker.Run(source, index, arch =>
-                arch.Rule("naming/x")
-                    .Migrate("Types are inconsistently named.", arch.Namespace("App.*").MustHaveSuffix("Handler"))
-                    .Because("Handler discovery is convention-based."))
+        RuleResult result = Checker.Run(MixedNames, index, HandlerNaming)
             .Single();
 
         result.ShouldHavePassed();
@@ -276,7 +264,7 @@ public sealed class MigrateRatchetTests
                 .WithSiteCount(1)
                 .WithBecause("INC-1234"));
 
-        RuleResult result = Checker.Run(TwoSiteController, index, NoDataAccess)
+        RuleResult result = Checker.Run(Sources.TwoSiteControllerModel, index, Sources.NoDataAccess)
             .Single();
 
         result.ShouldHaveFailed();
@@ -299,13 +287,13 @@ public sealed class MigrateRatchetTests
             BaselineEntry.ForEdge("T:App.Handler", "T:Errors.DbError")
                 .WithSiteCount(1));
 
-        RuleResult unfiltered = Checker.Run(ThreeCatchHandler, index, arch =>
+        RuleResult unfiltered = Checker.Run(ThreeCatchHandlerModel, index, arch =>
                 arch.Rule("ex/x")
                     .Migrate("Handlers catch the domain error blind.",
                         arch.Namespace("App.*").MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
                     .Because("A blind catch hides a failing dependency."))
             .Single();
-        RuleResult broad = Checker.Run(ThreeCatchHandler, index, arch =>
+        RuleResult broad = Checker.Run(ThreeCatchHandlerModel, index, arch =>
                 arch.Rule("ex/x")
                     .Migrate("Handlers catch the domain error at all.",
                         arch.Namespace("App.*").MustNotCatch(arch.Namespace("Errors.*")))
@@ -329,7 +317,7 @@ public sealed class MigrateRatchetTests
             OldControllerToDb,
             BaselineEntry.ForEdge("T:App.Web.GhostController", "T:App.Data.Db"));
 
-        RuleResult result = Checker.Run(OneController, index, NoDataAccess)
+        RuleResult result = Checker.Run(Sources.OneControllerModel, index, Sources.NoDataAccess)
             .Single();
 
         result.ShouldHavePassed();
@@ -340,7 +328,7 @@ public sealed class MigrateRatchetTests
     [Fact]
     public void Check_UncapturedMigrateRule_AllViolationsRedAndCapturedFalse()
     {
-        RuleResult result = Checker.Run(OneController, BaselineIndex.Empty, NoDataAccess)
+        RuleResult result = Checker.Run(Sources.OneControllerModel, BaselineIndex.Empty, Sources.NoDataAccess)
             .Single();
 
         result.ShouldHaveFailed();
@@ -357,7 +345,7 @@ public sealed class MigrateRatchetTests
                               namespace App.Data { public class Db {} }
                               """;
 
-        RuleResult result = Checker.Run(source, Checker.Baselines("data/x"), NoDataAccess)
+        RuleResult result = Checker.Run(source, Checker.Baselines("data/x"), Sources.NoDataAccess)
             .Single();
 
         result.ShouldHavePassed();
@@ -369,13 +357,8 @@ public sealed class MigrateRatchetTests
     [Fact]
     public void Check_MigrateEmptySubject_IsRedNeverBaselinable()
     {
-        RuleResult result = Checker.Run("namespace App { public class X {} }", Checker.Baselines("data/x"), arch =>
-                arch.Rule("data/x")
-                    .Migrate(
-                        "old",
-                        arch.Namespace("App.Nowhere.*").WithSuffix("Controller")
-                            .MustNotReference(arch.Namespace("App.Data.*")))
-                    .Because("b"))
+        RuleResult result = Checker.Run(
+                "namespace App { public class X {} }", Checker.Baselines("data/x"), NoDataAccessFromNowhere)
             .Single();
 
         result.ShouldHaveFailed();
@@ -398,13 +381,8 @@ public sealed class MigrateRatchetTests
             BaselineEntry.ForEdge("T:App.Web.GhostController", "T:App.Data.Db"));
         var narrowing = new NarrowedUniverse(NarrowingSkipReason);
 
-        RuleResult result = Checker.Run("namespace App { public class X {} }", index, narrowing, arch =>
-                arch.Rule("data/x")
-                    .Migrate(
-                        "old",
-                        arch.Namespace("App.Nowhere.*").WithSuffix("Controller")
-                            .MustNotReference(arch.Namespace("App.Data.*")))
-                    .Because("b"))
+        RuleResult result = Checker.Run(
+                "namespace App { public class X {} }", index, narrowing, NoDataAccessFromNowhere)
             .Single();
 
         result.ShouldHaveSkipped(NarrowingSkipReason);
@@ -446,7 +424,7 @@ public sealed class MigrateRatchetTests
     [Fact]
     public void Check_TwoArgOverload_TreatsBaselinesAsEmpty()
     {
-        RuleResult result = Checker.Run(OneController, NoDataAccess)
+        RuleResult result = Checker.Run(Sources.OneControllerModel, Sources.NoDataAccess)
             .Single();
 
         result.ShouldHaveFailed();
@@ -459,7 +437,7 @@ public sealed class MigrateRatchetTests
         // Even an index that carries the exact edge does not grandfather an Enforce rule.
         BaselineIndex index = Checker.Baselines("layer/x", OldControllerToDb);
 
-        RuleResult result = Checker.Run(OneController, index, arch =>
+        RuleResult result = Checker.Run(Sources.OneControllerModel, index, arch =>
                 arch.Rule("layer/x")
                     .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
                     .Because("b"))

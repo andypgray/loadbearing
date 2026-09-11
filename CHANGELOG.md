@@ -256,6 +256,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A `Where` and an `Except` on one subject render the `Where` first.** Whichever order they were
+  written, the exception now canonicalizes last. `.Except(arch.Type<SqlConnection>()).Where(pred,
+  "whose name contains a digit")` used to read "Types in `MyApp.*`, except `SqlConnection` whose
+  name contains a digit must be sealed" — the description landing on the exception, and the comma
+  that should close the parenthetical with nowhere to go. It now reads "Types in `MyApp.*` whose
+  name contains a digit, except `SqlConnection`, must be sealed." The checker is untouched:
+  exclusion and filtering commute, so the sentence names the set it always named. No published
+  spec carries both clauses on one subject, so no managed block moves.
+
 - **Every rule in the .NET guidance pack cites its page through `Citation`, and its reason ends
   as a sentence.** The pack's nine reasons carried the Microsoft URL as their last token, joined
   by an em-dash, because there was nowhere else to put it. Each reason now closes with a full

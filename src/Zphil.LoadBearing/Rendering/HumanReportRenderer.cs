@@ -1,3 +1,4 @@
+using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Codebase;
 
@@ -129,8 +130,14 @@ public static class HumanReportRenderer
         int grown = result.GrownBaselineEntries;
         if (grown == 0) return;
 
-        int baselined = result.GrownEntries.Values.Sum(entry => entry.SiteCount ?? 0);
-        int observed = result.GrownEntries.Keys.Sum(violation => violation.Sites.Count);
+        var baselined = 0;
+        var observed = 0;
+        foreach (KeyValuePair<Violation, BaselineEntry> pair in result.GrownEntries)
+        {
+            baselined += pair.Value.SiteCount ?? 0;
+            observed += pair.Key.Sites.Count;
+        }
+
         string pairs = Plurals.Noun(grown, "pair");
         output.WriteLine(
             $"  grown: {grown} grandfathered {pairs} exceeded the baseline site count "
@@ -164,23 +171,10 @@ public static class HumanReportRenderer
                     foreach (SourceLocation site in violation.Sites)
                         located.Add((relativizer.Relative(site.FilePath), site.Line, edgeText));
                     break;
-                case ViolationKind.Shape:
-                    Place(violation.Sites.FirstOrDefault(), violation.Subject!.FullName);
-                    break;
-                case ViolationKind.MemberShape:
-                    MemberNode member = violation.SubjectMember!;
-                    Place(violation.Sites.FirstOrDefault(), MemberText(member.DeclaringTypeFullName, member.Name, member.Kind));
-                    break;
-                case ViolationKind.ProjectShape:
-                    // The Shape parallel over a project: its name, at whichever declaration carried the fact
-                    // the verb read — which may be a props file above the project, and may be nothing at all.
-                    // A per-package violation names the package too, in EdgeText's register (no backticks:
-                    // these lines are jump targets, not prose).
-                    ProjectNode project = violation.SubjectProject!;
-                    string projectText = violation.Package is { } package
-                        ? $"{project.Name} references package {package.Name}"
-                        : project.Name;
-                    Place(violation.Sites.FirstOrDefault(), projectText);
+                // The three subject kinds place identically — one line at the first site the verb carried,
+                // or the unlocated block — so they share the arm and differ only in the text SubjectText picks.
+                case ViolationKind.Shape or ViolationKind.MemberShape or ViolationKind.ProjectShape:
+                    Place(violation.Sites.FirstOrDefault(), SubjectText(violation));
                     break;
                 case ViolationKind.EmptySubject:
                     unlocated.Add(violation.Detail ?? "the subject selection matched no types");
@@ -216,6 +210,24 @@ public static class HumanReportRenderer
             ViolationKind.Throw => $"{violation.Source!.FullName} throws {violation.Target!.FullName}",
             ViolationKind.Expose => $"{violation.Source!.FullName} exposes {violation.Target!.FullName}",
             _ => string.Empty
+        };
+    }
+
+    // What each of the three subject kinds says, with placement left to the shared Place above. The project
+    // arm is the Shape parallel over a project: its name, at whichever declaration carried the fact the verb
+    // read — which may be a props file above the project, and may be nothing at all. A per-package violation
+    // names the package too, in EdgeText's register (no backticks: these lines are jump targets, not prose).
+    private static string SubjectText(Violation violation)
+    {
+        return violation.Kind switch
+        {
+            ViolationKind.MemberShape => MemberText(
+                violation.SubjectMember!.DeclaringTypeFullName, violation.SubjectMember.Name,
+                violation.SubjectMember.Kind),
+            ViolationKind.ProjectShape => violation.Package is { } package
+                ? $"{violation.SubjectProject!.Name} references package {package.Name}"
+                : violation.SubjectProject!.Name,
+            _ => violation.Subject!.FullName
         };
     }
 

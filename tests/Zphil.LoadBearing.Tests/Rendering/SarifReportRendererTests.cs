@@ -28,12 +28,6 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 /// </summary>
 public sealed class SarifReportRendererTests
 {
-    // One controller opening the data layer directly — a single forbidden edge (OldController -> App.Data.Db).
-    private const string OneController = """
-                                         namespace App.Web { public class OldController { public App.Data.Db Load() => new App.Data.Db(); } }
-                                         namespace App.Data { public class Db {} }
-                                         """;
-
     // Alpha sits inside the quarantined scope and User outside it, referencing nothing — so the containment
     // twin stays green and the only finding in the log is the tripwire's.
     private static readonly CodebaseModel QuarantinedCodebase = CompilationFactory.Extract(
@@ -44,26 +38,12 @@ public sealed class SarifReportRendererTests
     // The diff that arms the tripwire: one changed file, inside the scope.
     private static readonly DiffContext TouchedAlpha = new("HEAD", "/repo", ["App.Legacy/Alpha.cs"]);
 
-    // The same forbidden edge reached from two distinct lines: two sites under one identity, which is the
-    // shape a recorded site count is compared against.
-    private const string TwoSiteController = """
-                                             namespace App.Web
-                                             {
-                                                 public class OldController
-                                                 {
-                                                     public App.Data.Db A() => new App.Data.Db();
-                                                     public App.Data.Db B() => new App.Data.Db();
-                                                 }
-                                             }
-                                             namespace App.Data { public class Db {} }
-                                             """;
-
     [Fact]
     public void Serialize_RedReference_EmitsErrorLevelNewBaselineStateNoSuppressions()
     {
         // An uncaptured Enforce reference violation: every site is a red error at baselineState new, and —
         // nothing grandfathers it — carries no suppressions property at all (null-omitted, not an empty array).
-        CheckReport report = Checker.Run(OneController, arch =>
+        CheckReport report = Checker.Run(Sources.OneController, arch =>
             arch.Rule("layer/no-data")
                 .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
                 .Because("The web layer must not open the data layer directly."));
@@ -538,7 +518,7 @@ public sealed class SarifReportRendererTests
         // A grandfathered Migrate violation whose baseline entry has no `because`: the suppression falls back to
         // the generic `grandfathered in {conventional baseline path}` justification (note level, unchanged state).
         BaselineIndex index = Checker.Baselines("data/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
-        CheckReport report = Checker.Run(OneController, index, NoDataAccess);
+        CheckReport report = Checker.Run(Sources.OneController, index, Sources.NoDataAccess);
 
         string json = report.ToSarif();
 
@@ -554,7 +534,7 @@ public sealed class SarifReportRendererTests
         const string because = "Legacy Active Record; scheduled for removal in Q3.";
         BaselineEntry entry = BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db")
             .WithBecause(because);
-        CheckReport report = Checker.Run(OneController, Checker.Baselines("data/x", entry), NoDataAccess);
+        CheckReport report = Checker.Run(Sources.OneController, Checker.Baselines("data/x", entry), Sources.NoDataAccess);
 
         string json = report.ToSarif();
 
@@ -572,7 +552,7 @@ public sealed class SarifReportRendererTests
         BaselineEntry entry = BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db")
             .WithSiteCount(1)
             .WithBecause("Legacy Active Record; scheduled for removal in Q3.");
-        CheckReport report = Checker.Run(TwoSiteController, Checker.Baselines("data/x", entry), NoDataAccess);
+        CheckReport report = Checker.Run(Sources.TwoSiteController, Checker.Baselines("data/x", entry), Sources.NoDataAccess);
 
         string json = report.ToSarif();
 
@@ -589,17 +569,6 @@ public sealed class SarifReportRendererTests
             result.TryGetProperty("suppressions", out _)
                 .ShouldBeFalse();
         }
-    }
-
-    // The Migrate rule OneController is checked against: Web controllers must not reference the data layer. It
-    // omits .Baseline, so its conventional path is arch/baselines/data/x.json (GRAMMAR §4.4).
-    private static void NoDataAccess(Arch arch)
-    {
-        arch.Rule("data/x")
-            .Migrate(
-                "Controllers open the data layer directly (legacy Active Record style).",
-                arch.Namespace("App.Web.*").WithSuffix("Controller").MustNotReference(arch.Namespace("App.Data.*")))
-            .Because("Repository pattern for testability.");
     }
 
     // The scope QuarantinedCodebase is checked against: one statement desugaring into the containment law and

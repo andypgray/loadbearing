@@ -123,13 +123,45 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         + "package references that resolved to nothing produce no edges, so a rule about a package is "
         + "measured against a model that never saw it:";
 
+    // The four injected-diagnostic runs this class reads from more than one row. Each is a read-only
+    // check over one solution, one spec and one injected cause; the rows differ only in which channel
+    // they assert on, so one run answers them all — the shape CheckCommandE2ETests and
+    // TripwireDiffE2ETests already use. Nothing here writes, so a shared result cannot leak state.
+    private static readonly Lazy<Task<CliResult>> LoadDiagnosticHuman =
+        new(() => RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, false, false));
+
+    private static readonly Lazy<Task<CliResult>> LoadDiagnosticJson =
+        new(() => RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, false, true));
+
+    private static readonly Lazy<Task<CliResult>> RestoreFailureHuman =
+        new(() => RunWithInjectedRestoreFailureAsync(CliRunner.CleanSpecDll, false, false));
+
+    private static readonly Lazy<Task<CliResult>> AuditDiagnosticJson =
+        new(() => RunWithInjectedDiagnosticAsync([AuditDiagnostic], CliRunner.CleanSpecDll, false, true));
+
+    // One colliding-type tree, both channels off it: the two rows below assert on the same run's human
+    // and JSON renderings, and this class's fixture lease exists for nothing else. The lease is taken
+    // and released inside the factory, as TripwireDiffE2ETests does.
+    private static readonly Lazy<Task<(CliResult Human, CliResult Json)>> CollidingType = new(async () =>
+    {
+        using var workspace = new TempFixtureWorkspace();
+        WriteCollidingType(workspace);
+
+        CliResult human = await CliRunner.InvokeAsync(
+            "check", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--no-cache");
+        CliResult json = await CliRunner.InvokeAsync(
+            "check", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--no-cache", "--json");
+
+        return (human, json);
+    });
+
     // ── Workspace-load diagnostics fail check closed ──────────────────────────────────────────────────
 
     [Fact]
     public async Task Check_WorkspaceLoadDiagnostic_NoFlag_FailsClosedWithExitTwoAndGateLine()
     {
         // The clean spec would exit 0, but a project failed to load — the gate overrides that verdict.
-        CliResult result = await RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, false, false);
+        CliResult result = await LoadDiagnosticHuman.Value;
 
         result.ShouldRefuseWith(GateLine, BrokenProject); // and the refusal names what failed
         result.Err.ShouldContain($"warning: {LoadDiagnostic}"); // the load failure still prints as a warning
@@ -158,7 +190,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     [Fact]
     public async Task Check_WorkspaceLoadDiagnosticJson_NoFlag_StdoutStaysPureJsonAndGateLineOnStderr()
     {
-        CliResult result = await RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, false, true);
+        CliResult result = await LoadDiagnosticJson.Value;
 
         result.ShouldRefuseWith();
         // stdout is pure JSON: the diagnostic rides in the workspaceDiagnostics array and the gate line
@@ -196,7 +228,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     {
         // "A project failed to load" is nearly always a question about which MSBuild opened it, so the
         // selection and the override variable print beside the failure.
-        CliResult result = await RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, false, false);
+        CliResult result = await LoadDiagnosticHuman.Value;
 
         result.Err.ShouldContain(
             $"warning: MSBuild for this run: {MsBuildBootstrap.LastSelection}.",
@@ -211,7 +243,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         // stderr is the CLI's channel and the MCP surface discards it, so the note only reaches a client if
         // it rides the document. It does, because it is composed into the one list both renderers read
         // rather than appended at write time — the whole of the MCP-side fix, seen from the CLI.
-        CliResult result = await RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, false, true);
+        CliResult result = await LoadDiagnosticJson.Value;
 
         result.ShouldRefuseWith();
         using JsonDocument document = result.ShouldHaveJsonStdout();
@@ -227,7 +259,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         // note, which is not a NuGetAudit advisory — so a composed list reaching IncompleteModelGate would
         // read as a load failure, mark every run incomplete, and exit 2 always. The gate reads
         // source.Diagnostics; only the renderers read the composition.
-        CliResult result = await RunWithInjectedDiagnosticAsync([AuditDiagnostic], CliRunner.CleanSpecDll, false, true);
+        CliResult result = await AuditDiagnosticJson.Value;
 
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
@@ -256,11 +288,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     [Fact]
     public async Task Check_SameFqnAcrossTwoProjects_RendersMergeNoteWarningWithoutTrippingGate()
     {
-        using var workspace = new TempFixtureWorkspace();
-        WriteCollidingType(workspace);
-
-        CliResult result = await CliRunner.InvokeAsync(
-            "check", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--no-cache");
+        CliResult result = (await CollidingType.Value).Human;
 
         result.ShouldSucceed(); // merge notes are advisory — the gate never fires on them
         result.Err.ShouldContain(
@@ -274,11 +302,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     [Fact]
     public async Task Check_SameFqnAcrossTwoProjectsJson_LandsMergeNoteInWorkspaceDiagnosticsWithoutTrippingGate()
     {
-        using var workspace = new TempFixtureWorkspace();
-        WriteCollidingType(workspace);
-
-        CliResult result = await CliRunner.InvokeAsync(
-            "check", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--no-cache", "--json");
+        CliResult result = (await CollidingType.Value).Json;
 
         result.ShouldSucceed("\"workspaceDiagnostics\"");
         result.Out.ShouldContain(
@@ -324,7 +348,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     [Fact]
     public async Task Check_NuGetAuditDiagnosticJson_NoFlag_ExitsCleanWithAdvisoryInWorkspaceDiagnostics()
     {
-        CliResult result = await RunWithInjectedDiagnosticAsync([AuditDiagnostic], CliRunner.CleanSpecDll, false, true);
+        CliResult result = await AuditDiagnosticJson.Value;
 
         result.ShouldSucceed();
         // stdout stays pure JSON: the advisory rides the workspaceDiagnostics array and no gate line leaks.
@@ -403,7 +427,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         // cannot be read for it — MSBuild's words about a fatal failure and about a restore warning arrive
         // in the same shape — so the evidence needs its own slot, and it is the only channel an MCP client
         // has for it.
-        CliResult result = await RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, false, true);
+        CliResult result = await LoadDiagnosticJson.Value;
 
         result.ShouldRefuseWith();
         using JsonDocument document = result.ShouldHaveJsonStdout();
@@ -471,7 +495,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         // The measured silent pass, closed. The project loaded completely — full document set, both output
         // paths — so nothing in the loaded structure blames it and the old gate saw a clean solution, while
         // every package edge it declares was missing from the model and a rule over one reported itself inert.
-        CliResult result = await RunWithInjectedRestoreFailureAsync(CliRunner.CleanSpecDll, false, false);
+        CliResult result = await RestoreFailureHuman.Value;
 
         result.ShouldRefuseWith(RestoreGateLine, RestoreFailedProject);
     }
@@ -481,7 +505,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     {
         // The whole reason this is a second slot and not an extra entry in failedProjects: the repair differs.
         // A reader sent to `dotnet build` for a feed that could not be reached learns nothing.
-        CliResult result = await RunWithInjectedRestoreFailureAsync(CliRunner.CleanSpecDll, false, false);
+        CliResult result = await RestoreFailureHuman.Value;
 
         result.Err.ShouldContain("Restore the solution (dotnet restore)");
         // The remedy leads and the warnings are offered conditionally, because this block now also covers a

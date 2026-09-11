@@ -19,7 +19,8 @@ internal static class DirectoryPlacement
 {
     /// <summary>
     ///     The directory <paramref name="selection" />'s card belongs in, or null when no solution-declared
-    ///     type it matches has a declaration site — the caller's cue to record its own skip reason.
+    ///     type it matches has a declaration site — the caller's cue to record a skip, in the words
+    ///     <see cref="NoTypesSkipReason" /> holds for both emission keys.
     /// </summary>
     internal static string? ResolveDirectory(SelectionEvaluator evaluator, Selection selection)
     {
@@ -31,6 +32,16 @@ internal static class DirectoryPlacement
             .ToList();
 
         return sites.Count == 0 ? null : DeepestCommonDirectory(sites);
+    }
+
+    /// <summary>
+    ///     The skip reason for a selection <see cref="ResolveDirectory" /> could place nowhere, named by the
+    ///     kind of emission key that asked — <c>scope</c> or <c>layer</c>. One sentence for both keys, so a
+    ///     reader who meets it under one meets the same words under the other.
+    /// </summary>
+    internal static string NoTypesSkipReason(string kind, string name)
+    {
+        return $"{kind} '{name}' matched no types; no scoped context emitted";
     }
 
     // The deepest directory that contains every declaration site: the longest common prefix of the

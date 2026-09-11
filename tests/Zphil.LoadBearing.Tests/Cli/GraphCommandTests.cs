@@ -585,7 +585,7 @@ public sealed class GraphCommandTests
 
     private static GraphRequest Request(DocumentGrain grain = DocumentGrain.Full)
     {
-        string workingDirectory = Path.GetDirectoryName(Path.GetFullPath(CliRunner.MyAppSolution))!;
+        string workingDirectory = SolutionPaths.SolutionDirectoryOf(CliRunner.MyAppSolution);
         return new GraphRequest(
             CliRunner.MyAppSolution, true, workingDirectory, false, null, false, grain, null);
     }

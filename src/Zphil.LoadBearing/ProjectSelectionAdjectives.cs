@@ -54,7 +54,10 @@ public static class ProjectSelectionAdjectives
         return Append(selection, new ProjectPackableAdjective());
     }
 
-    /// <summary>Excludes another project selection; canonicalized to sentence-final (GRAMMAR §6).</summary>
+    /// <summary>
+    ///     Excludes another project selection; canonicalized to sentence-final, after any <c>Where</c> on
+    ///     the same selection (GRAMMAR §6).
+    /// </summary>
     public static ProjectSelection Except(this ProjectSelection selection, ProjectSelection exclusion)
     {
         return Append(selection, new ProjectExceptAdjective(NotNull(exclusion, nameof(exclusion))));

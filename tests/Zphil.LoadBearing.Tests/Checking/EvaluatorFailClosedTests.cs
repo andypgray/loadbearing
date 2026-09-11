@@ -63,8 +63,7 @@ public sealed class EvaluatorFailClosedTests
         var arch = new Arch();
         var selection = new RefinedSelection(arch, TypesNoun.Instance, [new UnknownAdjective()]);
         Constraint constraint = selection.MustHavePrefix("I");
-        var model = new ArchitectureModel(
-            [new ArchRule("area/rule", Posture.Enforce, "b", null, "sentence", constraint, null, null)], []);
+        ArchitectureModel model = Checker.HandBuilt("area/rule", constraint);
 
         RuleResult result = ArchChecker.Check(model, EmptyCodebase)
             .Results.Single();
@@ -86,8 +85,7 @@ public sealed class EvaluatorFailClosedTests
         var memberSelection = new KindMemberSelection(
             arch.Types, MemberKindFilter.Any, [new UnknownMemberAdjective()]);
         Constraint constraint = memberSelection.MustHaveSuffix("Async");
-        var model = new ArchitectureModel(
-            [new ArchRule("area/rule", Posture.Enforce, "b", null, "sentence", constraint, null, null)], []);
+        ArchitectureModel model = Checker.HandBuilt("area/rule", constraint);
 
         RuleResult result = ArchChecker.Check(model, EmptyCodebase)
             .Results.Single();
@@ -116,8 +114,7 @@ public sealed class EvaluatorFailClosedTests
         var arch = new Arch();
         var selection = new RefinedProjectSelection(arch, [new UnknownProjectAdjective()]);
         Constraint constraint = selection.MustNotBePackable();
-        var model = new ArchitectureModel(
-            [new ArchRule("area/rule", Posture.Enforce, "b", null, "sentence", constraint, null, null)], []);
+        ArchitectureModel model = Checker.HandBuilt("area/rule", constraint);
 
         RuleResult result = ArchChecker.Check(model, EmptyCodebase)
             .Results.Single();

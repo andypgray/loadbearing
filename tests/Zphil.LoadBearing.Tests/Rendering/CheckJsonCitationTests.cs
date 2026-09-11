@@ -3,8 +3,10 @@ using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Rendering;
+using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Roslyn.Diagnostics;
 using Zphil.LoadBearing.Tests.Checking;
+using Zphil.LoadBearing.Tests.Extraction;
 
 namespace Zphil.LoadBearing.Tests.Rendering;
 
@@ -16,20 +18,19 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 /// </summary>
 public sealed class CheckJsonCitationTests
 {
-    private const string OneController = """
-                                         namespace App.Web { public class OldController { public App.Data.Db Load() => new App.Data.Db(); } }
-                                         namespace App.Data { public class Db {} }
-                                         """;
-
     private const string Page = "https://learn.microsoft.com/dotnet/architecture/modern-web-apps-azure/common-web-application-architectures";
 
-    private static readonly CheckReport Cited = Checker.Run(OneController, arch =>
+    // One extraction, two reports: the arms differ only in whether the rule cites, so the compile is the
+    // class's rather than each field's.
+    private static readonly CodebaseModel Codebase = CompilationFactory.Extract(Sources.OneController);
+
+    private static readonly CheckReport Cited = Checker.Run(Codebase, arch =>
         arch.Rule("layer/no-data")
             .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
             .Because("The web layer must not open the data layer directly.")
             .Citation(Page));
 
-    private static readonly CheckReport Uncited = Checker.Run(OneController, arch =>
+    private static readonly CheckReport Uncited = Checker.Run(Codebase, arch =>
         arch.Rule("layer/no-data")
             .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
             .Because("The web layer must not open the data layer directly."));

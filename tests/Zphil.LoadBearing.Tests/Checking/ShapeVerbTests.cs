@@ -56,12 +56,16 @@ public sealed class ShapeVerbTests
                                  }
                                  """;
 
+    private static readonly CodebaseModel NamingModel = CompilationFactory.Extract(Naming);
+
+    private static readonly CodebaseModel ShapeModel = CompilationFactory.Extract(Shape);
+
     private static readonly CodebaseModel SimpleNameModel = CompilationFactory.Extract(SimpleNames);
 
     [Fact]
     public void OfKind_And_MustHavePrefix_FlagInterfaceWithoutIPrefix()
     {
-        RuleResult result = Checker.Run(Naming, arch =>
+        RuleResult result = Checker.Run(NamingModel, arch =>
                 arch.Rule("naming/interfaces")
                     .Enforce(arch.Types.OfKind(TypeKind.Interface).InNamespace("App.Naming.*").MustHavePrefix("I"))
                     .Because("b"))
@@ -73,7 +77,7 @@ public sealed class ShapeVerbTests
     [Fact]
     public void WithPrefix_And_MustHaveSuffix_FlagMismatchedSuffix()
     {
-        RuleResult result = Checker.Run(Naming, arch =>
+        RuleResult result = Checker.Run(NamingModel, arch =>
                 arch.Rule("naming/handlers")
                     .Enforce(arch.Types.WithPrefix("Order").MustHaveSuffix("Handler"))
                     .Because("b"))
@@ -85,7 +89,7 @@ public sealed class ShapeVerbTests
     [Fact]
     public void WithNameMatching_And_MustHaveNameMatching_Hold()
     {
-        Checker.Run(Naming, arch =>
+        Checker.Run(NamingModel, arch =>
                 arch.Rule("naming/repo")
                     .Enforce(arch.Types.WithNameMatching("*Repo*").MustHaveNameMatching("*Repository"))
                     .Because("b"))
@@ -113,7 +117,7 @@ public sealed class ShapeVerbTests
     [Fact]
     public void Must_EscapeHatch_HoldsAndFails()
     {
-        Checker.Run(Naming, arch =>
+        Checker.Run(NamingModel, arch =>
                 arch.Rule("style/short")
                     .Enforce(arch.Types.WithPrefix("X")
                         .Must(t => t.Name.Length <= 3, "keep names at or under 3 characters"))
@@ -121,7 +125,7 @@ public sealed class ShapeVerbTests
             .Single()
             .ShouldHavePassed();
 
-        Checker.Run(Naming, arch =>
+        Checker.Run(NamingModel, arch =>
                 arch.Rule("style/short")
                     .Enforce(arch.Types.WithPrefix("OrderC")
                         .Must(t => t.Name.Length <= 3, "keep names at or under 3 characters"))
@@ -134,7 +138,7 @@ public sealed class ShapeVerbTests
     public void Except_SubtractsPayloadSelection()
     {
         // Subjects = Order* except *Handler = {OrderController}; it fails the Handler suffix.
-        RuleResult result = Checker.Run(Naming, arch =>
+        RuleResult result = Checker.Run(NamingModel, arch =>
                 arch.Rule("naming/x")
                     .Enforce(arch.Types.WithPrefix("Order").Except(arch.Types.WithSuffix("Handler"))
                         .MustHaveSuffix("Handler"))
@@ -149,7 +153,7 @@ public sealed class ShapeVerbTests
     {
         // Several operands are one union payload, so every operand's types come out of the subject.
         IReadOnlyList<string> remaining = Checker.Selects(
-            CompilationFactory.Extract(Naming),
+            NamingModel,
             arch => arch.Types.InNamespace("App.Naming.*")
                 .Except(arch.Types.Named("X"), arch.Types.Named("Bar")));
 
@@ -197,7 +201,7 @@ public sealed class ShapeVerbTests
     public void Where_EscapeHatch_NarrowsSubjectSelection()
     {
         // Where narrows Order* to just the Handler; it then passes the Handler suffix check.
-        Checker.Run(Naming, arch =>
+        Checker.Run(NamingModel, arch =>
                 arch.Rule("naming/x")
                     .Enforce(arch.Types.WithPrefix("Order")
                         .Where(t => t.Name.EndsWith("Handler", StringComparison.Ordinal), "whose name ends with Handler")
@@ -211,7 +215,7 @@ public sealed class ShapeVerbTests
     public void ProjectNoun_SelectsTypesInNamedProject()
     {
         // CompilationFactory compiles into project "TestProject"; a non-empty pass proves the noun resolved.
-        Checker.Run(Naming, arch =>
+        Checker.Run(NamingModel, arch =>
                 arch.Rule("proj/x")
                     .Enforce(arch.Project("TestProject").MustHaveNameMatching("*"))
                     .Because("b"))
@@ -222,14 +226,14 @@ public sealed class ShapeVerbTests
     [Fact]
     public void MustBeSealed_HoldsAndFlagsUnsealed()
     {
-        Checker.Run(Shape, arch =>
+        Checker.Run(ShapeModel, arch =>
                 arch.Rule("shape/sealed")
                     .Enforce(arch.Types.WithPrefix("Sealed").MustBeSealed())
                     .Because("b"))
             .Single()
             .ShouldHavePassed();
 
-        Checker.Run(Shape, arch =>
+        Checker.Run(ShapeModel, arch =>
                 arch.Rule("shape/sealed")
                     .Enforce(arch.Types.WithPrefix("Open").MustBeSealed())
                     .Because("b"))
@@ -240,14 +244,14 @@ public sealed class ShapeVerbTests
     [Fact]
     public void MustBeStatic_HoldsAndFlagsNonStatic()
     {
-        Checker.Run(Shape, arch =>
+        Checker.Run(ShapeModel, arch =>
                 arch.Rule("shape/static")
                     .Enforce(arch.Types.WithPrefix("Static").MustBeStatic())
                     .Because("b"))
             .Single()
             .ShouldHavePassed();
 
-        Checker.Run(Shape, arch =>
+        Checker.Run(ShapeModel, arch =>
                 arch.Rule("shape/static")
                     .Enforce(arch.Types.WithPrefix("Open").MustBeStatic())
                     .Because("b"))
@@ -258,14 +262,14 @@ public sealed class ShapeVerbTests
     [Fact]
     public void MustBeAbstract_HoldsAndFlagsConcrete()
     {
-        Checker.Run(Shape, arch =>
+        Checker.Run(ShapeModel, arch =>
                 arch.Rule("shape/abstract")
                     .Enforce(arch.Types.WithPrefix("Abstract").MustBeAbstract())
                     .Because("b"))
             .Single()
             .ShouldHavePassed();
 
-        Checker.Run(Shape, arch =>
+        Checker.Run(ShapeModel, arch =>
                 arch.Rule("shape/abstract")
                     .Enforce(arch.Types.WithPrefix("Sealed").MustBeAbstract())
                     .Because("b"))
@@ -276,14 +280,14 @@ public sealed class ShapeVerbTests
     [Fact]
     public void MustBePublic_HoldsAndFlagsInternal()
     {
-        Checker.Run(Shape, arch =>
+        Checker.Run(ShapeModel, arch =>
                 arch.Rule("shape/public")
                     .Enforce(arch.Types.WithPrefix("Public").MustBePublic())
                     .Because("b"))
             .Single()
             .ShouldHavePassed();
 
-        Checker.Run(Shape, arch =>
+        Checker.Run(ShapeModel, arch =>
                 arch.Rule("shape/public")
                     .Enforce(arch.Types.WithPrefix("Internal").MustBePublic())
                     .Because("b"))
@@ -294,14 +298,14 @@ public sealed class ShapeVerbTests
     [Fact]
     public void MustBeInternal_HoldsAndFlagsPublic()
     {
-        Checker.Run(Shape, arch =>
+        Checker.Run(ShapeModel, arch =>
                 arch.Rule("shape/internal")
                     .Enforce(arch.Types.WithPrefix("Internal").MustBeInternal())
                     .Because("b"))
             .Single()
             .ShouldHavePassed();
 
-        Checker.Run(Shape, arch =>
+        Checker.Run(ShapeModel, arch =>
                 arch.Rule("shape/internal")
                     .Enforce(arch.Types.WithPrefix("Public").MustBeInternal())
                     .Because("b"))
@@ -314,14 +318,14 @@ public sealed class ShapeVerbTests
     {
         // Normalization visible at the verb layer: a static class fails both MustBeSealed and
         // MustBeAbstract (it is neither in C# declaration semantics).
-        Checker.Run(Shape, arch =>
+        Checker.Run(ShapeModel, arch =>
                 arch.Rule("shape/sealed")
                     .Enforce(arch.Types.WithPrefix("Static").MustBeSealed())
                     .Because("b"))
             .Single()
             .ShouldHaveFailedWithSubjects(["App.Shape.StaticThing"]);
 
-        Checker.Run(Shape, arch =>
+        Checker.Run(ShapeModel, arch =>
                 arch.Rule("shape/abstract")
                     .Enforce(arch.Types.WithPrefix("Static").MustBeAbstract())
                     .Because("b"))

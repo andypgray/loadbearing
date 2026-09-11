@@ -33,6 +33,14 @@ namespace Zphil.LoadBearing.Packs.DotNet;
 /// </remarks>
 public static class DotNetGuidance
 {
+    // The two pages more than one rule rests on, written once so a moved page cannot be corrected on some
+    // rules and missed on the others. The five pages a single rule cites stay at their own call site.
+    private const string DependencyInjectionGuidelines =
+        "https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines";
+
+    private const string TaskAsyncPattern =
+        "https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap";
+
     /// <summary>
     ///     <c>http/reuse-httpclient</c> — nothing outside <paramref name="compositionRoot" /> constructs
     ///     an <see cref="HttpClient" />.
@@ -75,7 +83,7 @@ public static class DotNetGuidance
 
         Declare(rule, constraint, posture,
             "Resolving services from IServiceProvider at call sites hides a type's real dependencies; declare them as constructor parameters.",
-            "https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines",
+            DependencyInjectionGuidelines,
             "Take the dependency in the constructor; the composition root and its scope seam are the only sanctioned resolve sites.",
             fix);
     }
@@ -97,7 +105,7 @@ public static class DotNetGuidance
 
         Declare(rule, constraint, posture,
             "Calling BuildServiceProvider while configuring services builds a second container with its own singletons, a duplicate-instance trap.",
-            "https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines",
+            DependencyInjectionGuidelines,
             "Register the dependency and let the host build the provider once; inject what you need.",
             fix);
     }
@@ -147,7 +155,7 @@ public static class DotNetGuidance
 
         Declare(rule, constraint, posture,
             "A singleton is created once and holds every dependency it injects for the whole process, so a scoped or transient service injected into it is captured past its lifetime and shared across all callers.",
-            "https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines",
+            DependencyInjectionGuidelines,
             "Resolve the scoped or transient service per unit of work inside an IServiceScopeFactory scope; take only singleton-safe dependencies in the constructor.",
             fix);
     }
@@ -168,7 +176,7 @@ public static class DotNetGuidance
 
         Declare(rule, constraint, posture,
             "Task-returning methods carry the Async suffix so callers see at the call site that a method must be awaited.",
-            "https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap",
+            TaskAsyncPattern,
             "Rename the method to end in Async.",
             fix);
     }
@@ -211,7 +219,7 @@ public static class DotNetGuidance
 
         Declare(rule, constraint, posture,
             "Accepting a CancellationToken lets a caller stop in-flight async work and flow that request on to the calls it makes, so a Task-returning method without one cannot take part in cooperative cancellation.",
-            "https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap",
+            TaskAsyncPattern,
             "Add a CancellationToken parameter and flow the caller's token through the call chain.",
             fix);
     }

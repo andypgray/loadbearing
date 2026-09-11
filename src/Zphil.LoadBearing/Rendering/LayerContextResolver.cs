@@ -53,7 +53,7 @@ public static class LayerContextResolver
 
             placements.Add(directory is null
                 ? new LayerPlacement(layer.Name, layer.Purpose, anchored, null,
-                    $"layer '{layer.Name}' matched no types; no scoped context emitted")
+                    DirectoryPlacement.NoTypesSkipReason("layer", layer.Name))
                 : new LayerPlacement(layer.Name, layer.Purpose, anchored, directory, null));
         }
 

@@ -53,23 +53,23 @@ internal static class SpecValidator
             // Like the duplicate-name error above, these are spec-wide (null ID, named by layer in the
             // message) and location-free: a layer name is a unique, trivially greppable string. A selection
             // definition takes every walk a rule's selections take, in the order a rule takes them.
-            var subject = $"layer '{layer.Name}'";
+            var target = new ErrorTarget(null, null, $"layer '{layer.Name}'");
             if (layer.Definition is { } definition)
             {
-                CheckSelectionOperands([definition], null, arch, null, errors, subject);
-                CheckFamilies(FamilyPositions(definition, FamilyPosition.LayerDefinition), null, null, errors, subject);
+                CheckSelectionOperands([definition], target, arch, errors);
+                CheckFamilies(FamilyPositions(definition, FamilyPosition.LayerDefinition), target, errors);
             }
             else
             {
                 foreach (string glob in layer.Globs)
-                    CheckPattern(glob, PatternKind.NamespacePattern, null, null, errors, subject);
+                    CheckPattern(glob, PatternKind.NamespacePattern, target, errors);
             }
 
             // A purpose is prose like any other (§8 items 5–6) and is checked where the layer is declared, on the
             // same spec-wide terms as its globs: null ID, no location, named by layer.
             foreach (string purpose in registration.Purposes)
-                CheckProse(purpose, "purpose", null, null, errors, subject);
-            CheckRepeated(registration.Purposes.Count, "Purpose", null, null, errors, subject);
+                CheckProse(purpose, "purpose", target, errors);
+            CheckRepeated(registration.Purposes.Count, "Purpose", target, errors);
         }
     }
 
@@ -134,17 +134,21 @@ internal static class SpecValidator
             errors.Add(new SpecValidationError(Code.RepeatedPosture, rule.Id,
                 $"Rule '{rule.Id}' has more than one posture; call .Enforce(...) or .Migrate(...) exactly once.", rule.Location));
 
-        CheckBecause(rule.Becauses, rule.Id, rule.Location, errors);
-        CheckRepeated(rule.Fixes.Count, "Fix", rule.Id, rule.Location, errors);
-        CheckRepeated(rule.Citations.Count, "Citation", rule.Id, rule.Location, errors);
-        CheckRepeated(rule.Baselines.Count, "Baseline", rule.Id, rule.Location, errors);
-        CheckRepeated(rule.Policies.Count, "WhileYoureThere", rule.Id, rule.Location, errors);
+        var target = new ErrorTarget(rule.Id, rule.Location);
+
+        CheckBecause(rule.Becauses, target, errors);
+        CheckRepeated(rule.Fixes.Count, "Fix", target, errors);
+        CheckRepeated(rule.Citations.Count, "Citation", target, errors);
+        CheckRepeated(rule.Baselines.Count, "Baseline", target, errors);
+        CheckRepeated(rule.Policies.Count, "WhileYoureThere", target, errors);
 
         foreach ((string label, string? value) in RuleProse(rule))
-            CheckProse(value, label, rule.Id, rule.Location, errors);
+            CheckProse(value, label, target, errors);
+
+        List<Selection> selections = RuleSelections(rule).ToList();
 
         CheckCitations(rule, errors);
-        CheckForeign(RuleSelections(rule), rule.Id, arch, rule.Location, errors);
+        CheckForeign(selections, target, arch, errors);
         CheckForeignProjects(rule, arch, errors);
         CheckProjectPatterns(rule, errors);
         CheckTargetFrameworks(rule, errors);
@@ -153,9 +157,9 @@ internal static class SpecValidator
         CheckMemberReturning(rule, errors);
         CheckMemberAcceptParameter(rule, errors);
         CheckHierarchyAnchors(rule, errors);
-        CheckPatterns(RulePatterns(rule), rule.Id, rule.Location, errors);
-        CheckLifetimes(RuleSelections(rule), rule.Id, rule.Location, errors);
-        CheckFamilies(RuleFamilyPositions(rule), rule.Id, rule.Location, errors);
+        CheckPatterns(RulePatterns(rule), target, errors);
+        CheckLifetimes(selections, target, errors);
+        CheckFamilies(RuleFamilyPositions(rule), target, errors);
         CheckEachOtherSubject(rule, errors);
         CheckCircularReferencesSubject(rule, errors);
     }
@@ -176,10 +180,12 @@ internal static class SpecValidator
                 $"Scope '{scope.Id}' has more than one posture; call .Quarantine(...) or .Caution(...) exactly once.",
                 scope.Location));
 
-        CheckBecause(scope.Becauses, scope.Id, scope.Location, errors);
-        CheckRepeated(scope.Dragons.Count, "Dragons", scope.Id, scope.Location, errors);
-        CheckRepeated(scope.DragonsDocs.Count, "DragonsDoc", scope.Id, scope.Location, errors);
-        CheckRepeated(scope.Baselines.Count, "Baseline", scope.Id, scope.Location, errors);
+        var target = new ErrorTarget(scope.Id, scope.Location);
+
+        CheckBecause(scope.Becauses, target, errors);
+        CheckRepeated(scope.Dragons.Count, "Dragons", target, errors);
+        CheckRepeated(scope.DragonsDocs.Count, "DragonsDoc", target, errors);
+        CheckRepeated(scope.Baselines.Count, "Baseline", target, errors);
 
         if (scope.BoundaryOnlyViaCount > 1)
             errors.Add(new SpecValidationError(Code.RepeatedTrailer, scope.Id, $"Repeated trailer 'BoundaryOnlyVia' on '{scope.Id}'.", scope.Location));
@@ -197,55 +203,49 @@ internal static class SpecValidator
                 scope.Location));
 
         foreach ((string label, string? value) in ScopeProse(scope))
-            CheckProse(value, label, scope.Id, scope.Location, errors);
+            CheckProse(value, label, target, errors);
 
-        CheckSelectionOperands(ScopeOperands(scope), scope.Id, arch, scope.Location, errors);
-        CheckFamilies(ScopeFamilyPositions(scope), scope.Id, scope.Location, errors);
+        CheckSelectionOperands(ScopeOperands(scope), target, arch, errors);
+        CheckFamilies(ScopeFamilyPositions(scope), target, errors);
     }
 
-    private static void CheckBecause(List<string> becauses, string id, SpecSourceLocation? location, List<SpecValidationError> errors)
+    private static void CheckBecause(List<string> becauses, ErrorTarget target, List<SpecValidationError> errors)
     {
-        if (becauses.Count == 0) errors.Add(new SpecValidationError(Code.MissingBecause, id, $"'{id}' is missing a required .Because(...).", location));
+        if (becauses.Count == 0) errors.Add(new SpecValidationError(Code.MissingBecause, target.Id, $"'{target.Id}' is missing a required .Because(...).", target.Location));
 
-        CheckRepeated(becauses.Count, "Because", id, location, errors);
+        CheckRepeated(becauses.Count, "Because", target, errors);
     }
 
-    // A layer trailer reports spec-wide (null ID, no location) and names the layer as its subject; every
-    // rule and scope trailer quotes its ID, which is why the subject is derived unless supplied.
-    private static void CheckRepeated(
-        int count, string trailer, string? id, SpecSourceLocation? location, List<SpecValidationError> errors,
-        string? subject = null)
+    private static void CheckRepeated(int count, string trailer, ErrorTarget target, List<SpecValidationError> errors)
     {
-        if (count > 1) errors.Add(new SpecValidationError(Code.RepeatedTrailer, id, $"Repeated trailer '{trailer}' on {SubjectOf(id, subject)}.", location));
+        if (count > 1) errors.Add(new SpecValidationError(Code.RepeatedTrailer, target.Id, $"Repeated trailer '{trailer}' on {target.Subject}.", target.Location));
     }
 
-    private static void CheckProse(
-        string? value, string label, string? id, SpecSourceLocation? location, List<SpecValidationError> errors,
-        string? subject = null)
+    // Read by this walk, which reports the multi-line value, and by the citation check that skips what the
+    // walk already reported — one predicate, so a citation can never be reported twice or missed once.
+    private static void CheckProse(string? value, string label, ErrorTarget target, List<SpecValidationError> errors)
     {
         if (string.IsNullOrWhiteSpace(value))
-            ReportBlank(Code.BlankProse, label, id, location, errors, subject);
-        else if (value!.IndexOf('\n') >= 0 || value.IndexOf('\r') >= 0) errors.Add(new SpecValidationError(Code.MultiLineProse, id, $"Multi-line {label} on {SubjectOf(id, subject)}; prose fields are single-line.", location));
+            ReportBlank(Code.BlankProse, label, target, errors);
+        else if (SingleLineProse.IsMultiLine(value!)) errors.Add(new SpecValidationError(Code.MultiLineProse, target.Id, $"Multi-line {label} on {target.Subject}; prose fields are single-line.", target.Location));
     }
 
     // The walks every selection-bearing anchor takes — a layer's definition and a scope's operands alike —
     // in the order a rule's selections take them, so a bad selection reports the same first error wherever
     // it sits.
     private static void CheckSelectionOperands(
-        IEnumerable<Selection> operands, string? id, Arch arch, SpecSourceLocation? location,
-        List<SpecValidationError> errors, string? subject = null)
+        IEnumerable<Selection> operands, ErrorTarget target, Arch arch, List<SpecValidationError> errors)
     {
         List<Selection> roots = operands.ToList();
-        CheckForeign(roots.SelectMany(SelectionWalk.ExpandSelection), id, arch, location, errors, subject);
-        CheckPatterns(roots.SelectMany(SelectionPatterns), id, location, errors, subject);
-        CheckLifetimes(roots.SelectMany(SelectionWalk.ExpandSelection), id, location, errors, subject);
+        CheckForeign(roots.SelectMany(SelectionWalk.ExpandSelection), target, arch, errors);
+        CheckPatterns(roots.SelectMany(SelectionPatterns), target, errors);
+        CheckLifetimes(roots.SelectMany(SelectionWalk.ExpandSelection), target, errors);
     }
 
     private static void CheckPatterns(
-        IEnumerable<(string Value, PatternKind Kind)> patterns, string? id, SpecSourceLocation? location,
-        List<SpecValidationError> errors, string? subject = null)
+        IEnumerable<(string Value, PatternKind Kind)> patterns, ErrorTarget target, List<SpecValidationError> errors)
     {
-        foreach ((string value, PatternKind kind) in patterns) CheckPattern(value, kind, id, location, errors, subject);
+        foreach ((string value, PatternKind kind) in patterns) CheckPattern(value, kind, target, errors);
     }
 
     // GRAMMAR §8 items 15–16. A blank glob or affix is BlankPattern (the shared catalog-wide code, one
@@ -254,16 +254,13 @@ internal static class SpecValidator
     // dot-segment structure, so only the blank check applies — the matcher has no subtree operator to
     // strand a wildcard behind. Blank is handled here first so every kind shares one code; the
     // namespace well-formedness verdict itself stays in NamespacePattern.Validate (its self-contained
-    // blank branch backstops any direct caller). The trailing subject is the "on {subject}" text where the
-    // quoted ID would be wrong — a layer glob, which is spec-wide (null ID, no location) and named by layer
-    // instead.
+    // blank branch backstops any direct caller).
     private static void CheckPattern(
-        string value, PatternKind kind, string? id, SpecSourceLocation? location, List<SpecValidationError> errors,
-        string? subject = null)
+        string value, PatternKind kind, ErrorTarget target, List<SpecValidationError> errors)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            ReportBlank(Code.BlankPattern, kind.Label, id, location, errors, subject);
+            ReportBlank(Code.BlankPattern, kind.Label, target, errors);
             return;
         }
 
@@ -271,40 +268,54 @@ internal static class SpecValidator
 
         string? reason = NamespacePattern.Validate(value);
         if (reason is not null)
-            errors.Add(new SpecValidationError(Code.UnanchoredSubtreePattern, id, $"The {kind.Label} '{value}' on {SubjectOf(id, subject)} {reason}.", location));
+            errors.Add(new SpecValidationError(Code.UnanchoredSubtreePattern, target.Id, $"The {kind.Label} '{value}' on {target.Subject} {reason}.", target.Location));
     }
 
     // The one blank-operand sentence — "Blank {label} on {subject}." — every stratum's blank check renders.
     // The catalog parts them by CODE, not by wording: they fail in different directions and each entry has
     // to be able to say so, while a reader who has met one blank-operand error has met them all.
-    private static void ReportBlank(
-        Code code, string label, string? id, SpecSourceLocation? location, List<SpecValidationError> errors,
-        string? subject = null)
+    private static void ReportBlank(Code code, string label, ErrorTarget target, List<SpecValidationError> errors)
     {
-        errors.Add(new SpecValidationError(code, id, $"Blank {label} on {SubjectOf(id, subject)}.", location));
+        errors.Add(new SpecValidationError(code, target.Id, $"Blank {label} on {target.Subject}.", target.Location));
     }
 
-    // The "on {subject}" text of a message: the quoted ID, unless the caller names the subject outright —
-    // which a layer does, because a layer error is spec-wide, with no ID and no location to quote.
-    private static string SubjectOf(string? id, string? subject)
+    // Where an error lands and what its sentence calls the offender. A rule or scope error quotes its ID
+    // and carries the anchor's spec-source location; a layer error is spec-wide — no ID, no location, the
+    // layer named outright — which is the whole of the difference and the whole reason this is one value
+    // rather than three parameters that can be threaded apart or transposed.
+    private readonly struct ErrorTarget
     {
-        return subject ?? $"'{id}'";
+        private readonly string? _subject;
+
+        internal ErrorTarget(string? id, SpecSourceLocation? location, string? subject = null)
+        {
+            Id = id;
+            Location = location;
+            _subject = subject;
+        }
+
+        internal string? Id { get; }
+
+        internal SpecSourceLocation? Location { get; }
+
+        /// <summary>The "on {subject}" text of a message: the quoted ID, or the outright name a layer supplies.</summary>
+        internal string Subject => _subject ?? $"'{Id}'";
     }
 
     // GRAMMAR §8 item 27: a family may stand only as a rule subject. One code and one sentence shape for
     // every position, with the position word varying — what the author has to move is the family, and where
     // it stands is the whole of what they need told.
     private static void CheckFamilies(
-        IEnumerable<(Selection Selection, string Position)> candidates, string? id, SpecSourceLocation? location,
-        List<SpecValidationError> errors, string? subject = null)
+        IEnumerable<(Selection Selection, string Position)> candidates, ErrorTarget target,
+        List<SpecValidationError> errors)
     {
         foreach ((Selection selection, string position) in candidates)
         {
-            if (selection is UnionSelection || selection.Noun is not EachNoun) continue;
+            if (SelectionWalk.FamilyNoun(selection) is null) continue;
 
-            errors.Add(new SpecValidationError(Code.FamilyMisplaced, id,
-                $"A family (`arch.Each`) used as {position} by {SubjectOf(id, subject)}; "
-                + "a family may stand only as a rule subject.", location));
+            errors.Add(new SpecValidationError(Code.FamilyMisplaced, target.Id,
+                $"A family (`arch.Each`) used as {position} by {target.Subject}; "
+                + "a family may stand only as a rule subject.", target.Location));
         }
     }
 
@@ -315,8 +326,7 @@ internal static class SpecValidator
     {
         if (rule.Constraint is not MustNotReferenceEachOtherConstraint constraint) return;
 
-        Selection subject = constraint.Subject!;
-        if (subject is not UnionSelection && subject.Noun is EachNoun) return;
+        if (SelectionWalk.FamilyNoun(constraint.Subject) is not null) return;
 
         errors.Add(new SpecValidationError(Code.EachOtherWithoutFamily, rule.Id,
             $"`MustNotReferenceEachOther` on '{rule.Id}' needs a family subject (`arch.Each`); "
@@ -331,8 +341,7 @@ internal static class SpecValidator
     {
         if (rule.Constraint is not MustNotHaveCircularReferencesConstraint constraint) return;
 
-        Selection subject = constraint.Subject!;
-        if (subject is UnionSelection || subject.Noun is not EachNoun family)
+        if (SelectionWalk.FamilyNoun(constraint.Subject) is not { } family)
         {
             errors.Add(new SpecValidationError(Code.CircularReferencesNeedLayerFamily, rule.Id,
                 $"`MustNotHaveCircularReferences` on '{rule.Id}' needs a family of layers (`arch.Each`); "
@@ -421,14 +430,14 @@ internal static class SpecValidator
     // was reported, which is what lets a caller skip the per-item checks a foreign owner makes meaningless.
     private static bool ReportFirstForeign(
         IEnumerable<(Arch Owner, SpecSourceLocation? Location)> candidates, Arch arch, Code code, string noun,
-        string? id, List<SpecValidationError> errors, string? subject = null)
+        ErrorTarget target, List<SpecValidationError> errors)
     {
         foreach ((Arch owner, SpecSourceLocation? location) in candidates)
         {
             if (ReferenceEquals(owner, arch)) continue;
 
-            errors.Add(new SpecValidationError(code, id,
-                $"{noun} used by {SubjectOf(id, subject)} was minted on a different Arch instance; it is not registered with this model.",
+            errors.Add(new SpecValidationError(code, target.Id,
+                $"{noun} used by {target.Subject} was minted on a different Arch instance; it is not registered with this model.",
                 location));
             return true;
         }
@@ -437,13 +446,13 @@ internal static class SpecValidator
     }
 
     private static void CheckForeign(
-        IEnumerable<Selection> selections, string? id, Arch arch, SpecSourceLocation? location,
-        List<SpecValidationError> errors, string? subject = null)
+        IEnumerable<Selection> selections, ErrorTarget target, Arch arch, List<SpecValidationError> errors)
     {
+        SpecSourceLocation? location = target.Location;
         IEnumerable<(Arch Owner, SpecSourceLocation? Location)> candidates =
             selections.Select(selection => (selection.Owner, Location: location));
 
-        ReportFirstForeign(candidates, arch, Code.ForeignSelection, "A selection", id, errors, subject);
+        ReportFirstForeign(candidates, arch, Code.ForeignSelection, "A selection", target, errors);
     }
 
     // GRAMMAR §8 item 22: the project-stratum sibling of CheckForeign. A project selection carries its own
@@ -459,7 +468,9 @@ internal static class SpecValidator
         IEnumerable<(Arch Owner, SpecSourceLocation? Location)> candidates =
             selections.Select(selection => (selection.Owner, rule.Location));
 
-        ReportFirstForeign(candidates, arch, Code.ForeignProjectSelection, "A project selection", rule.Id, errors);
+        ReportFirstForeign(
+            candidates, arch, Code.ForeignProjectSelection, "A project selection",
+            new ErrorTarget(rule.Id, rule.Location), errors);
     }
 
     // GRAMMAR §8 item 23: the blank check over a project subject's own operands — the .Named names and the
@@ -491,7 +502,7 @@ internal static class SpecValidator
     {
         if (!string.IsNullOrWhiteSpace(value)) return;
 
-        ReportBlank(Code.BlankProjectPattern, kind.Label, rule.Id, rule.Location, errors);
+        ReportBlank(Code.BlankProjectPattern, kind.Label, new ErrorTarget(rule.Id, rule.Location), errors);
     }
 
     // GRAMMAR §8 item 24: MustOnlyTarget's own operands. A blank moniker matches nothing, so it narrows the
@@ -503,7 +514,7 @@ internal static class SpecValidator
 
         foreach (string framework in target.Frameworks)
             if (string.IsNullOrWhiteSpace(framework))
-                ReportBlank(Code.BlankTargetFramework, "target framework", rule.Id, rule.Location, errors);
+                ReportBlank(Code.BlankTargetFramework, "target framework", new ErrorTarget(rule.Id, rule.Location), errors);
     }
 
     // GRAMMAR §8 item 26: MustHaveExactlyOneCounterpart's name template. A template with no {Name} in it is
@@ -535,8 +546,7 @@ internal static class SpecValidator
     {
         foreach (string citation in rule.Citations)
         {
-            if (string.IsNullOrWhiteSpace(citation) || citation.IndexOf('\n') >= 0 || citation.IndexOf('\r') >= 0)
-                continue;
+            if (string.IsNullOrWhiteSpace(citation) || SingleLineProse.IsMultiLine(citation)) continue;
 
             bool absolute = Uri.TryCreate(citation, UriKind.Absolute, out Uri parsed);
             if (absolute && (parsed.Scheme == Uri.UriSchemeHttp || parsed.Scheme == Uri.UriSchemeHttps)) continue;
@@ -558,7 +568,7 @@ internal static class SpecValidator
 
         IEnumerable<(Arch Owner, SpecSourceLocation? Location)> candidates =
             members.Select(member => (member.Owner, Location: member.Location ?? rule.Location));
-        if (ReportFirstForeign(candidates, arch, Code.ForeignMember, "A member", rule.Id, errors)) return;
+        if (ReportFirstForeign(candidates, arch, Code.ForeignMember, "A member", new ErrorTarget(rule.Id, rule.Location), errors)) return;
 
         foreach (Member member in members) CheckMember(member, rule.Id, rule.Location, errors);
     }
@@ -576,11 +586,7 @@ internal static class SpecValidator
 
         foreach (MemberAdjective adjective in memberConstraint.MemberSubject.Adjectives)
             if (adjective is ReturningAdjective returning)
-                foreach (Type type in TypedAnchors(returning.Anchors))
-                    if (Generics.IsConstructed(type))
-                        errors.Add(new SpecValidationError(Code.MemberReturningClosedGeneric, rule.Id,
-                            $"'{SafeFullDisplay(type)}' is a closed generic; .Returning matches definition-level — " +
-                            $"use typeof({TypeofForm(Generics.Definition(type))}) (used by '{rule.Id}').", rule.Location));
+                CheckClosedGenericAnchors(rule, errors, returning.Anchors, Code.MemberReturningClosedGeneric, ".Returning");
     }
 
     // GRAMMAR §8 item 20: a MustAcceptParameter anchor is definition-level, so a closed-generic anchor
@@ -593,10 +599,21 @@ internal static class SpecValidator
     {
         if (rule.Constraint is not MemberMustAcceptParameterConstraint accept) return;
 
-        foreach (Type type in TypedAnchors([accept.Anchor]))
+        CheckClosedGenericAnchors(
+            rule, errors, [accept.Anchor], Code.MemberAcceptParameterClosedGeneric, "MustAcceptParameter");
+    }
+
+    // The definition-level refusal items 14 and 20 share, with the caller's verb in the steer and its own
+    // code in the catalog. A string anchor carries no reflected type, so TypedAnchors drops it before
+    // anything is judged.
+    private static void CheckClosedGenericAnchors(
+        RuleRegistration rule, List<SpecValidationError> errors, IReadOnlyList<TypeAnchor> anchors,
+        Code code, string verb)
+    {
+        foreach (Type type in TypedAnchors(anchors))
             if (Generics.IsConstructed(type))
-                errors.Add(new SpecValidationError(Code.MemberAcceptParameterClosedGeneric, rule.Id,
-                    $"'{SafeFullDisplay(type)}' is a closed generic; MustAcceptParameter matches definition-level — " +
+                errors.Add(new SpecValidationError(code, rule.Id,
+                    $"'{SafeFullDisplay(type)}' is a closed generic; {verb} matches definition-level — " +
                     $"use typeof({TypeofForm(Generics.Definition(type))}) (used by '{rule.Id}').", rule.Location));
     }
 
@@ -687,16 +704,15 @@ internal static class SpecValidator
     // UnionSelection has no single noun). Reported all-at-once, and the build throws before membership
     // resolution ever sees the bad value.
     private static void CheckLifetimes(
-        IEnumerable<Selection> selections, string? id, SpecSourceLocation? location,
-        List<SpecValidationError> errors, string? subject = null)
+        IEnumerable<Selection> selections, ErrorTarget target, List<SpecValidationError> errors)
     {
         foreach (Selection selection in selections)
-            if (selection is not UnionSelection && selection.Noun is RegisteredNoun { Lifetime: { } lifetime }
-                                                && !Enum.IsDefined(typeof(Lifetime), lifetime))
-                errors.Add(new SpecValidationError(Code.UndefinedLifetime, id,
+            if (SelectionWalk.NounOf(selection) is RegisteredNoun { Lifetime: { } lifetime }
+                && !Enum.IsDefined(typeof(Lifetime), lifetime))
+                errors.Add(new SpecValidationError(Code.UndefinedLifetime, target.Id,
                     $"'(Lifetime){(int)lifetime}' is not a defined Lifetime — " +
-                    $"use Lifetime.Singleton, Lifetime.Scoped, or Lifetime.Transient (used by {SubjectOf(id, subject)}).",
-                    location));
+                    $"use Lifetime.Singleton, Lifetime.Scoped, or Lifetime.Transient (used by {target.Subject}).",
+                    target.Location));
     }
 
     private static void CheckMember(Member member, string id, SpecSourceLocation? ruleLocation, List<SpecValidationError> errors)

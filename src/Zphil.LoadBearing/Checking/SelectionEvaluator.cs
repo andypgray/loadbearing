@@ -89,44 +89,38 @@ internal sealed class SelectionEvaluator
     /// <summary>Whether the operand is a pattern/glob selection (anything but a bare <c>typeof</c>) — the inert-warning gate.</summary>
     internal static bool IsPatternSelection(Selection selection)
     {
-        return selection is UnionSelection || selection.Adjectives.Count > 0 || selection.Noun is not TypeNoun;
+        return selection.Adjectives.Count > 0 || SelectionWalk.NounOf(selection) is not TypeNoun;
     }
 
     internal HashSet<TypeNode> Evaluate(Selection selection, SelectionPosition position)
     {
+        // A union's operands and a family's cells differ in what they mean and not in how they combine
+        // (GRAMMAR §5.1): each part resolves in this same position, the memberships unite, and the enclosing
+        // selection's own adjectives narrow the union. The union arm comes first because a union has no
+        // single noun — reading Selection.Noun on one throws by design.
         if (selection is UnionSelection union)
         {
-            var parts = new List<HashSet<TypeNode>>(union.Parts.Count);
-            foreach (Selection member in union.Parts) parts.Add(Evaluate(member, position));
+            var parts = new HashSet<TypeNode>();
+            foreach (Selection member in union.Parts) parts.UnionWith(Evaluate(member, position));
 
-            return Unite(union, parts);
+            return Narrow(union, parts);
+        }
+
+        // A family is the union of its cells to every reader but the three that read the partition
+        // (GRAMMAR §5.1), so it resolves through the one place cells are minted rather than deriving them
+        // a second time. Dispatched here rather than in ByNoun because Cells needs the selection, not the
+        // noun; unmemoized on purpose, for the reason the definition-layer arm is — a layer cell may carry
+        // a Where predicate through its definition, and a project family's cells are decided by a project
+        // selection that may carry one directly.
+        if (selection.Noun is EachNoun)
+        {
+            var cells = new HashSet<TypeNode>();
+            foreach (Selection cell in Cells(selection)) cells.UnionWith(Evaluate(cell, position));
+
+            return Narrow(selection, cells);
         }
 
         return Narrow(selection, ByNoun(selection.Noun, position));
-    }
-
-    /// <summary>
-    ///     The second half of the union arm: folds the already-evaluated operand sets together and
-    ///     applies the union's own adjectives.
-    /// </summary>
-    /// <remarks>
-    ///     Union adjectives apply to the unioned set, never through each operand (GRAMMAR §5.1):
-    ///     <c>AnyOf(a, b).Except(c)</c> is (a ∪ b) − c. Exposed so a caller that has already evaluated
-    ///     the operands in the same position can finish the union without evaluating them a second time.
-    /// </remarks>
-    internal HashSet<TypeNode> Unite(UnionSelection union, IReadOnlyList<HashSet<TypeNode>> parts)
-    {
-        var members = new HashSet<TypeNode>();
-        foreach (HashSet<TypeNode>? part in parts) members.UnionWith(part);
-
-        if (union.Adjectives.Count == 0) return members;
-
-        IEnumerable<TypeNode> unioned = members;
-        foreach (SelectionAdjective adjective in union.Adjectives) unioned = ApplyAdjective(unioned, adjective);
-
-        // Same as Evaluate's tail: the constructor names the deduplication rather than implying it.
-        // ReSharper disable once UseCollectionExpression
-        return new HashSet<TypeNode>(unioned);
     }
 
     /// <summary>
@@ -134,8 +128,8 @@ internal sealed class SelectionEvaluator
     ///     the tail of <see cref="Evaluate" /> without its noun resolution.
     /// </summary>
     /// <remarks>
-    ///     Exposed for the same reason as <see cref="Unite" />: a caller that already holds what the
-    ///     selection's noun resolves to can finish the selection without resolving it a second time.
+    ///     Exposed so a caller that already holds what the selection's noun resolves to can finish the
+    ///     selection without resolving it a second time.
     /// </remarks>
     internal HashSet<TypeNode> Narrow(Selection selection, IEnumerable<TypeNode> candidates)
     {
@@ -182,12 +176,6 @@ internal sealed class SelectionEvaluator
                 });
             case ProjectNoun project:
                 return ProjectMembers(project.Name, subject);
-            case EachNoun family:
-                // A family is the union of its cells to every reader but the three that read the
-                // partition (GRAMMAR §5.1). Unmemoized on purpose, for the reason the definition-layer arm
-                // above is: a layer cell may carry a Where predicate through its definition, and a project
-                // family's cells are decided by a project selection that may carry one directly.
-                return FamilyMembers(family, subject, position);
             case TypeNoun typeNoun:
                 // The scan is a lookup wearing a Where: every node carrying the name, position-filtered.
                 // Usually that is one — one source file compiled into several projects is conflated at merge,
@@ -237,26 +225,6 @@ internal sealed class SelectionEvaluator
             .Select(project => (Selection)new RefinedSelection(
                 family.Owner, new ProjectNoun(project.Name), Array.Empty<SelectionAdjective>()))
             .ToList();
-    }
-
-    // A family's membership: the union of its cells, each resolved in the caller's position. The layer
-    // form evaluates the cell selection (so a definition-defined cell stays transparent to its
-    // definition); the project form takes the project noun's own path per named project, which is what
-    // makes a family of projects name exactly what a union of project nouns would.
-    private IEnumerable<TypeNode> FamilyMembers(EachNoun family, bool subject, SelectionPosition position)
-    {
-        var members = new HashSet<TypeNode>();
-        if (family.Layers is { } layers)
-        {
-            foreach (Layer cell in layers) members.UnionWith(Evaluate(cell, position));
-
-            return members;
-        }
-
-        foreach (ProjectNode project in ProjectSelectionEvaluator.Resolve(family.Projects!, _model.Projects))
-            members.UnionWith(ProjectMembers(project.Name, subject));
-
-        return members;
     }
 
     // The ordinal declarer index, then the position filter — the same nodes in the same order the

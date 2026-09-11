@@ -44,14 +44,15 @@ internal static class StatusFormatter
         if (result.Status == RuleStatus.Skipped)
             return $"skip {result.Rule.Id} — {result.SkipReason}";
 
-        return result.Rule.Posture switch
-        {
-            Posture.Migrate => RatchetLine(result, "migrate"),
-            // Containment ratchets like Migrate but never suggests promotion; it is a quarantine's only
-            // non-tripwire child, and a caution has none.
-            Posture.Quarantine => RatchetLine(result, "quarantine"),
-            _ => EnforceLine(result)
-        };
+        // Keyed on the payload rather than the posture, like every other reader of "is this rule ratcheted"
+        // (ArchChecker, the human report, both JSON documents, the baseline verb): a baseline path is what a
+        // Migrate rule and a quarantine's containment child have in common, and it is what a posture added
+        // later would have to grow to earn the burndown line. Containment ratchets like Migrate but never
+        // suggests promotion — RuleResult.Promotable already gates that on the posture, so the label is the
+        // only thing left for the posture to supply.
+        return result.Rule.BaselinePath is not null
+            ? RatchetLine(result, result.Rule.Posture.ToString().ToLowerInvariant())
+            : EnforceLine(result);
     }
 
     private static bool IsTripwire(RuleResult result)
@@ -67,14 +68,22 @@ internal static class StatusFormatter
         return $"skip {result.Rule.Id} (tripwire) — diff-aware; run 'loadbearing check --diff-base <ref>'";
     }
 
+    // The verdict word every non-skip status line opens with. Two-valued, unlike the human report's: a
+    // status line's skips take their own arms above, and a warning is not a status the burndown reports.
+    private static string Marker(RuleResult result)
+    {
+        return result.Status == RuleStatus.Failed ? "FAIL" : "pass";
+    }
+
     private static string EnforceLine(RuleResult result)
     {
         var details = new List<string>();
         if (result.Violations.Count > 0) details.Add($"{result.Violations.Count} {Plurals.Noun(result.Violations.Count, "violation")}");
         if (result.Warnings.Count > 0) details.Add($"{result.Warnings.Count} {Plurals.Noun(result.Warnings.Count, "warning")}");
 
-        string marker = result.Status == RuleStatus.Failed ? "FAIL" : "pass";
-        return details.Count > 0 ? $"{marker} {result.Rule.Id} — {string.Join(", ", details)}" : $"{marker} {result.Rule.Id}";
+        return details.Count > 0
+            ? $"{Marker(result)} {result.Rule.Id} — {string.Join(", ", details)}"
+            : $"{Marker(result)} {result.Rule.Id}";
     }
 
     // Shared by Migrate and Quarantine containment. The promotable branch fires only for Migrate — quarantine
@@ -83,8 +92,7 @@ internal static class StatusFormatter
     // so this line and the status document can never disagree about which rules are ready.
     private static string RatchetLine(RuleResult result, string postureLabel)
     {
-        string marker = result.Status == RuleStatus.Failed ? "FAIL" : "pass";
-        return $"{marker} {result.Rule.Id} ({postureLabel}) — {RatchetDetail(result)}";
+        return $"{Marker(result)} {result.Rule.Id} ({postureLabel}) — {RatchetDetail(result)}";
     }
 
     // The whole result rather than its counts one by one: six ints in a row now feed this line, and a

@@ -170,7 +170,7 @@ public static class AgentContextRenderer
         if (constraint is MustBeRegisteredConstraint) return true;
 
         IEnumerable<Selection> selections = SelectionWalk.ConstraintSelections(constraint);
-        return selections.Any(selection => selection is not UnionSelection && selection.Noun is RegisteredNoun);
+        return selections.Any(selection => SelectionWalk.NounOf(selection) is RegisteredNoun);
     }
 
     /// <summary>
@@ -195,7 +195,8 @@ public static class AgentContextRenderer
         {
             $"- {ProseFormat.Backtick(containmentRule.Id)} — {containmentRule.Sentence} {containmentRule.Because}"
         };
-        if (quarantine.Surface.Count > 0) bullets.Add($"- Sanctioned surface: {SurfaceList(quarantine.Surface)}.");
+        if (quarantine.Surface.Count > 0)
+            bullets.Add($"- Sanctioned surface: {ProseFormat.JoinInventory(quarantine.Surface)}.");
 
         return ScopeCardBody(
             $"## Quarantined scope {ProseFormat.Backtick(scopeId)}",
@@ -367,7 +368,8 @@ public static class AgentContextRenderer
     {
         ScopeData quarantine = rule.Scope!;
         var bullet = $"- {ProseFormat.Backtick(quarantine.ScopeId)} — {rule.Sentence} {rule.Because}";
-        if (quarantine.Surface.Count > 0) bullet += $" Sanctioned surface: {SurfaceList(quarantine.Surface)}.";
+        if (quarantine.Surface.Count > 0)
+            bullet += $" Sanctioned surface: {ProseFormat.JoinInventory(quarantine.Surface)}.";
         return bullet;
     }
 
@@ -382,12 +384,5 @@ public static class AgentContextRenderer
             _ => "If you are already editing a grandfathered site and the migration is small, migrate it; " +
                  "otherwise do not grow the debt."
         };
-    }
-
-    // Comma-joined rather than or-joined: this is an inventory of the sanctioned surface, not a
-    // sentence naming an alternative, and the fragments arrive already rendered and widened.
-    private static string SurfaceList(IReadOnlyList<string> surface)
-    {
-        return string.Join(", ", surface);
     }
 }

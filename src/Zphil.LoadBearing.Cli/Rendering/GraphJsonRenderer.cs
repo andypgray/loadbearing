@@ -113,7 +113,7 @@ internal static class GraphJsonRenderer
             index ? null : project.ProjectReferences,
             grain >= DocumentGrain.Skeleton ? null : project.PackageReferences,
             project.Types,
-            project.Generated > 0 ? project.Generated : null,
+            LoadBearingJson.OmitZero(project.Generated),
             grain >= DocumentGrain.Overview
                 ? null
                 : project.Namespaces.Select(ToNamespace).ToList());
@@ -124,6 +124,6 @@ internal static class GraphJsonRenderer
     private static GraphNamespaceJson ToNamespace(NamespaceCount @namespace)
     {
         return new GraphNamespaceJson(
-            @namespace.Namespace, @namespace.Types, @namespace.Generated > 0 ? @namespace.Generated : null);
+            @namespace.Namespace, @namespace.Types, LoadBearingJson.OmitZero(@namespace.Generated));
     }
 }

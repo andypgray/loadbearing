@@ -7,8 +7,8 @@ namespace Zphil.LoadBearing.Prose;
 ///     Assembles the deterministic law sentence from a <see cref="Constraint" /> (GRAMMAR §6). The
 ///     nouns and adjectives own their local fragments; this orchestrates the cross-node concerns:
 ///     the collective-vs-types voice switch, sentence-final canonicalization of <c>Except</c>/
-///     <c>Where</c>, closing the <c>Except</c> parenthetical with a comma at whatever junction follows
-///     it, colliding-simple-name qualification in target lists (the shared
+///     <c>Where</c> with <c>Except</c> last, closing the <c>Except</c> parenthetical with a comma at
+///     whatever junction follows it, colliding-simple-name qualification in target lists (the shared
 ///     <see cref="ProseFormat.ResolveTypeDisplays" /> primitive), and capitalization.
 /// </summary>
 internal static class SentenceRenderer
@@ -70,26 +70,25 @@ internal static class SentenceRenderer
     ///     which read as their own noun phrase rather than through the "types" head.
     /// </summary>
     /// <remarks>
-    ///     The same structural test <see cref="Phrase(Selection,string,string)" /> makes, exposed because
-    ///     the family verbs' phrases have to agree with the voice the subject was assembled in.
+    ///     <see cref="Phrase(Selection,string,string)" /> decides the voice by this test, and the
+    ///     family-voice readers below ask it too, so none of them can disagree.
     /// </remarks>
-    internal static bool IsCollective(Selection selection)
+    private static bool IsCollective(Selection selection)
     {
-        return selection is not UnionSelection
-               && selection.Adjectives.Count == 0
-               && selection.Noun is LayerNoun or EachNoun;
+        return selection.Adjectives.Count == 0
+               && SelectionWalk.NounOf(selection) is LayerNoun or EachNoun;
     }
 
     /// <summary>
     ///     The singular cell word — "layer" or "project" — a family subject speaking in the <em>types</em>
     ///     voice names its cells by, and null for every other subject: a plain selection, or a family in
     ///     the collective voice. <c>MustNotReferenceEachOther</c> and <c>MustNotHaveCircularReferences</c>
-    ///     branch on it directly and <see cref="SelfReference" /> folds it into the leaf verbs' self phrase,
-    ///     so null means the subject has no cells to name (GRAMMAR §5.3, §6).
+    ///     reach it only through their phrases' <see cref="SelfReference" /> and <see cref="OtherCells" />,
+    ///     its two callers, so null means the subject has no cells to name (GRAMMAR §5.3, §6).
     /// </summary>
     internal static string? FamilyCellWord(Selection selection)
     {
-        if (selection is UnionSelection || selection.Noun is not EachNoun family) return null;
+        if (SelectionWalk.FamilyNoun(selection) is not { } family) return null;
 
         return IsCollective(selection) ? null : family.CellWord;
     }
@@ -110,6 +109,17 @@ internal static class SentenceRenderer
         if (FamilyCellWord(selection) is { } cell) return $"their own {cell}";
 
         return IsCollective(selection) ? "itself" : "themselves";
+    }
+
+    /// <summary>
+    ///     How a subject names its <em>other</em> cells — the far end the two family verbs forbid (GRAMMAR
+    ///     §5.3): "the other layers" or "the other projects" for a family in the types voice, and "the
+    ///     others" for a bare family or any subject with no cells to name. The twin of
+    ///     <see cref="SelfReference" />, and the same voice agreement.
+    /// </summary>
+    internal static string OtherCells(Selection selection)
+    {
+        return FamilyCellWord(selection) is { } cell ? $"the other {cell}s" : "the others";
     }
 
     /// <summary>How a selection reads in reference position (lowercase; joins union members).</summary>
@@ -253,16 +263,18 @@ internal static class SentenceRenderer
 
         // Collective voice: a bare layer or a bare family with no adjectives ("the Domain layer", "each
         // of the Host, Adapter and Pack layers"). Any adjective switches to types voice — the switch is
-        // structural, hence deterministic (GRAMMAR §6). IsCollective states the same test for the verb
-        // phrases, which have to agree with the voice assembled here.
-        if (noun is LayerNoun or EachNoun && adjectives.Count == 0 && headOverride is null && headPrefixOverride is null)
+        // structural, hence deterministic (GRAMMAR §6). Asked of IsCollective, which the family verb
+        // phrases also ask, so the voice they agree with is the voice assembled here by construction. The
+        // union half of that test is already discharged by the early return above.
+        if (IsCollective(selection) && headOverride is null && headPrefixOverride is null)
             return noun.ReferenceFragment;
 
         // The head defaults to "types" (the type nouns) but is taken from the noun for a noun whose
         // fragment IS its head — the registration noun — so a qualified Registered subject keeps its
         // qualifier instead of collapsing to a false bare "types" (GRAMMAR §5.1, head truth).
         (string? head, string? headPrefix, string inline, string subjectFinal) = Placements(
-            adjectives.Select(adjective => (adjective.Placement, adjective.Fragment)),
+            adjectives.Select(adjective =>
+                (adjective.Placement, adjective.Fragment, adjective.OpensParenthetical)),
             headOverride ?? noun.SubjectHead,
             headPrefixOverride ?? string.Empty);
 
@@ -294,7 +306,8 @@ internal static class SentenceRenderer
         if (adjectives.Count == 0 && headOverride is null && headPrefixOverride is null) return UnionReference(union);
 
         (string? head, string? headPrefix, string inline, string subjectFinal) = Placements(
-            adjectives.Select(adjective => (adjective.Placement, adjective.Fragment)),
+            adjectives.Select(adjective =>
+                (adjective.Placement, adjective.Fragment, adjective.OpensParenthetical)),
             headOverride,
             headPrefixOverride);
 
@@ -311,19 +324,22 @@ internal static class SentenceRenderer
     }
 
     // Where each adjective lands (GRAMMAR §5.2, §4.10), accumulated in authoring order: Head and HeadPrefix
-    // substitute, Inline and SubjectFinal concatenate. The caller supplies the seeds — Phrase its noun's
-    // head and an empty prefix, UnionPhrase the union's nullable overrides, ProjectPhrase the bare plural —
-    // so no two subject assemblies can disagree about a placement, and a fifth AdjectivePlacement is one
-    // edit rather than one per stratum. It takes (placement, fragment) pairs rather than an adjective list
-    // because the strata's adjective hierarchies are deliberately disjoint and share no base: the pairs are
+    // substitute, Inline concatenates, and SubjectFinal collects into a group the return renders in
+    // sentence-final order. The caller supplies the seeds — Phrase its noun's head and an empty prefix,
+    // UnionPhrase the union's nullable overrides, ProjectPhrase the bare plural — so no two subject
+    // assemblies can disagree about a placement, and a fifth AdjectivePlacement is one edit rather than one
+    // per stratum. It takes (placement, fragment, opens-parenthetical) triples rather than an adjective list
+    // because the strata's adjective hierarchies are deliberately disjoint and share no base: the triples are
     // the whole of what placement needs from any of them. MemberPhrase keeps its own variant, and that one
-    // is a real divergence rather than a copy — its HeadPrefix arm concatenates where these substitute.
+    // is a real divergence rather than a copy — its HeadPrefix arm concatenates where these substitute, and
+    // the member stratum has no Except, so its sentence-final group has nothing to order.
     private static (string? Head, string? HeadPrefix, string Inline, string SubjectFinal) Placements(
-        IEnumerable<(AdjectivePlacement Placement, string Fragment)> adjectives, string? head, string? headPrefix)
+        IEnumerable<(AdjectivePlacement Placement, string Fragment, bool OpensParenthetical)> adjectives,
+        string? head, string? headPrefix)
     {
         var inline = string.Empty;
-        var subjectFinal = string.Empty;
-        foreach ((AdjectivePlacement placement, string fragment) in adjectives)
+        var clauses = new List<(string Fragment, bool OpensParenthetical)>();
+        foreach ((AdjectivePlacement placement, string fragment, bool opensParenthetical) in adjectives)
             switch (placement)
             {
                 case AdjectivePlacement.Head:
@@ -336,11 +352,26 @@ internal static class SentenceRenderer
                     inline += fragment;
                     break;
                 case AdjectivePlacement.SubjectFinal:
-                    subjectFinal += fragment;
+                    clauses.Add((fragment, opensParenthetical));
                     break;
             }
 
+        IEnumerable<(string Fragment, bool OpensParenthetical)> ordered =
+            SentenceFinalOrder(clauses, clause => clause.OpensParenthetical);
+        string subjectFinal = string.Concat(ordered.Select(clause => clause.Fragment));
+
         return (head, headPrefix, inline, subjectFinal);
+    }
+
+    // The sentence-final group in rendered order (GRAMMAR §6): every Where in authoring order, then every
+    // Except in authoring order, so the parenthetical is the last thing before the junction that closes it.
+    // OrderBy is stable, which is what keeps authoring order inside each half. Placements assembles the group
+    // by this and the EndsOpen twins read its last clause by this, so a phrase and its openness cannot
+    // disagree. Generic over the clause type because the strata's adjective hierarchies share no base.
+    private static IEnumerable<TClause> SentenceFinalOrder<TClause>(
+        IEnumerable<TClause> clauses, Func<TClause, bool> opensParenthetical)
+    {
+        return clauses.OrderBy(opensParenthetical);
     }
 
     // The operand nouns of a union that collapses to one head and locative, or null when it does not
@@ -363,15 +394,18 @@ internal static class SentenceRenderer
         return nouns[0].CollapsedLocative(nouns) is null ? null : nouns;
     }
 
-    // Whether a phrase ends inside an Except parenthetical (GRAMMAR §6): its last sentence-final adjective
-    // says it opens one — a Where after an Except closes nothing, and is not open either — or, with no
-    // clause of its own, it is an or-joined union whose last operand ends open. A collapsed union, a bare
-    // noun and an inline-terminated phrase are closed. The composer reads this at every junction where
-    // text follows, because the fragment cannot know what follows it.
+    // Whether a phrase ends inside an Except parenthetical (GRAMMAR §6): the last clause of its
+    // sentence-final group, read in rendered rather than authoring order, says it opens one — and because a
+    // Where never follows an Except in that order, the group ends open exactly when it carries an Except —
+    // or, with no clause of its own, it is an or-joined union whose last operand ends open. A collapsed
+    // union, a bare noun and an inline-terminated phrase are closed. The composer reads this at every
+    // junction where text follows, because the fragment cannot know what follows it.
     private static bool EndsOpen(Selection selection)
     {
-        SelectionAdjective? lastClause = selection.Adjectives
-            .LastOrDefault(adjective => adjective.Placement == AdjectivePlacement.SubjectFinal);
+        IEnumerable<SelectionAdjective> clauses = selection.Adjectives
+            .Where(adjective => adjective.Placement == AdjectivePlacement.SubjectFinal);
+        SelectionAdjective? lastClause = SentenceFinalOrder(clauses, adjective => adjective.OpensParenthetical)
+            .LastOrDefault();
         if (lastClause is not null) return lastClause.OpensParenthetical;
 
         bool endsWithInlineClause = selection.Adjectives
@@ -383,12 +417,15 @@ internal static class SentenceRenderer
         return EndsOpen(union.Parts[union.Parts.Count - 1]);
     }
 
-    // The project stratum's twin. Except and Where are the only sentence-final project adjectives, and the
-    // project phrase has no union or bare-noun arm to fall through to.
+    // The project stratum's twin, reading the same rendered order. Except and Where are the only
+    // sentence-final project adjectives, and the project phrase has no union or bare-noun arm to fall
+    // through to.
     private static bool EndsOpen(ProjectSelection selection)
     {
-        ProjectAdjective? lastClause = selection.Adjectives
-            .LastOrDefault(adjective => adjective.Placement == AdjectivePlacement.SubjectFinal);
+        IEnumerable<ProjectAdjective> clauses = selection.Adjectives
+            .Where(adjective => adjective.Placement == AdjectivePlacement.SubjectFinal);
+        ProjectAdjective? lastClause = SentenceFinalOrder(clauses, adjective => adjective.OpensParenthetical)
+            .LastOrDefault();
         return lastClause is { OpensParenthetical: true };
     }
 
@@ -460,7 +497,8 @@ internal static class SentenceRenderer
     private static string ProjectPhrase(ProjectSelection selection)
     {
         (string? head, string? headPrefix, string inline, string subjectFinal) = Placements(
-            selection.Adjectives.Select(adjective => (adjective.Placement, adjective.Fragment)),
+            selection.Adjectives.Select(adjective =>
+                (adjective.Placement, adjective.Fragment, adjective.OpensParenthetical)),
             "projects",
             string.Empty);
 
@@ -469,7 +507,7 @@ internal static class SentenceRenderer
 
     private static bool TryBareType(Selection selection, out Type type)
     {
-        if (selection is not UnionSelection && selection.Adjectives.Count == 0 && selection.Noun is TypeNoun typeNoun)
+        if (selection.Adjectives.Count == 0 && SelectionWalk.NounOf(selection) is TypeNoun typeNoun)
         {
             type = typeNoun.Type;
             return true;

@@ -200,6 +200,17 @@ internal static class ProseFormat
         return Join(references, " and ");
     }
 
+    /// <summary>
+    ///     The inventory join, for a list that is a set of things rather than a sentence naming an
+    ///     alternative: <c>A, B, C</c>. The sanctioned surface of a quarantine reads this way on both
+    ///     surfaces that print it — the scope card and <c>explain</c> — over the same pre-rendered
+    ///     fragments (<see cref="SentenceRenderer.ReferenceFragments" />).
+    /// </summary>
+    internal static string JoinInventory(IReadOnlyList<string> values)
+    {
+        return string.Join(", ", values);
+    }
+
     // The one join both conjunctions take: everything but the last, comma-separated, then the joiner.
     private static string Join(IReadOnlyList<string> references, string joiner)
     {

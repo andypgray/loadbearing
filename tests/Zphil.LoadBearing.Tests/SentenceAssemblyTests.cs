@@ -265,6 +265,69 @@ public class SentenceAssemblyTests
                 + "(external packages are not constrained by this rule).");
     }
 
+    // ---- Except and Where on one subject (GRAMMAR §6): the Except renders last, whatever order ----
+
+    [Fact]
+    public void ExceptAndWhere_RenderTheWhereFirst_RegardlessOfChainPosition()
+    {
+        // The junction: the verb. Both clauses are sentence-final, and the Except canonicalizes after the
+        // Where, so the parenthetical is the last thing before what closes it in either chain order.
+        const string expected =
+            "Types in `MyApp.*` whose name contains a digit, except `SqlConnection`, must be sealed.";
+        SentenceRenderer.Sentence(Arch.Types.InNamespace("MyApp.*")
+                .Except(Arch.Type(typeof(SqlConnection)))
+                .Where(t => t.Name.Any(char.IsDigit), "whose name contains a digit")
+                .MustBeSealed())
+            .ShouldBe(expected);
+        SentenceRenderer.Sentence(Arch.Types.InNamespace("MyApp.*")
+                .Where(t => t.Name.Any(char.IsDigit), "whose name contains a digit")
+                .Except(Arch.Type(typeof(SqlConnection)))
+                .MustBeSealed())
+            .ShouldBe(expected);
+    }
+
+    [Fact]
+    public void ExceptAndWhere_InTargetPosition_ThePeriodClosesTheParenthetical()
+    {
+        // The junction that needs nothing: the sentence-final period, reached through a target's phrase.
+        SentenceRenderer.Sentence(Arch.Types.MustNotReference(Arch.Types.InNamespace("MyApp.Legacy.*")
+                .Except(Arch.Type(typeof(SqlConnection)))
+                .Where(t => t.Name.Any(char.IsDigit), "whose name contains a digit")))
+            .ShouldBe(
+                "Types must not reference types in `MyApp.Legacy.*` whose name contains a digit, "
+                + "except `SqlConnection`.");
+    }
+
+    [Fact]
+    public void ExceptAndWhere_OnAMemberSubjectsSource_TheMemberClausesCloseIt()
+    {
+        // The junction: the member subject's own clauses. The source now ends open where the Where used to
+        // leave it closed, so the comma the member clauses owe it is back.
+        SentenceRenderer.Sentence(Arch.Types.InNamespace("MyApp.*")
+                .Except(Arch.Type(typeof(SqlConnection)))
+                .Where(t => t.Name.Any(char.IsDigit), "whose name contains a digit")
+                .Methods.Returning(typeof(Task))
+                .MustHaveSuffix("Async"))
+            .ShouldBe(
+                "Methods of types in `MyApp.*` whose name contains a digit, except `SqlConnection`, "
+                + "returning `Task` must be named `*Async`.");
+    }
+
+    [Fact]
+    public void SeveralWheres_KeepAuthoringOrder_AheadOfTheExcept()
+    {
+        // Ordering the group is stable, so the Wheres stay in the order they were written and only the
+        // Except moves — the exception cannot land between two clauses that read as one description.
+        Selection selection = Arch.Types.InNamespace("MyApp.*")
+            .Where(t => t.Name.Any(char.IsDigit), "whose name contains a digit")
+            .Except(Arch.Type(typeof(SqlConnection)))
+            .Where(t => t.IsGenerated, "and that a source generator emitted");
+        SentenceRenderer.Subject(selection)
+            .ShouldBe(
+                "Types in `MyApp.*` whose name contains a digit and that a source generator emitted, "
+                + "except `SqlConnection`");
+    }
+
     // ---- Except over several operands (GRAMMAR §5.1, §5.2): the union arch.AnyOf would mint ----
 
     [Fact]
@@ -946,6 +1009,18 @@ public class SentenceAssemblyTests
     }
 
     [Fact]
+    public void UnionExceptAndWhere_RenderTheWhereFirstAfterTheCollapsedLocative()
+    {
+        // A union's own sentence-final group orders exactly as a single selection's, against the same
+        // hoisted head and locative.
+        Selection union = Arch.AnyOf(Arch.Project("A"), Arch.Project("B"))
+            .Except(Arch.Type(typeof(SqlConnection)))
+            .Where(t => t.Name.Any(char.IsDigit), "whose name contains a digit");
+        SentenceRenderer.Subject(union)
+            .ShouldBe("Types in projects `A` or `B` whose name contains a digit, except `SqlConnection`");
+    }
+
+    [Fact]
     public void UnionOfKind_SubstitutesTheHoistedHead()
     {
         Selection union = Arch.AnyOf(Arch.Project("A"), Arch.Project("B"))
@@ -1372,6 +1447,20 @@ public class SentenceAssemblyTests
                 .MustNotBePackable())
             .ShouldBe(
                 "Projects matching `Zphil.*`, except project `Zphil.LoadBearing.Cli`, must not be packable.");
+    }
+
+    [Fact]
+    public void ProjectExceptAndWhere_RenderTheWhereFirstAndTheVerbClosesIt()
+    {
+        // The project stratum orders its sentence-final group through the same helper the type side uses,
+        // so the parenthetical reaches the verb junction here too.
+        SentenceRenderer.Sentence(Arch.Projects.Matching("Zphil.*")
+                .Except(Arch.Projects.Named("Zphil.LoadBearing.Cli"))
+                .Where(project => project.IsPackable == true, description: "whose name ends in a digit")
+                .MustNotBePackable())
+            .ShouldBe(
+                "Projects matching `Zphil.*` whose name ends in a digit, "
+                + "except project `Zphil.LoadBearing.Cli`, must not be packable.");
     }
 
     [Fact]

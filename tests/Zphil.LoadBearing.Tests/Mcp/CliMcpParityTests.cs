@@ -82,12 +82,8 @@ public sealed class CliMcpParityTests
         "- `layering/reporting-not-billing` — The Reporting layer must not reference types in " +
         "`MyApp.Legacy.Billing.*`. The reporting slice takes its numbers from the domain, never from the " +
         "legacy biller.\n" +
-        "- `layering/leaves-independent` — Each of the Reporting and Billing layers must not reference " +
-        "the others. Reporting and billing are the two leaves of this solution; neither may grow a " +
-        "dependency on the other.\n" +
-        "- `layering/leaves-not-circular` — Each of the Reporting and Billing layers must not have " +
-        "circular references with the others. Reporting and billing may only ever point one way; a circle " +
-        "between the two leaves would make the reporting slice part of the legacy biller.\n" +
+        RenderedLawText.LeavesBullet +
+        RenderedLawText.LeavesNotCircularBullet +
         "- Expand any rule above with `loadbearing explain <rule-id>`.";
 
     // The truncator's own token → character multiple, restated here because the budget row has to work
@@ -238,9 +234,7 @@ public sealed class CliMcpParityTests
     {
         using var repo = new TempGitRepo();
         // A brand-new untracked file in dragon territory — the tripwire's agent-hook case.
-        File.WriteAllText(
-            repo.PathOf("MyApp.Legacy.Billing", "LegacyNote.cs"),
-            "namespace MyApp.Legacy.Billing;\n\npublic class LegacyNote;\n");
+        repo.WriteQuarantineNote();
 
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
             McpServerBindings.For(repo.SolutionPath, CliRunner.QuarantinedSpecDll), Ct);

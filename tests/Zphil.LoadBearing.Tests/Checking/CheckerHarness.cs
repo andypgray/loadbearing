@@ -74,6 +74,12 @@ internal static class Checker
     }
 
     /// <summary>
+    ///     The reified canonical sample (GRAMMAR §12), built once — the model is immutable and every
+    ///     caller only reads it.
+    /// </summary>
+    public static readonly ArchitectureModel Canonical = ArchModelBuilder.Build(new ArchSpec());
+
+    /// <summary>
     ///     The tripwire a scope spec desugars to — a caution's only child, or a quarantine's second.
     /// </summary>
     public static ArchRule Tripwire(Action<Arch> define)
@@ -144,6 +150,16 @@ internal static class Checker
         {
             [ruleId] = new(entries)
         });
+    }
+
+    /// <summary>
+    ///     A one-rule model built by hand, bypassing spec-build validation so a check-time backstop can be
+    ///     reached. Sentence and because are placeholders: a caller that needed either would build a spec.
+    /// </summary>
+    public static ArchitectureModel HandBuilt(string ruleId, Constraint constraint)
+    {
+        return new ArchitectureModel(
+            [new ArchRule(ruleId, Posture.Enforce, "b", null, "sentence", constraint, null, null)], []);
     }
 
     /// <summary>The single rule result — most specs under test carry exactly one rule.</summary>
