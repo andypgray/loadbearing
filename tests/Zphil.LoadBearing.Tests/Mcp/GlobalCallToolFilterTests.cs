@@ -49,6 +49,33 @@ public sealed class GlobalCallToolFilterTests
     }
 
     [Fact]
+    public async Task CallTool_StringifiedArrayArgument_RefusesOnTheShapeWithoutTheRoster()
+    {
+        // Arrange — the defect as filed, on the surface it was filed against: a client serialized a JSON
+        // array into the string parameter it was binding, so the tool received one token carrying brackets.
+        // A real one-element array never reaches the runner (StringCoercerFactory unwraps it); a string that
+        // merely looks like one survives untouched, which is the value under test.
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            McpServerBindings.For(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll), Ct);
+
+        // Act
+        CallToolResult result = await harness.Client.CallToolAsync(
+            "arch_explain",
+            new Dictionary<string, object?> { ["ruleId"] = """["layering/domain-independent"]""" },
+            cancellationToken: Ct);
+
+        // Assert — the shape named, and no roster. Listing every other ID beside the one inside the caller's
+        // own brackets is what made the old refusal read as self-contradictory.
+        result.IsError.ShouldBe(true);
+        string text = result.ShouldHaveTextContent();
+        text.ShouldStartWith(
+            "Unknown rule ID '[\"layering/domain-independent\"]'. That is a JSON array written as text; "
+            + "pass one rule ID: 'layering/domain-independent'.");
+        text.ShouldNotContain("Available rule IDs");
+        harness.Logs.Warnings.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task CallTool_UserErrorWhileUnbound_AppendsTheSessionRecovery()
     {
         // Arrange — a harness flagged unbound over a solution that does resolve. Deliberate, and exactly the

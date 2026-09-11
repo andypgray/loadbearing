@@ -39,9 +39,12 @@ public sealed class TypeNameSimpleTests
     }
 
     // Arity is the shape under test — neither parameter is meant to be used, and the types are named by
-    // typeof rather than constructed, so nothing here is ever instantiated.
+    // typeof rather than constructed, so nothing here is ever instantiated. Nor is it static: an ordinary
+    // generic class carrying nested types is the production shape TypeName.Simple has to render, and a
+    // fixture that stops resembling it stops testing it.
     // ReSharper disable once UnusedTypeParameter
     // ReSharper disable once ClassNeverInstantiated.Local
+    // ReSharper disable once ConvertToStaticClass
     private sealed class GenericOuter<TOuter>
     {
         // ReSharper disable once UnusedTypeParameter

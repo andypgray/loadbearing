@@ -39,6 +39,13 @@
          which still writes Cobertura, so only the request changes and everything downstream that reads the
          XML is unaffected. global.json at the repo root names the runner. -->
     <ItemGroup>
+        <!-- FsCheck.Xunit.v3, not FsCheck.Xunit: the plain package pins xunit.extensibility.execution below
+             3.0.0 — xunit v2 — so it cannot restore beside the xunit.v3 below. The .v3 variant pins
+             xunit.v3.extensibility.core [4.0.0, 5.0.0) and still puts [Property] in the FsCheck.Xunit
+             namespace. FsCheck itself is explicit rather than transitive so Dependabot tracks the version the
+             one property suite (Internal/WildcardPropertyTests) is written against. -->
+        <PackageReference Include="FsCheck" Version="3.4.0" />
+        <PackageReference Include="FsCheck.Xunit.v3" Version="3.4.0" />
         <!-- The DI/Hosting abstractions the registration-recognition tests (CompilationFactory's DiReferences)
              bind against — promoted from transitive (via the MCP/Hosting stack) to explicit, so the versions
              the recognizer resolves are pinned here rather than floating on another package's closure. -->

@@ -9,8 +9,8 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 /// <remarks>
 ///     <c>sh</c> is the gate proper — every CI OS has a POSIX shell, Git for Windows supplying it on Windows,
 ///     where it ships without necessarily landing on the machine <c>PATH</c>, hence the two fallback homes.
-///     <c>pwsh</c> is present on some machines and not others (not on the maintainer's), so a suite that wants
-///     it skips with a named reason rather than failing.
+///     <c>pwsh</c> is present on some machines and not others, so a suite that wants it skips with a
+///     named reason rather than failing.
 /// </remarks>
 internal static class ShellInterpreter
 {

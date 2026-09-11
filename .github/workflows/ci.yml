@@ -85,6 +85,20 @@ jobs:
       # the arch project and the throwaway fixtures, which carry no lock file by design, restore
       # unlocked exactly as before. Which projects those are is a law rather than a count:
       # packaging/shipping-locks-restore requires a lock file of everything that ships.
+      #
+      # This is the only step in either workflow that restores through a line of its own. Every other
+      # restore is IMPLICIT — pack-check's pack, self-check's build, the examples job's four example
+      # builds plus its CLI build and its adapter test, and release.yml's Release build and pack — so
+      # each of those names -p:RestoreLockedMode=true instead, for exactly the reason above. That is
+      # the property form of this same policy: --locked-mode is a restore-only switch and sets that
+      # property, so a step with no restore line of its own can only name the property.
+      #
+      # Measured 2026-09-01 rather than assumed. With one direct entry's requested range made stale
+      # (the lock file out of date, not broken), a plain build exits 0 and silently rewrites the lock
+      # file back to matching — the exposure — while the same build, the same pack, and an example
+      # solution build that reaches src only by ProjectReference all exit 1 on NU1004 once the
+      # property is on. Dropping a transitive entry instead proves nothing: a lock file that is broken
+      # rather than stale fails NU1102 in both modes.
       - name: Restore
         run: dotnet restore Zphil.LoadBearing.slnx --locked-mode
 
@@ -213,8 +227,10 @@ jobs:
           git add -- '*packages.lock.json'
           git diff --cached --quiet || git commit -q -m 'Regenerate NuGet lock files'
 
+      # This step restores implicitly, so without the property its locked mode would be contingent on
+      # the runner setting CI=true — the exposure build-and-test's Restore step names in full.
       - name: Pack
-        run: dotnet pack Zphil.LoadBearing.slnx -c Release -o artifacts
+        run: dotnet pack Zphil.LoadBearing.slnx -c Release -o artifacts -p:RestoreLockedMode=true
 
       # Target the Cli package explicitly: the solution pack emits four nupkgs and only the
       # Cli one carries the MCP manifest. A bare artifacts/*.nupkg glob would hand unzip four
@@ -634,9 +650,11 @@ jobs:
       # Build the whole solution (CLI + the arch spec) so --no-build can run the check over
       # the real MSBuildWorkspace, exactly as build-and-test does. --spec is explicit: the
       # self-solution has many Core-referencing members, so the one-spec convention cannot
-      # pick (the self-spec test passes the same path).
+      # pick (the self-spec test passes the same path). The restore is implicit here, so the
+      # locked mode is named as a property rather than left to CI=true — build-and-test's
+      # Restore step carries the reason.
       - name: Build
-        run: dotnet build Zphil.LoadBearing.slnx
+        run: dotnet build Zphil.LoadBearing.slnx -p:RestoreLockedMode=true
       # --diff-base arms the Quarantine tripwire: a change set touching roslyn/msbuild-bootstrap
       # draws a warning naming the file, which is the recommended CI shape and the one this
       # repository owed its own quarantined scope. Without the flag the tripwire reports skipped
@@ -715,18 +733,26 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -- '*packages.lock.json'
           git diff --cached --quiet || git commit -q -m 'Regenerate NuGet lock files'
-      # The CLI never builds the target; build the example solutions first. Examples restore
-      # unlocked (no lock policy under examples/); CLI/src restore locked via committed lock files.
+      # The CLI never builds the target; build the example solutions first. Every step below restores
+      # IMPLICITLY, so each names -p:RestoreLockedMode=true rather than leaving the locked mode to
+      # CI=true — build-and-test's Restore step carries the reason in full.
+      #
+      # It goes on the example builds too, not only on the CLI, because each example's spec project
+      # carries a ProjectReference to src/Zphil.LoadBearing: the first example build here is the first
+      # restore of that project in this job, and an unlocked one would rewrite its lock file before the
+      # CLI build below could hold it to the committed one. The property costs the examples nothing —
+      # locked mode only bites where a lock file exists, and nothing under examples/ carries one, which
+      # is why they still restore unlocked exactly as before.
       - name: Build the Meridian example solution
-        run: dotnet build examples/Meridian/Meridian.slnx
+        run: dotnet build examples/Meridian/Meridian.slnx -p:RestoreLockedMode=true
       - name: Build the Meridian.Quoting example solution
-        run: dotnet build examples/Meridian.Quoting/Meridian.Quoting.slnx
+        run: dotnet build examples/Meridian.Quoting/Meridian.Quoting.slnx -p:RestoreLockedMode=true
       - name: Build the Meridian.Operations example solution
-        run: dotnet build examples/Meridian.Operations/Meridian.Operations.slnx
+        run: dotnet build examples/Meridian.Operations/Meridian.Operations.slnx -p:RestoreLockedMode=true
       - name: Build the Meridian.Interchange example solution
-        run: dotnet build examples/Meridian.Interchange/Meridian.Interchange.slnx
+        run: dotnet build examples/Meridian.Interchange/Meridian.Interchange.slnx -p:RestoreLockedMode=true
       - name: Build the LoadBearing CLI
-        run: dotnet build src/Zphil.LoadBearing.Cli/Zphil.LoadBearing.Cli.csproj
+        run: dotnet build src/Zphil.LoadBearing.Cli/Zphil.LoadBearing.Cli.csproj -p:RestoreLockedMode=true
       - name: Check Meridian (expect exit 0 on the committed baselines)
         run: dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- check examples/Meridian/Meridian.slnx
       - name: Check Meridian.Quoting (expect exit 0; Enforce-only, no baselines)
@@ -736,9 +762,10 @@ jobs:
       - name: Check Meridian.Interchange (expect exit 0 on the committed baseline)
         run: dotnet run --no-build --project src/Zphil.LoadBearing.Cli -- check examples/Meridian.Interchange/Meridian.Interchange.slnx
       # No --no-build here: the adapter test project is not a member of any slnx, so nothing
-      # above builds it. dotnet test restores and builds it (and the Xunit adapter it references).
+      # above builds it. dotnet test restores and builds it (and the Xunit adapter it references) —
+      # src/Zphil.LoadBearing.Xunit, which carries a lock file, hence the property here too.
       - name: Test the Meridian.Quoting xUnit adapter (one named test per rule)
-        run: dotnet test examples/Meridian.Quoting/tests/Meridian.Quoting.ArchTests/Meridian.Quoting.ArchTests.csproj --output Detailed
+        run: dotnet test examples/Meridian.Quoting/tests/Meridian.Quoting.ArchTests/Meridian.Quoting.ArchTests.csproj --output Detailed -p:RestoreLockedMode=true
       # No scope flag on any of these four, which is the property being exercised: every example spec
       # project references the LoadBearing packages it is written against, so the workspace loads this
       # repository's projects on each render and only the survey fence's declared-members default keeps

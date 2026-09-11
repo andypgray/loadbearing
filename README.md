@@ -73,6 +73,8 @@ Nothing in the build system stops the CLI writing to `Console`, and the MCP serv
 
 Nobody wrote that sentence, and nobody can let it go stale: [`SelfSpecTests.AgentsMd_IsCurrent`](https://github.com/andypgray/loadbearing/blob/main/tests/Zphil.LoadBearing.Tests/Dogfood/SelfSpecTests.cs) composes the block in process and asserts the committed file already equals it. Its sibling `ScopedCards_AreCurrent` holds the whole class the same way, every per-directory card this repository commits, and also fails on a card that no rule placement produced, so one orphaned by a spec change cannot stay behind being read. The prose an agent reads is provably the spec the build enforces. Agents that query rather than read get the same model over MCP (`loadbearing mcp`).
 
+The block is as current as the CLI that renders it. Nothing inside it records a version, so an older `loadbearing` re-renders it to that older tool's content without warning. Keep the tool and the spec's package reference in lockstep (see [Installing](#installing)), and re-render in CI to fail on a diff, the way this repository does for its [examples](#examples).
+
 ## When an agent breaks it
 
 Suppose an agent adds a progress printer to the CLI so a slow solution load stops looking hung, and reaches for `Console.WriteLine`. The `PostToolUse` hook in [`hooks/`](https://github.com/andypgray/loadbearing/tree/main/hooks) runs `check` on the edit, the rule goes red, and the wrapper exits 2, which is how a Claude Code hook blocks, with the report on the agent's stderr:
@@ -429,15 +431,11 @@ anything: the server's replies name `dotnet dnx Zphil.LoadBearing.Cli@<version> 
 of the verb, pinned to the build answering. Bind such a repository at install time instead: put the
 solution in the config's `args` after `mcp`, or set `LOADBEARING_SOLUTION_PATH` in its `env`.
 
-`dnx` ships with the .NET 10 SDK, but installing that SDK is not what makes the command exist:
-`dotnet` picks an SDK per directory, honouring the nearest `global.json` at or above the
-working directory, and `dnx` is present only where the SDK picked there is 10 or newer. A
-repository pinning an older SDK (the normal state of the codebases this tool is built for)
-has no `dnx` at its root however much .NET 10 is installed beside it, and a registry client
-launching there sees a server that died before the handshake, with the reason on stderr
-alone. Wire such a repository with the installed `loadbearing` command instead: the global
-tool needs a .NET 10 SDK installed on the machine, `dnx` needs one selected in the working
-directory, and a `global.json` pinning lower blocks only the second.
+`dnx` ships with the .NET 10 SDK, and one installed on the machine is the whole requirement.
+`dnx` picks its own SDK from what is installed and never reads `global.json`, so a repository
+pinning an older SDK launches the server anyway. Without any .NET 10 SDK there is no `dnx`
+command, and a registry client sees a server that died before the handshake, with the reason
+on stderr alone.
 
 ## Building
 

@@ -7,8 +7,8 @@ namespace Zphil.LoadBearing.Tests.Cli;
 /// <summary>
 ///     End-to-end <c>explain</c> through the real command tree, all on the DLL fast path (no workspace,
 ///     so fast): a rule dumps its fields and exits 0; an unknown ID exits 2 with the ordinal-sorted list
-///     of available (post-desugar) IDs; a missing <c>rule-id</c> argument is a parse error remapped to
-///     exit 2.
+///     of available (post-desugar) IDs; an ID that is a JSON array written as text exits 2 naming that
+///     shape and nothing else; a missing <c>rule-id</c> argument is a parse error remapped to exit 2.
 /// </summary>
 public sealed class ExplainCommandTests
 {
@@ -77,6 +77,35 @@ public sealed class ExplainCommandTests
                 "  packaging/nothing-published\n" +
                 "  packaging/supported-frameworks\n" +
                 "  state/no-static-mutable");
+    }
+
+    [Fact]
+    public async Task Explain_RuleIdAsAStringifiedArray_RefusesOnTheShapeAndOmitsTheListing()
+    {
+        CliResult result = await CliRunner.InvokeAsync(
+            "explain", """["layering/domain-independent"]""", "--spec", CliRunner.ViolatedSpecDll);
+
+        // The listing above is what a reader needs when they misspelled an ID; here they can read the ID off
+        // their own brackets, so the shape is the whole of what they are missing.
+        result.ShouldRefuseWith(
+            "Unknown rule ID '[\"layering/domain-independent\"]'. That is a JSON array written as text; "
+            + "pass one rule ID: 'layering/domain-independent'.");
+        result.Err.ShouldNotContain("Available rule IDs");
+    }
+
+    [Fact]
+    public async Task Explain_SeveralRuleIdsInOneArray_NamesTheShapeAndEchoesNothing()
+    {
+        CliResult result = await CliRunner.InvokeAsync(
+            "explain", """["layering/domain-independent","layering/no-ghost"]""",
+            "--spec", CliRunner.ViolatedSpecDll);
+
+        // No echo: an array of several holds no single value this verb could have taken, and picking one of
+        // them for the caller would be a guess dressed as advice.
+        result.ShouldRefuseWith(
+            "Unknown rule ID '[\"layering/domain-independent\",\"layering/no-ghost\"]'. That is a JSON array "
+            + "written as text; pass one rule ID.");
+        result.Err.ShouldNotContain("Available rule IDs");
     }
 
     [Fact]

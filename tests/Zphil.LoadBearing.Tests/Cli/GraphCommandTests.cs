@@ -218,6 +218,23 @@ public sealed class GraphCommandTests
     }
 
     [Fact]
+    public async Task Graph_ProjectsAsAStringifiedArray_RefusesOnTheShapeAndOmitsTheRoster()
+    {
+        // Act
+        CliResult result = await CliRunner.InvokeAsync(
+            "graph", CliRunner.MyAppSolution, "--projects", """["MyApp.Web","MyApp.Domain"]""");
+
+        // Assert — the sentence check's rule filter gives, because the two filters take the same list and a
+        // reader who meets both should meet one wording. Both names are real, so the roster would have read
+        // as a contradiction here too.
+        result.ShouldRefuseWith(
+            "No project matched '[\"MyApp.Web\",\"MyApp.Domain\"]'. That is a JSON array written as text; "
+            + "pass the globs as one semicolon-separated string: 'MyApp.Web;MyApp.Domain'.");
+        result.Err.ShouldNotContain("Available projects");
+        result.Out.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Graph_MyAppFixtureSkeletonJson_MatchesGolden()
     {
         // Act

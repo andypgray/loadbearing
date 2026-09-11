@@ -57,6 +57,46 @@ public sealed class ProcessFileFootprintTests
         released.ShouldBeEmpty($"nothing should be held under '{probeRoot}' once the stream is disposed.");
     }
 
+    [Fact]
+    public void ExceptInjected_WithNothingProfiling_ExcusesNothing()
+    {
+        IReadOnlyList<RetainedPath> retained =
+        [
+            Mapped(@"C:\repo\bin\Zphil.LoadBearing.dll"),
+            Mapped(@"C:\repo\bin\runtimes\win-x64\native\covrun64.dll")
+        ];
+
+        IReadOnlyList<RetainedPath> kept = ProcessFileFootprint.ExceptInjected(retained, null);
+
+        // A null directory is the no-profiler case, which every ordinary run is. The filter has to be a
+        // no-op there, or it would quietly shrink what the scan reports when nothing forced anything in.
+        kept.ShouldBe(retained);
+    }
+
+    [Fact]
+    public void ExceptInjected_DropsWhatSitsUnderTheProfilerDirectory_AndKeepsTheRest()
+    {
+        const string profilerDirectory = @"C:\repo\bin\runtimes\win-x64\native";
+
+        RetainedPath productImage = Mapped(@"C:\repo\bin\Zphil.LoadBearing.dll");
+        RetainedPath injectedImage = Mapped(profilerDirectory + @"\covrun64.dll");
+        RetainedPath lookalike = Mapped(@"C:\repo\bin\runtimes\win-x64\native-extras\other.dll");
+
+        IReadOnlyList<RetainedPath> kept = ProcessFileFootprint.ExceptInjected(
+            [productImage, injectedImage, lookalike], profilerDirectory);
+
+        // The lookalike is the point of the pair: a bare prefix match would swallow a sibling directory
+        // whose name merely starts with the profiler's, and excusing a product image is precisely how this
+        // filter would hide the retention it is meant to let through.
+        kept.ShouldBe([productImage, lookalike]);
+    }
+
+    /// <summary>A mapped-view hit at <paramref name="path" />, with a plausible device spelling beside it.</summary>
+    private static RetainedPath Mapped(string path)
+    {
+        return new RetainedPath(FootprintScan.MappedView, $@"\Device\HarddiskVolume1{path[2..]}", path);
+    }
+
     private static string Format(IReadOnlyList<RetainedPath> retained)
     {
         return retained.Count == 0

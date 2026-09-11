@@ -31,7 +31,8 @@ internal static class CheckPipeline
     /// <summary>
     ///     The rules a run evaluates: every rule for an empty glob list, otherwise the matches of
     ///     <paramref name="ruleIdGlobs" />. A filter that matches nothing refuses with the available IDs
-    ///     rather than checking an empty model, which would exit 0 and read as a clean solution.
+    ///     rather than checking an empty model, which would exit 0 and read as a clean solution — or, where
+    ///     the filter is a JSON array written as text, names that shape instead (<see cref="Refusals" />).
     /// </summary>
     public static IReadOnlyList<ArchRule> SelectRules(ArchitectureModel model, IReadOnlyList<string> ruleIdGlobs)
     {
@@ -60,9 +61,17 @@ internal static class CheckPipeline
     }
 
     // The unmatched-filter refusal, in the shared shape explain's unknown-rule refusal and graph's
-    // unmatched-project one also take.
+    // unmatched-project one also take — except when the filter is a JSON array a client wrote into the
+    // string parameter, which is answered on its shape instead of with a roster whose entries the reader
+    // can already read off their own brackets.
     private static string UnmatchedRulesMessage(IReadOnlyList<string> ruleIdGlobs, ArchitectureModel model)
     {
-        return Refusals.RuleNotFound($"No rule matched '{string.Join(";", ruleIdGlobs)}'", model);
+        string written = string.Join(";", ruleIdGlobs);
+        var lead = $"No rule matched '{written}'";
+        IReadOnlyList<string>? elements = Refusals.StringifiedArrayElements(written);
+
+        return elements is null
+            ? Refusals.RuleNotFound(lead, model)
+            : Refusals.StringifiedArrayMessage(lead, Refusals.GlobListAdvice(elements));
     }
 }

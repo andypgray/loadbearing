@@ -30,7 +30,9 @@ namespace Zphil.LoadBearing.Cli.Verbs;
 ///         Two knobs narrow what a caller reads, and they are independent: <see cref="GraphRequest.Projects" />
 ///         narrows the <em>subject</em> (which projects the survey is of), while
 ///         <see cref="GraphRequest.Grain" /> coarsens the <em>grain</em> (how much detail each one gets).
-///         A filter matching no project refuses with the available names rather than surveying nothing.
+///         A filter matching no project refuses with the available names rather than surveying nothing —
+///         or, where the filter is a JSON array written as text, names that shape instead
+///         (<see cref="Refusals" />).
 ///     </para>
 ///     <para>
 ///         Output/error writers are injected so the in-process e2e tests can capture them, the
@@ -150,12 +152,16 @@ internal sealed class GraphRunner(
 
     // The unmatched-filter refusal, in the shared shape explain's unknown-rule refusal also takes. The
     // roster rides in survey order, not sorted: it is the summary's own order, which is what the rest of
-    // the survey prints.
+    // the survey prints. A JSON array a client wrote into the string parameter gets the shape refusal
+    // instead — the same one check's rule filter gives, because the two filters take the same list.
     private static string UnmatchedProjectsMessage(IReadOnlyList<string> projectGlobs, GraphSummary summary)
     {
-        return Refusals.NotFoundMessage(
-            $"No project matched '{string.Join(";", projectGlobs)}'",
-            "Available projects",
-            summary.Projects.Select(project => project.Name));
+        string written = string.Join(";", projectGlobs);
+        var lead = $"No project matched '{written}'";
+        IReadOnlyList<string>? elements = Refusals.StringifiedArrayElements(written);
+
+        return elements is null
+            ? Refusals.NotFoundMessage(lead, "Available projects", summary.Projects.Select(project => project.Name))
+            : Refusals.StringifiedArrayMessage(lead, Refusals.GlobListAdvice(elements));
     }
 }

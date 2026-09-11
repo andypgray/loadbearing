@@ -18,6 +18,19 @@ public static class AgentContextRenderer
 {
     private const string Heading = "## Architecture (LoadBearing)";
 
+    // The root block's second meta-line: the recovery for the reader whose checkout declares the tool but
+    // whose machine lacks it, where a configured MCP server dying at launch reads as a config problem
+    // rather than a missing install. Root block only, never the scoped cards. Unpinned, unlike the MCP
+    // server's own recovery coda: a committed render has no running engine to make the same-engine
+    // promise, so a pin here could only rot. Three tokens are load-bearing: `dotnet dnx`, never bare
+    // `dnx` (on Windows the short form is a .cmd a POSIX shell cannot resolve); `--yes` (a cold machine
+    // can block on a trust prompt); and a read verb, never `mcp` (a stdio server waits on stdin and
+    // would hang silently).
+    private const string InstallRecoveryLine =
+        "*If the `loadbearing` command is missing (a configured MCP server dies without it), " +
+        "install the tool with `dotnet tool install -g Zphil.LoadBearing.Cli`, or run any verb " +
+        "without installing: `dotnet dnx Zphil.LoadBearing.Cli --yes -- check <solution>`.*";
+
     // The glossary composes from per-axis clauses, not 2^N whole-string constants: the "reference" clause is
     // always present, "use" iff a member-target rule exists, "construct" iff a ctor rule exists — each axis
     // gates independently, so a spec is never glossed a term it does not use (GRAMMAR §4.1/§4.5/§10). The
@@ -87,10 +100,11 @@ public static class AgentContextRenderer
     }
 
     /// <summary>
-    ///     The root managed-block body: provenance, the H2 heading, the glossary + drill-down pointer
-    ///     (GRAMMAR §4.1, once), then — each omitted when empty — the module map (Layers), the Enforce
-    ///     laws (Rules), the Migrate counter-prior paragraphs (Migrations), and the Quarantine containment
-    ///     laws (Quarantined scopes — the containment law + sanctioned surface; dragons prose stays scoped).
+    ///     The root managed-block body: provenance, the install-recovery line, the H2 heading, the
+    ///     glossary + drill-down pointer (GRAMMAR §4.1, once), then — each omitted when empty — the
+    ///     module map (Layers), the Enforce laws (Rules), the Migrate counter-prior paragraphs
+    ///     (Migrations), and the Quarantine containment laws (Quarantined scopes — the containment law +
+    ///     sanctioned surface; dragons prose stays scoped).
     /// </summary>
     /// <remarks>
     ///     <paramref name="grandfatheredCounts" /> is an optional live-count provider: when it returns a
@@ -107,6 +121,7 @@ public static class AgentContextRenderer
         var sections = new List<string>
         {
             ProvenanceLine(specName),
+            InstallRecoveryLine,
             Heading,
             GlossaryLine(model.Rules)
         };

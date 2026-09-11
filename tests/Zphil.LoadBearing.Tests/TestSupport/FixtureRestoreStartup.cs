@@ -1,5 +1,6 @@
 using Xunit.Sdk;
 using Xunit.v3;
+using Zphil.LoadBearing.Tests.DocHygiene;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 [assembly: TestPipelineStartup(typeof(FixtureRestoreStartup))]
@@ -7,8 +8,9 @@ using Zphil.LoadBearing.Tests.TestSupport;
 namespace Zphil.LoadBearing.Tests.TestSupport;
 
 /// <summary>
-///     Restores the checked-in fixture solutions once, at the start of the discover/run pipeline —
-///     after the runner's assembly-info probe, before any test executes.
+///     The assembly's one-time setup at the start of the discover/run pipeline — after the runner's
+///     assembly-info probe, before any test executes: restores the checked-in fixture solutions and
+///     forces the tracked-file inventory's <c>git ls-files</c> spawn while no test can race it.
 /// </summary>
 /// <remarks>
 ///     A pipeline-startup hook rather than a <c>[ModuleInitializer]</c>: module initializers also run
@@ -21,6 +23,7 @@ internal sealed class FixtureRestoreStartup : ITestPipelineStartup
     public ValueTask StartAsync(IMessageSink diagnosticMessageSink)
     {
         FixtureRestorer.EnsureRestored();
+        TrackedFiles.EnsureEnumerated();
         return ValueTask.CompletedTask;
     }
 

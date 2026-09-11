@@ -141,6 +141,29 @@ public class GenericSugarTests
     }
 
     [Fact]
+    public void MemberAttributedWith_GenericOnMembers_ServesTheKindOnlyReceiver()
+    {
+        // .Members is typed MemberSelection — its KindMemberSelection is internal, so no per-kind overload
+        // can name it and the MemberSelection overload is the only one that binds. That is what the fourth
+        // member of the completeness set is for, and nothing else in the suite reaches it.
+        Checker.Sentence(arch => arch.Types.Members.AttributedWith<SugarAttribute>()
+                .MustBePublic())
+            .ShouldBe(Checker.Sentence(arch => arch.Types.Members.AttributedWith(typeof(SugarAttribute))
+                .MustBePublic()));
+    }
+
+    [Fact]
+    public void MemberAttributedWith_GenericOnEvents_ServesTheKindOnlyReceiver()
+    {
+        // .Events is the other MemberSelection-typed projection — same overload, a different kind filter
+        // riding underneath it.
+        Checker.Sentence(arch => arch.Types.Events.AttributedWith<SugarAttribute>()
+                .MustBePublic())
+            .ShouldBe(Checker.Sentence(arch => arch.Types.Events.AttributedWith(typeof(SugarAttribute))
+                .MustBePublic()));
+    }
+
+    [Fact]
     public void MemberMustBeAttributedWith_Generic_ReifiesIdenticallyToTypeof()
     {
         Checker.Sentence(arch => arch.Types.Methods.MustBeAttributedWith<SugarAttribute>())

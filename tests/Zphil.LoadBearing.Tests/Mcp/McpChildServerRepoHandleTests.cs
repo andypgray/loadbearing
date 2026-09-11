@@ -41,6 +41,17 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 ///         The exclusion is exact-path and handle-only; the negative control proves it does not gut the scan,
 ///         because the in-repo server's own working-directory handle survives it.
 ///     </para>
+///     <para>
+///         <b>Injected, not chosen.</b> A profiler is the same story on the mapped-view side, which is the
+///         side inheritance cannot reach. Under a coverage run the child inherits the environment naming
+///         the CLR profiler and maps it — measured 2026-09-01: the instrumentation engine and covrun64.dll,
+///         both out of the collector's redistributable directory inside the test output, and therefore
+///         under this repository. Nothing the server does can decline them, so both tests discount whatever
+///         sits under <see cref="ProcessFileFootprint.InjectedProfilerDirectory" />; with no profiler
+///         attached that is null and nothing is excused. Worth keeping sharp, because this test exists to
+///         catch the server pinning the build tree, and a profiler the harness forced in is not the server
+///         doing that.
+///     </para>
 /// </remarks>
 [Collection("Serial")]
 public sealed class McpChildServerRepoHandleTests
@@ -92,6 +103,7 @@ public sealed class McpChildServerRepoHandleTests
             repo.Root);
 
         IReadOnlyList<RetainedPath> inherited = LauncherHandlesUnderRepo();
+        string? injected = ProcessFileFootprint.InjectedProfilerDirectory();
 
         // The footprint assertion is the only one that has to run against a live process, so it rides the
         // harness's whileComplete hook — which fires only on a conversation that actually completed, so a
@@ -100,7 +112,8 @@ public sealed class McpChildServerRepoHandleTests
             startInfo,
             ReadToolCalls,
             whileComplete: server =>
-                server.ShouldEventuallyHoldNoPathsUnder(RepoRoot.Directory, FootprintBudget, inherited));
+                server.ShouldEventuallyHoldNoPathsUnder(
+                    RepoRoot.Directory, FootprintBudget, inherited, injected));
 
         conversation.Handshake.ShouldNotBeNull(
             $"the staged MCP server never answered `initialize`.\nstderr:\n{conversation.Diagnostics}");
@@ -138,6 +151,7 @@ public sealed class McpChildServerRepoHandleTests
             AppContext.BaseDirectory);
 
         IReadOnlyList<RetainedPath> inherited = LauncherHandlesUnderRepo();
+        string? injected = ProcessFileFootprint.InjectedProfilerDirectory();
 
         IReadOnlyList<RetainedPath> retained = [];
 
@@ -146,8 +160,12 @@ public sealed class McpChildServerRepoHandleTests
         ChildConversation conversation = await McpChildHarness.ConverseAsync(
             startInfo,
             [],
-            whileComplete: server => retained = ProcessFileFootprint.ExceptInherited(
-                ProcessFileFootprint.PathsUnder(server, RepoRoot.Directory), inherited));
+            whileComplete: server =>
+            {
+                IReadOnlyList<RetainedPath> scanned = ProcessFileFootprint.PathsUnder(server, RepoRoot.Directory);
+                IReadOnlyList<RetainedPath> acquired = ProcessFileFootprint.ExceptInherited(scanned, inherited);
+                retained = ProcessFileFootprint.ExceptInjected(acquired, injected);
+            });
 
         conversation.Handshake.ShouldNotBeNull(
             $"the MCP server never answered `initialize` over real stdio.\nstderr:\n{conversation.Diagnostics}");

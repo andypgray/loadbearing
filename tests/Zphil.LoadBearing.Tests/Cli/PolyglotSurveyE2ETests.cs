@@ -267,6 +267,48 @@ public sealed class PolyglotSurveyE2ETests
                 + "is not a clean solution.");
     }
 
+    [Fact]
+    public async Task CheckSarifChannel_OverAPolyglotSolution_WarnsThatTheScanCoveredPartOfTheSolution()
+    {
+        // Arrange — the render target with neither an exit code nor a prose channel to fall back on. Code
+        // scanning reads the log and nothing else, so a clean SARIF over this solution closes every alert
+        // the unreadable project would have raised, with nothing in the document saying it was never
+        // scanned. The same silence the two channels above deny, on the surface that cannot be re-read.
+        using var fixture = new TempFixtureWorkspace("TestSolutions/PolyglotApp", "PolyglotApp.slnx");
+        using TempDirectory temp = TestTempRoot.Fresh("polyglot-sarif");
+        string sarifPath = temp.PathOf("polyglot.sarif");
+
+        // Act
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", fixture.SolutionPath, "--spec", CliRunner.PolyglotSpecDll, "--sarif", sarifPath);
+
+        // Assert — one notification and no other, so a clean polyglot run is pinned to say exactly this
+        // much. The level is read off that notification rather than the log text because it carries the
+        // posture its JSON twin pins: a project this product cannot read makes the universe smaller, never
+        // wrong, so it warns beside the narrowing notice instead of gating like a failed load.
+        result.ShouldSucceed();
+        using JsonDocument log = JsonDocument.Parse(File.ReadAllText(sarifPath));
+        JsonElement notification = log.RootElement.GetProperty("runs")
+            .EnumerateArray()
+            .ShouldHaveSingleItem()
+            .GetProperty("invocations")
+            .EnumerateArray()
+            .ShouldHaveSingleItem()
+            .GetProperty("toolExecutionNotifications")
+            .EnumerateArray()
+            .ShouldHaveSingleItem();
+
+        notification.GetProperty("message")
+            .GetProperty("text")
+            .GetString()
+            .ShouldBe(
+                "1 project the solution declares was not surveyed, so these results cover part of the "
+                + "solution: PolyglotApp.Fs/PolyglotApp.Fs.fsproj (not a C# project)");
+        notification.GetProperty("level")
+            .GetString()
+            .ShouldBe("warning");
+    }
+
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
 
     // One section of the human survey: the lines between its heading and the blank line closing it.

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The rendered root block now names the install route.** The managed `AGENTS.md` block carries a
+  second meta-line directly after the provenance sentence: if the `loadbearing` command is missing
+  (a configured MCP server dies without it), install the tool with
+  `dotnet tool install -g Zphil.LoadBearing.Cli`, or run any verb without installing:
+  `dotnet dnx Zphil.LoadBearing.Cli --yes -- check <solution>`. The line exists for the reader a
+  dead MCP server leaves behind: a checkout can commit its MCP wiring but not the tool, so the
+  first session on a fresh clone meets a configured server that dies at launch. That failure reads
+  as a configuration problem rather than a missing install, and the committed block is the one
+  surface such a session reads without being pointed at it. The line is unpinned, unlike the live
+  server's recovery coda: a committed render has no running engine behind it, so there is no
+  same-engine promise for a version to back, and a pinned version in a committed file only rots.
+  Re-rendering updates the root block; scoped cards are unchanged.
+
 ## [0.7.0] - 2026-08-26
 
 ### Added

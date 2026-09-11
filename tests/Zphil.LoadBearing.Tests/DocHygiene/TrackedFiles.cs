@@ -25,6 +25,13 @@ namespace Zphil.LoadBearing.Tests.DocHygiene;
 ///         character set, so the day a path needs quoting the gate says so rather than silently
 ///         dropping the file.
 ///     </para>
+///     <para>
+///         The enumeration is forced at pipeline startup — <see cref="FixtureRestoreStartup" /> calls
+///         <see cref="EnsureEnumerated" /> before any test runs — because the spawn is a redirected
+///         child process, and fired lazily from whichever gate reads <see cref="All" /> first it would
+///         race the workspace-loading tests in <c>"Serial"</c>: the deadlock shape
+///         <see cref="SerialCollection" />'s remarks document.
+///     </para>
 /// </remarks>
 internal static class TrackedFiles
 {
@@ -63,6 +70,24 @@ internal static class TrackedFiles
     ///     doc nobody registered.
     /// </summary>
     public static IReadOnlyList<string> Markdown => LazyMarkdown.Value;
+
+    /// <summary>
+    ///     Forces the tracked-file inventory now, swallowing any failure: <see cref="Lazy{T}" /> caches
+    ///     a faulted enumeration, so a missing git still throws at the first gate that reads
+    ///     <see cref="All" />, naming itself. Surfacing the fault here instead would turn "the DocHygiene
+    ///     gates fail" into "the whole run fails to start".
+    /// </summary>
+    internal static void EnsureEnumerated()
+    {
+        try
+        {
+            _ = LazyAll.Value;
+        }
+        catch (Exception)
+        {
+            // Deliberately swallowed — the cached fault re-throws at the first gate that reads the set.
+        }
+    }
 
     private static bool IsCSharp(string relativePath)
     {

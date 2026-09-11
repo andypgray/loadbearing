@@ -75,14 +75,22 @@ jobs:
 
       # Build the whole solution — the slnx is the entire tree here, so this compiles every
       # shipping project directly.
+      #
+      # There is no explicit restore step in this job, so this is the restore, and it is implicit:
+      # -p:RestoreLockedMode=true is what holds every shipping project to its committed lock file
+      # here, rather than the runner happening to set CI=true. This is the job that pushes to
+      # nuget.org, so it is the one place a graph nobody committed must not be publishable. The pack
+      # below restores implicitly too and names the property for the same reason, even though the
+      # build above has already satisfied it. ci.yml's build-and-test Restore step carries the full
+      # rationale; the measurement behind it is on ci.yml's line too.
       - name: Build
-        run: dotnet build Zphil.LoadBearing.slnx -c Release
+        run: dotnet build Zphil.LoadBearing.slnx -c Release -p:RestoreLockedMode=true
 
       - name: Test
         run: dotnet test Zphil.LoadBearing.slnx -c Release --no-build
 
       - name: Pack (produces four .nupkg + four .snupkg)
-        run: dotnet pack Zphil.LoadBearing.slnx -c Release -o artifacts
+        run: dotnet pack Zphil.LoadBearing.slnx -c Release -o artifacts -p:RestoreLockedMode=true
 
       # nuget.org generates the VS Code MCP config only if the package holds an entry at
       # exactly `.mcp/server.json`. A backslash PackagePath mis-packs it as `.mcp//server.json`

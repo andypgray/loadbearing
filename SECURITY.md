@@ -31,7 +31,7 @@ The release also carries the Sigstore bundle (`attestation.intoto.jsonl`) for of
 
 The nuget.org copy differs. nuget.org appends a repository signature (`.signature.p7s`) after upload, which changes the file hash, so the attestation matches the GitHub release copy rather than the file you download from nuget.org. Use the GitHub release asset for digest verification, and `dotnet nuget verify <file>` for the nuget.org repository signature.
 
-`dotnet tool install -g Zphil.LoadBearing.Cli` and, where the working directory selects a .NET 10 SDK, `dnx Zphil.LoadBearing.Cli` install the same nuget.org package. `loadbearing --version` prints `<version>+<commit>`, and that commit matches the release tag on andypgray/loadbearing, a source cross-check that needs no tooling.
+`dotnet tool install -g Zphil.LoadBearing.Cli` and, on a machine with a .NET 10 SDK installed, `dotnet dnx Zphil.LoadBearing.Cli` fetch the same nuget.org package. `loadbearing --version` prints `<version>+<commit>`, and that commit matches the release tag on andypgray/loadbearing, a source cross-check that needs no tooling.
 
 ## Supply chain
 

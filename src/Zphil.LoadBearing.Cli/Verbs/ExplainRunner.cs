@@ -11,8 +11,9 @@ namespace Zphil.LoadBearing.Cli.Verbs;
 ///     The <c>explain</c> pipeline: load the model (the DLL fast path needs no workspace; convention or
 ///     a csproj loads one for resolution only, never extraction) → find the rule by ID → dump its
 ///     fields (<see cref="ExplainFormatter" />) → exit 0. An unknown ID is a <see cref="UserErrorException" />
-///     listing every available (post-desugar) ID, ordinal-sorted → exit 2. A missing ID argument never
-///     reaches here — System.CommandLine rejects it as a parse error, remapped to exit 2.
+///     listing every available (post-desugar) ID, ordinal-sorted → exit 2 — unless the ID is a JSON array
+///     written as text, which is named as that instead of rostered (<see cref="Refusals" />). A missing ID
+///     argument never reaches here — System.CommandLine rejects it as a parse error, remapped to exit 2.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -71,8 +72,15 @@ internal sealed class ExplainRunner(
         return source.Model;
     }
 
+    // A JSON array a client wrote into the string parameter is answered on its shape rather than with the
+    // roster: every ID the reader could want is inside their own brackets already.
     private static string UnknownRuleMessage(string ruleId, ArchitectureModel model)
     {
-        return Refusals.RuleNotFound($"Unknown rule ID '{ruleId}'", model);
+        var lead = $"Unknown rule ID '{ruleId}'";
+        IReadOnlyList<string>? elements = Refusals.StringifiedArrayElements(ruleId);
+
+        return elements is null
+            ? Refusals.RuleNotFound(lead, model)
+            : Refusals.StringifiedArrayMessage(lead, Refusals.SingleValueAdvice("pass one rule ID", elements));
     }
 }

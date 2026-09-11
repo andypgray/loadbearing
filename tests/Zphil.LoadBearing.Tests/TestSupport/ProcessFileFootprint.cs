@@ -136,10 +136,11 @@ internal static class ProcessFileFootprint
     ///     process actually acquired.
     /// </summary>
     /// <remarks>
-    ///     Only the handle scan is filtered, and only by exact path. A mapped view cannot be inherited: each
-    ///     process maps its own, so an image under the repository is always one this process loaded — which
-    ///     matters, because a mapped image is exactly how the spec-DLL retention this guards against
-    ///     manifested.
+    ///     Only the handle scan is filtered, and only by exact path. A mapped view cannot be
+    ///     <em>inherited</em> — each process maps its own — which matters, because a mapped image is exactly
+    ///     how the spec-DLL retention this guards against manifested. A view can still be <em>injected</em>,
+    ///     so an image under the repository is not always one the process chose; that is the other half of
+    ///     given-rather-than-acquired, and it belongs to <see cref="ExceptInjected" />.
     /// </remarks>
     internal static IReadOnlyList<RetainedPath> ExceptInherited(
         IReadOnlyList<RetainedPath> retained, IReadOnlyCollection<RetainedPath> inheritedHandles)
@@ -151,6 +152,50 @@ internal static class ProcessFileFootprint
 
         return retained
             .Where(path => path.Scan != FootprintScan.Handle || !handed.Contains(path.ResolvedPath))
+            .ToList();
+    }
+
+    /// <summary>
+    ///     The directory the CLR profiler this host runs under was loaded from, or <c>null</c> when nothing
+    ///     is profiling this process.
+    /// </summary>
+    /// <remarks>
+    ///     A CLR profiler is named by environment, and a child created from this process's environment loads
+    ///     it too — so images under this directory are forced into a child rather than chosen by it, no
+    ///     matter how the child was deployed. Read from the environment rather than written as literals,
+    ///     because the file names belong to whichever collector is in use and a hard-coded list would go
+    ///     stale in silence. The directory rather than the one file, because a profiler pulls its
+    ///     dependencies in from beside itself: measured under Microsoft.Testing.Extensions.CodeCoverage that
+    ///     is covrun64.dll loaded by MicrosoftInstrumentationEngine_x64.dll — two images for one variable.
+    /// </remarks>
+    internal static string? InjectedProfilerDirectory()
+    {
+        string? profiler = Environment.GetEnvironmentVariable("CORECLR_PROFILER_PATH_64")
+                           ?? Environment.GetEnvironmentVariable("CORECLR_PROFILER_PATH");
+
+        if (string.IsNullOrEmpty(profiler)) return null;
+
+        string? directory = Path.GetDirectoryName(profiler);
+        return string.IsNullOrEmpty(directory) ? null : Canonicalize(directory);
+    }
+
+    /// <summary>
+    ///     <paramref name="retained" /> minus everything under <paramref name="injectedProfilerDirectory" />
+    ///     — the images a profiler forces in, on either scan.
+    /// </summary>
+    /// <remarks>
+    ///     A null directory means nothing is profiling, and the list comes back untouched: a run without
+    ///     coverage measures exactly what it measured before this filter existed. Filtering by directory
+    ///     rather than by name keeps the rule attributable — everything excused is something the profiler
+    ///     brought, and a product assembly can never be under there.
+    /// </remarks>
+    internal static IReadOnlyList<RetainedPath> ExceptInjected(
+        IReadOnlyList<RetainedPath> retained, string? injectedProfilerDirectory)
+    {
+        if (injectedProfilerDirectory is null) return retained;
+
+        return retained
+            .Where(path => !IsUnder(path.ResolvedPath, injectedProfilerDirectory))
             .ToList();
     }
 

@@ -119,8 +119,9 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         [Description("Git ref; files changed since it that fall in a quarantined scope raise a tripwire warning.")]
         string? diffBase = null,
         [Description(
-            "Rule-ID globs, semicolon-separated ('*' spans '/'). Only matching rules run, so rules[] "
-            + "and summary cover that subset alone. Matching no rule is an error listing the available IDs.")]
+            "Rule-ID globs as one string, not an array, semicolon-separated ('*' spans '/'). Only matching "
+            + "rules run, so rules[] and summary cover that subset alone. Matching no rule is an error "
+            + "listing the available IDs.")]
         string? rules = null,
         [Description(
             "Elide each violation's sites, keeping every rule and every violation; siteCount (always "
@@ -201,7 +202,11 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         OpenWorld = false)]
     [Description(ContextDescription)]
     public async Task<string> ContextAsync(
-        [Description("A file or directory path (absolute or solution-relative) to find architecture scope cards for.")]
+        [Description(
+            "A file or directory path (absolute or solution-relative) as one string, not an array, to find "
+            + "architecture scope cards for. A path no card covers — including one the codebase does not "
+            + "contain yet — answers successfully saying so; a JSON array written as text is an error naming "
+            + "that shape rather than a no-coverage answer that was never asked the question.")]
         string path,
         CancellationToken cancellationToken = default)
     {
@@ -242,9 +247,9 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
             + "picks from. Still not a narrower subject.")]
         bool index = false,
         [Description(
-            "Project-name globs, semicolon-separated ('*' allowed). References in both directions are "
-            + "kept, so an edge can name a project outside the scope. Matching no project is an error listing "
-            + "the available names.")]
+            "Project-name globs as one string, not an array, semicolon-separated ('*' allowed). References "
+            + "in both directions are kept, so an edge can name a project outside the scope. Matching no "
+            + "project is an error listing the available names.")]
         string? projects = null,
         CancellationToken cancellationToken = default)
     {

@@ -31,7 +31,13 @@ namespace Zphil.LoadBearing.Tests.Hooks;
 ///         Both skip with a named reason away from Windows and away from a default Git home: the claim is
 ///         about one machine shape, and a tick earned anywhere else would be a fiction.
 ///     </para>
+///     <para>
+///         In the <see cref="SerialCollection">Serial</see> collection: the two Windows facts start the
+///         documented shell with both output channels redirected, which is the child a concurrent
+///         workspace load can deadlock.
+///     </para>
 /// </remarks>
+[Collection("Serial")]
 public sealed class McpRegistrationTests
 {
     /// <summary>Where a default Git for Windows install keeps the POSIX shell — off every PATH but Git Bash's own.</summary>

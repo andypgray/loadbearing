@@ -18,12 +18,17 @@ namespace Zphil.LoadBearing.Tests.TestSupport;
 ///         <b>What breaks without it.</b> Tests that spawn a child process with redirected stdout/stderr
 ///         (<see cref="TempGitRepo" /> and <see cref="Hooks.HookWrapperTests" /> → <c>git</c>,
 ///         <see cref="FixtureRestorer" /> → <c>dotnet restore</c>,
+///         <see cref="Hooks.McpLaunchScriptTests" /> and <see cref="Hooks.McpRegistrationTests" /> → <c>sh</c>,
 ///         <see cref="Mcp.Infrastructure.ParentProcessWatcherTests" /> → <c>cmd</c>) deadlock when a
 ///         workspace-loading test concurrently spawns a long-lived Roslyn <c>BuildHost</c>: the BuildHost
 ///         (or a reused MSBuild node) inherits a duplicate of the child's stdout write handle, so the read
 ///         never sees EOF and the whole run hangs. <see cref="Zphil.LoadBearing.Roslyn.Hosting.ChildProcess" /> bounds
 ///         the wait and kills the tree, so the hang becomes a timeout instead; serializing here removes the
-///         race entirely so that ceiling never trips.
+///         race entirely so that ceiling never trips. The one redirected child outside this collection
+///         is deliberate: the tracked-file inventory's <c>git ls-files</c>
+///         (<see cref="DocHygiene.TrackedFiles" />) is forced at pipeline startup by
+///         <see cref="FixtureRestoreStartup" />, before any test runs, so it cannot meet a concurrent
+///         BuildHost — a lazy first-touch spawn from a gate would put it right back in this race.
 ///     </para>
 ///     <para>
 ///         It covers process-global watchdog state too:

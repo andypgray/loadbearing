@@ -584,6 +584,25 @@ public sealed class CheckCommandE2ETests
         result.Out.ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task Check_RulesAsAStringifiedArray_RefusesOnTheShapeAndOmitsTheRoster()
+    {
+        // Act — what a client sends when it serializes a JSON array into the string parameter the schema
+        // advertises. The ID inside the brackets is a real one, which is what made the roster read as a
+        // contradiction: it named back the very ID the lead said nothing matched.
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll,
+            "--rules", """["layering/domain-independent"]""");
+
+        // Assert — the roster's absence is the point. Every name the reader could want is inside their own
+        // brackets, so the missing information is the shape, and the advice echoes the value to paste back.
+        result.ShouldRefuseWith(
+            "No rule matched '[\"layering/domain-independent\"]'. That is a JSON array written as text; "
+            + "pass the globs as one semicolon-separated string: 'layering/domain-independent'.");
+        result.Err.ShouldNotContain("Available rule IDs");
+        result.Out.ShouldBeEmpty();
+    }
+
     // One rule's block out of the human report: its marker line plus the indented lines under it. Needed
     // wherever an assertion is an ABSENCE — a type named by one rule and not another is invisible to a
     // whole-report ShouldNotContain.

@@ -16,7 +16,8 @@ internal static class ProcessFileFootprintAssertions
     ///     Asserts that <paramref name="process" /> holds nothing under <paramref name="root" /> — no mapped
     ///     view, no open handle — polling until it is true or the budget expires. Pass
     ///     <paramref name="inheritedHandles" /> (the launcher's own handles, taken before the process
-    ///     started) to exclude what it was handed rather than acquired.
+    ///     started) and <paramref name="injectedProfilerDirectory" /> (where a profiler was loaded from, if
+    ///     one is attached) to exclude what the process was given rather than acquired.
     /// </summary>
     /// <remarks>
     ///     Polling rather than a single shot because the subject is a live server: a tool call that has just
@@ -24,12 +25,17 @@ internal static class ProcessFileFootprintAssertions
     ///     retained one. A clean first scan passes immediately, so the budget costs nothing in the green
     ///     case; only a genuine leak pays it. The failure names every offender with both spellings, because
     ///     when this reds the useful question is <em>which</em> build output is pinned.
+    ///     <para>
+    ///         Both exclusions run inside the loop rather than over the caller's first scan, because the
+    ///         subject is re-scanned each poll and an unfiltered rescan would resurrect what was excused.
+    ///     </para>
     /// </remarks>
     internal static void ShouldEventuallyHoldNoPathsUnder(
         this Process process,
         string root,
         TimeSpan? budget = null,
-        IReadOnlyCollection<RetainedPath>? inheritedHandles = null)
+        IReadOnlyCollection<RetainedPath>? inheritedHandles = null,
+        string? injectedProfilerDirectory = null)
     {
         TimeSpan ceiling = budget ?? DefaultBudget;
         long start = Stopwatch.GetTimestamp();
@@ -39,6 +45,8 @@ internal static class ProcessFileFootprintAssertions
             IReadOnlyList<RetainedPath> retained = ProcessFileFootprint.PathsUnder(process, root);
             if (inheritedHandles is not null)
                 retained = ProcessFileFootprint.ExceptInherited(retained, inheritedHandles);
+
+            retained = ProcessFileFootprint.ExceptInjected(retained, injectedProfilerDirectory);
 
             if (retained.Count == 0) return;
 

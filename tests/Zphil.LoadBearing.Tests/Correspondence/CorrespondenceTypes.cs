@@ -9,6 +9,10 @@ namespace Zphil.LoadBearing.Tests.Correspondence;
 
 public class Simple;
 
+// Outer holds no members of its own because being nested in IS the shape under test, and the source copy
+// this is in lockstep with declares it exactly this way. Marking it static would put the two out of step
+// over a modifier neither rendering is measuring.
+// ReSharper disable once ConvertToStaticClass
 public class Outer
 {
     public class Inner;

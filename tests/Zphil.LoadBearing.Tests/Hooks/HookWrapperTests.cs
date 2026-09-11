@@ -31,8 +31,8 @@ namespace Zphil.LoadBearing.Tests.Hooks;
 ///     <para>
 ///         The <c>sh</c> arm is the gate proper — every CI OS has a POSIX shell, Git Bash supplying it on
 ///         Windows. The <c>pwsh</c> arm runs the same eleven cases where PowerShell 7 is installed and
-///         skips with a named reason where it is not, which is the case on the maintainer's machine (and
-///         why the local hook install uses the <c>.sh</c> variant at all).
+///         skips with a named reason where it is not — the shape that keeps the arm portable across
+///         machines that have PowerShell 7 and machines that do not.
 ///     </para>
 ///     <para>
 ///         The twin gate at the bottom is the other half: five wrappers ship the same contract region, and

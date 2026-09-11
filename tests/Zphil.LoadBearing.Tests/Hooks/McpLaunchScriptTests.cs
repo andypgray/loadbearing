@@ -28,7 +28,13 @@ namespace Zphil.LoadBearing.Tests.Hooks;
 ///         stray line on it is a protocol error before the handshake — so the prelude is redirected wholesale
 ///         and every case here asserts an empty stdout, including the two that fail.
 ///     </para>
+///     <para>
+///         In the <see cref="SerialCollection">Serial</see> collection: every case runs the launcher under
+///         a real shell with both output channels redirected, which is the child a concurrent workspace
+///         load can deadlock.
+///     </para>
 /// </remarks>
+[Collection("Serial")]
 public sealed class McpLaunchScriptTests
 {
     /// <summary>The file whose modification time and size key the copy, and the one the launcher execs.</summary>
