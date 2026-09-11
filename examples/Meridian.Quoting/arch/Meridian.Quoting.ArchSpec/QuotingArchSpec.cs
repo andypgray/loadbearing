@@ -34,7 +34,8 @@ public sealed class QuotingArchSpec : IArchitectureSpec
 
         arch.Rule("naming/interfaces")
             .Enforce(arch.Types.OfKind(TypeKind.Interface).InNamespace("Meridian.Quoting.*").MustHavePrefix("I"))
-            .Because("The `I` prefix is how a reader and an agent tell a port from its implementation at a glance; the convention stays total so the distinction is reliable.");
+            .Because("The `I` prefix is how a reader and an agent tell a port from its implementation at a glance; the convention stays total so the distinction is reliable.")
+            .Citation("https://learn.microsoft.com/dotnet/standard/design-guidelines/names-of-classes-structs-and-interfaces");
 
         arch.Rule("naming/controllers")
             .Enforce(arch.Types.InNamespace("Meridian.Quoting.Api.Controllers.*").MustHaveSuffix("Controller"))

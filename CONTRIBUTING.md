@@ -15,6 +15,8 @@ dotnet test Zphil.LoadBearing.slnx
 dotnet test Zphil.LoadBearing.slnx --filter "FullyQualifiedName~SpecValidationTests"
 ```
 
+One gate reaches the network and is off by default. Set `LOADBEARING_LINK_CHECK=1` and the suite HEADs every page the committed context blocks cite, failing on a 404 or 410; unset, it reports itself skipped with that reason, so a clone with no network still goes green. CI opts in on its Linux leg, and the release workflow opts in for the run that publishes.
+
 The suite runs on Microsoft.Testing.Platform rather than VSTest, because `xunit.v3` 4.0.0 ships a version of that platform the .NET 10 SDK declines to drive through the VSTest target. `global.json` selects the runner, and the test project carries neither `Microsoft.NET.Test.Sdk` nor `xunit.runner.visualstudio`. Filter expressions are unchanged, since `xunit.v3` accepts the VSTest filter syntax. VSTest's other options are rejected rather than ignored: `--logger "console;verbosity=normal"` stops the run before a test is discovered, and `--output Detailed` prints the per-test line it used to. A failing run exits 2 where VSTest exited 1, and a filter that matches nothing exits 8 where VSTest reported success.
 
 ## Test culture: pinned tests are the spec

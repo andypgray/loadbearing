@@ -31,12 +31,12 @@ Twelve rules of ordinary C# in [arch/Meridian.Interchange.ArchSpec/InterchangeAr
 | `http/reuse-httpclient` | Enforce | do not `new HttpClient()` |
 | `di/no-service-locator` | Enforce | do not resolve from the provider |
 | `di/no-buildserviceprovider` | Enforce | no `BuildServiceProvider` while configuring |
-| `async/no-sync-over-async` | Migrate | do not block on a `Task` |
+| `async/no-sync-over-async` | Migrate | do not block on a `Task` or a `ValueTask` |
 | `di/hosted-services-scope-their-work` | Enforce | a hosted service captures no scoped service |
 | `di/no-captive-dependencies` | Enforce | a singleton injects no scoped or transient service |
-| `naming/async-suffix` | Enforce | `Task`-returning methods end in `Async` |
-| `exceptions/no-general-catch` | Enforce | catch base `Exception` only in a top-level handler |
-| `async/accept-cancellation` | Enforce | `Task`-returning methods accept a `CancellationToken` |
+| `naming/async-suffix` | Enforce | authored `Task`/`ValueTask`-returning methods end in `Async` |
+| `exceptions/no-general-catch` | Enforce | swallow base `Exception` only in a top-level handler |
+| `async/accept-cancellation` | Enforce | authored `Task`/`ValueTask`-returning methods accept a `CancellationToken` |
 | `persistence/no-mapping-attributes` | Enforce | no `[Table]`/`[ComplexType]` on a persisted type |
 | `contracts/no-entity-exposure` | Enforce | do not expose `OutboxMessage` outside the `Outbox` cone |
 
@@ -88,14 +88,14 @@ The message carries all five components: the rule ID, the `because`, the `citati
 
 ## The burndown
 
-One rule ratchets. `LegacyManifestClient` adapts Meridian's own legacy manifest gateway, whose SDK exposes only synchronous entry points, so the adapter blocks at three points: serializing the manifest, taking the single-flight gate, and posting it. Those three lines touch four distinct blocking members (`Task<T>.GetAwaiter`, `TaskAwaiter<T>.GetResult`, `Task.Wait`, and `Task<T>.Result`), so the generated baseline carries four entries. Because they are grandfathered, `check` exits 0, and `loadbearing status` prints what is left to work off:
+One rule ratchets. `LegacyManifestClient` adapts Meridian's own legacy manifest gateway, whose SDK exposes only synchronous entry points, so the adapter blocks at three points: serializing the manifest, taking the single-flight gate, and posting it. Those three lines touch three distinct blocking members (`TaskAwaiter<T>.GetResult`, `Task.Wait`, and `Task<T>.Result`), so the generated baseline carries three entries. Because they are grandfathered, `check` exits 0, and `loadbearing status` prints what is left to work off:
 
 ```text
 pass di/construct-via-container
 pass http/reuse-httpclient
 pass di/no-service-locator
 pass di/no-buildserviceprovider
-pass async/no-sync-over-async (migrate) — 4 grandfathered remaining, 0 new, 0 fixed awaiting acceptance
+pass async/no-sync-over-async (migrate) — 3 grandfathered remaining, 0 new, 0 fixed awaiting acceptance
 pass di/hosted-services-scope-their-work
 pass di/no-captive-dependencies
 pass naming/async-suffix
@@ -103,10 +103,10 @@ pass exceptions/no-general-catch
 pass async/accept-cancellation
 pass persistence/no-mapping-attributes
 pass contracts/no-entity-exposure
-Checked 12 rules: 12 passed, 0 failed, 0 skipped. Burndown: 4 grandfathered remaining, 0 fixed awaiting acceptance.
+Checked 12 rules: 12 passed, 0 failed, 0 skipped. Burndown: 3 grandfathered remaining, 0 fixed awaiting acceptance.
 ```
 
-The four blocking calls are recorded, not accepted. New blocking anywhere in the worker is red on sight, and when the legacy SDK exposes an async surface and the corner is rewritten, the count drops to zero and the rule is ready to promote to `Enforce`.
+The three blocking calls are recorded, not accepted. New blocking anywhere in the worker is red on sight, and when the legacy SDK exposes an async surface and the corner is rewritten, the count drops to zero and the rule is ready to promote to `Enforce`.
 
 ## The captive dependency
 
@@ -143,7 +143,7 @@ The registrations this rule reads are the ones the source spells: `AddSingleton`
 
 ## The scoped catch
 
-`exceptions/no-general-catch` is green over a worker that catches narrowly. `OutboxProcessor` retries a failed send inside `catch (HttpRequestException)` and lets everything else surface; no type in the worker wraps its work in a blanket `catch (Exception)`, except the one that is meant to. The rule bans catching base `Exception` across `Meridian.Interchange.*` and excepts the types that derive from `BackgroundService`, here the dispatcher alone.
+`exceptions/no-general-catch` is green over a worker that catches narrowly. `OutboxProcessor` retries a failed send inside `catch (HttpRequestException)` and lets everything else surface; no type in the worker wraps its work in a blanket `catch (Exception)`, except the one that is meant to. The rule bans swallowing base `Exception` across `Meridian.Interchange.*` — catching it with no `when` filter and no rethrow, the composite a handler needs to hold a failure and carry on — and excepts the types that derive from `BackgroundService`, here the dispatcher alone.
 
 That one exception is the load-bearing part. `OutboxDispatcher.ExecuteAsync` wraps each poll in `catch (Exception)` and logs, because on modern .NET an unhandled exception out of a `BackgroundService` stops the host. The poll loop is the worker's top-level handler, the one site the guidance sanctions a catch-all. CA1031 (Do not catch general exception types) would flag the dispatcher's site; the spec sanctions it by scope and holds the ban everywhere else.
 
@@ -159,18 +159,18 @@ catch (Exception)
 `dotnet build` is green: a blanket `catch (Exception)` is valid C#. `check` is not:
 
 ```text
-FAIL exceptions/no-general-catch — Types in `Meridian.Interchange.*`, except types derived from `BackgroundService`, must not catch `Exception`.
-  because: Catching base Exception outside a top-level handler swallows the faults you meant to see; the dispatcher's poll loop is that handler, so scope the catch-all there and let other code catch only the specific types it can handle.
+FAIL exceptions/no-general-catch — Types in `Meridian.Interchange.*`, except types derived from `BackgroundService`, must not swallow `Exception`.
+  because: Catching base Exception outside a top-level handler swallows the faults you meant to see; scope the catch-all to that handler and let other code catch only the specific types it can handle.
   citation: https://learn.microsoft.com/dotnet/standard/design-guidelines/using-standard-exception-types
   fix: Catch the specific exception you can handle; the only sanctioned catch-all is the dispatcher's poll loop, where OutboxDispatcher logs and continues to the next poll.
   src/Meridian.Interchange/Processing/OutboxProcessor.cs:32 — Meridian.Interchange.Processing.OutboxProcessor catches System.Exception
 ```
 
-The match is exact: `MustNotCatch(typeof(Exception))` flags a catch of base `Exception`, and a `catch (TimeoutException)` beside it stays invisible to the rule, which is the good state the guidance wants. Revert the catch and `check` is exit 0 again.
+The match is exact: `MustNotSwallow(typeof(Exception))` flags a catch of base `Exception`, and a `catch (TimeoutException)` beside it stays invisible to the rule, which is the good state the guidance wants. Add a `when` filter to the blanket catch, or end its block in `throw`, and the site goes green without narrowing the type: either one leaves the failure visible, so neither is a swallow. Revert the catch and `check` is exit 0 again.
 
 ## The flowed token
 
-`async/accept-cancellation` is green over a worker that carries a token the whole way down. Every `Task`-returning method in `Meridian.Interchange.*` accepts a `CancellationToken`: `OutboxDispatcher.ExecuteAsync` receives the host's `stoppingToken`, `ScopedDispatchRunner` and `OutboxProcessor` pass it to the calls they make, and the partner clients and the outbox store take it at the leaf. The rule requires the parameter on every one of them.
+`async/accept-cancellation` is green over a worker that carries a token the whole way down. Every `Task`-returning method on an authored type in `Meridian.Interchange.*` accepts a `CancellationToken`: `OutboxDispatcher.ExecuteAsync` receives the host's `stoppingToken`, `ScopedDispatchRunner` and `OutboxProcessor` pass it to the calls they make, and the partner clients and the outbox store take it at the leaf. The rule requires the parameter on every one of them.
 
 ```csharp
 DotNetGuidance.AcceptCancellation(arch, arch.Types.InNamespace("Meridian.Interchange.*"), PackPosture.Enforce,
@@ -199,8 +199,8 @@ await runner.RunPendingAsync();
 `dotnet build` is green: dropping a parameter is valid C#. `check` is not:
 
 ```text
-FAIL async/accept-cancellation — Methods of types in `Meridian.Interchange.*` returning `Task` or `Task<TResult>` must accept a parameter of type `CancellationToken`.
-  because: Accepting a CancellationToken lets a caller stop in-flight async work and flow that request on to the calls it makes, so a Task-returning method without one cannot take part in cooperative cancellation.
+FAIL async/accept-cancellation — Methods of authored types in `Meridian.Interchange.*` returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` must accept a parameter of type `CancellationToken`.
+  because: Accepting a CancellationToken lets a caller stop in-flight async work and flow that request on to the calls it makes, so a Task- or ValueTask-returning method without one cannot take part in cooperative cancellation.
   citation: https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap
   fix: Add a CancellationToken parameter and flow OutboxDispatcher's stoppingToken through the call chain, as ScopedDispatchRunner and OutboxProcessor already do.
   src/Meridian.Interchange/Host/ScopedDispatchRunner.cs:13 — Meridian.Interchange.Host.ScopedDispatchRunner.RunPendingAsync()
@@ -292,7 +292,7 @@ Every rule cites the page it enforces. The quoted phrase below is drawn from tha
 | `persistence/no-mapping-attributes` | "Persistence-specific required attributes" | [Architectural principles](https://learn.microsoft.com/dotnet/architecture/modern-web-apps-azure/architectural-principles) |
 | `contracts/no-entity-exposure` | "Use ViewModels specifically made for client apps, independent from domain model constraints" | [CQRS reads/queries](https://learn.microsoft.com/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/cqrs-microservice-reads) |
 
-Four rules share the DI guidelines page, which is one document covering construction, the service-locator anti-pattern, `BuildServiceProvider`, and the captive-dependency anti-pattern across its recommendations and anti-patterns sections. The TAP page is cited twice, once for the `Async` suffix and once for the `CancellationToken` parameter, the two conventions it fixes for a `Task`-returning method.
+Four rules share the DI guidelines page, which is one document covering construction, the service-locator anti-pattern, `BuildServiceProvider`, and the captive-dependency anti-pattern across its recommendations and anti-patterns sections. The TAP page is cited twice, once for the `Async` suffix and once for the `CancellationToken` parameter, the two conventions it fixes for a method returning a `Task` or a `ValueTask`.
 
 ## Pairing with analyzers
 
@@ -302,12 +302,12 @@ Several rules have a neighbor in the analyzer ecosystem. What none of those neig
 - `di/no-buildserviceprovider`: ASP0000 warns on `BuildServiceProvider`, but only in the ASP.NET Core `Startup`/`ConfigureServices` shape. This rule is solution-wide and independent of that shape.
 - `async/no-sync-over-async`: VSTHRD002, VSTHRD103, MA0045, and AsyncFixer02 all detect blocking on a `Task`, blanket-wide. The delta is the posture: this rule grandfathers the one legacy corner on a counted baseline and holds the line against new blocking, where the analyzers give one global on/off with no scoped exemption and no ratchet.
 - `di/hosted-services-scope-their-work`: the container's `ValidateOnBuild`/`ValidateScopes` catches a captured scoped service, but at runtime, when the host builds. This rule catches the capture statically, in CI and in the agent's edit loop, before the app runs.
-- `di/no-captive-dependencies`: two community analyzers, Excubo.Analyzers.DependencyInjectionValidation and georgepwall1991/DependencyInjection.Lifetime.Analyzers, flag a captive dependency statically, each within a single compilation, while the runtime scope validation named above throws only when the host builds. The delta is whole-solution reach across a registration and a constructor that can live in different projects, and the citation carried in the reason.
-- `naming/async-suffix`: VSTHRD200 enforces the `Async` suffix, blanket-wide. The delta is scoping (this rule names the `Meridian.Interchange.*` cone) and the citation carried in the reason.
-- `exceptions/no-general-catch`: CA1031 (Do not catch general exception types) flags every `catch (System.Exception)`, blanket-wide, and is widely turned off because the one place a catch-all belongs (the top-level handler) trips it too. The delta is scoping: this rule excepts `BackgroundService`-derived types, so the dispatcher's poll loop is sanctioned while the ban holds across the rest of the worker, and the citation rides in the reason.
+- `di/no-captive-dependencies`: two community analyzers, Excubo.Analyzers.DependencyInjectionValidation and georgepwall1991/DependencyInjection.Lifetime.Analyzers, flag a captive dependency statically, each within a single compilation, while the runtime scope validation named above throws only when the host builds. The delta is whole-solution reach across a registration and a constructor that can live in different projects, and the citation the rule carries.
+- `naming/async-suffix`: VSTHRD200 enforces the `Async` suffix, blanket-wide. The delta is scoping: this rule names the `Meridian.Interchange.*` cone and, within it, the types an author wrote, so a generator that emits a `Task`-returning method under another convention is out of reach rather than suppressed one attribute at a time. The citation rides on the rule.
+- `exceptions/no-general-catch`: CA1031 (Do not catch general exception types) flags every `catch (System.Exception)`, blanket-wide, and is widely turned off because the one place a catch-all belongs (the top-level handler) trips it too. Two things differ. The rule excepts `BackgroundService`-derived types, so the dispatcher's poll loop is sanctioned while the ban holds across the rest of the worker; and it reads the filter and the rethrow, so a `catch (Exception) when (…)` and a catch that ends in `throw` are lawful where CA1031 flags them anyway. The citation rides on the rule.
 - `async/accept-cancellation`: CA1068 (CancellationToken parameters must come last) governs the position of a token that is already present, not whether one is present. Meziantou's MA0032, MA0040, and MA0079 flag a call site that forwards no token when one is in scope. Both act only once a token exists on the surface; requiring the parameter there in the first place is the white space this rule fills across `Meridian.Interchange.*`. The match is definition-level and exact: a `CancellationToken?` or a `params CancellationToken[]` parameter is a different declared type and does not satisfy the rule.
 - `persistence/no-mapping-attributes`: ArchUnitNET and NetArchTest can both assert that a type does not carry a given attribute, in hand-written test code, so the check is expressible elsewhere. The delta is the usual one: this rule is turnkey and declarative, runs whole-solution, and renders into the agent's context with its citation. No analyzer polices mapping attributes on a domain type; persistence ignorance is a documented principle with no build-time enforcer of its own.
-- `contracts/no-entity-exposure`: CA1002 (Do not expose generic lists) is the closest shadow, and it fires on one shape only (a `List<T>` surfacing on a public member), not on the exposure of an arbitrary named type across a layer boundary. No analyzer polices a domain entity reaching a public signature; this rule does, scoped to the `Meridian.Interchange.*` cone (excepting the entity's `Outbox` home), turnkey and declarative, with the citation carried in the reason.
+- `contracts/no-entity-exposure`: CA1002 (Do not expose generic lists) is the closest shadow, and it fires on one shape only (a `List<T>` surfacing on a public member), not on the exposure of an arbitrary named type across a layer boundary. No analyzer polices a domain entity reaching a public signature; this rule does, scoped to the `Meridian.Interchange.*` cone (excepting the entity's `Outbox` home), turnkey and declarative, with the citation the rule carries.
 - `di/no-service-locator`: one honesty note. This rule bans the `GetService`/`GetRequiredService` members, and a ban on an interface member catches a call through that interface, not a call through a concrete type that re-declares the member. In this worker every resolve goes through `IServiceProvider` or the `ServiceProviderServiceExtensions` methods, so the ban is complete here; a codebase that resolved through a concrete container type would need that type named too.
 
 ## Introduce a violation
@@ -327,8 +327,8 @@ FAIL di/hosted-services-scope-their-work — Types derived from `BackgroundServi
 Rename `IOutboxProcessor.ProcessPendingAsync` to `ProcessPending` (with its implementation and the one call site in `ScopedDispatchRunner`, so it compiles). Both the interface and the class now declare a `Task`-returning method without the suffix, so the rule fires on both:
 
 ```text
-FAIL naming/async-suffix — Methods of types in `Meridian.Interchange.*` returning `Task` or `Task<TResult>` must be named `*Async`.
-  because: Task-returning methods carry the Async suffix so callers see at the call site that a method must be awaited.
+FAIL naming/async-suffix — Methods of authored types in `Meridian.Interchange.*` returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` must be named `*Async`.
+  because: Task- and ValueTask-returning methods carry the Async suffix so callers see at the call site that a method must be awaited.
   citation: https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap
   fix: Rename the method to end in Async.
   src/Meridian.Interchange/Processing/IOutboxProcessor.cs:7 — Meridian.Interchange.Processing.IOutboxProcessor.ProcessPending()

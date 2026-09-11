@@ -13,9 +13,9 @@ namespace Meridian.Interchange.ArchSpec;
 ///     partners over HTTP. Its rules encode canonical Microsoft .NET guidance: partner clients are
 ///     wired through the composition root, HttpClients come from the factory, nothing resolves from
 ///     the provider outside that root, the hosted service scopes its own work, base Exception is
-///     caught only in a top-level handler, and Task-returning methods carry the Async suffix — with
-///     the one legacy manifest corner that still blocks
-///     grandfathered until its gateway goes async.
+///     swallowed only in a top-level handler, and awaitable-returning methods carry the Async suffix
+///     — with the one legacy manifest corner that still blocks grandfathered until its gateway goes
+///     async.
 ///     <para>
 ///         Nine of the twelve are canonical .NET guidance that nothing here makes special, so they
 ///         come from the shared <c>DotNetGuidance</c> pack rather than being written again: the pack
@@ -34,7 +34,7 @@ public sealed class InterchangeArchSpec : IArchitectureSpec
 
         // 1 — DI guidelines: no direct instantiation of dependent classes outside the composition root.
         arch.Rule("di/construct-via-container")
-            .Enforce(arch.Types.Except(host).MustNotConstruct(arch.Types.Implementing(typeof(IPartnerClient))))
+            .Enforce(arch.Types.Except(host).MustNotConstruct(arch.Types.Implementing<IPartnerClient>()))
             .Because("Partner clients are wired with their pooled HttpClient and options in the composition root; constructing one elsewhere bypasses that wiring and the registered lifetime.")
             .Citation("https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines")
             .Fix("Inject IPartnerClient (or IEnumerable<IPartnerClient>); the composition root owns wiring.");

@@ -86,11 +86,12 @@ internal sealed class InlineNineSpec : IArchitectureSpec
                 arch.Types.MustNotUse(
                     arch.Member<Task>(t => t.Wait()),
                     arch.Member<Task<object>>(t => t.Result),
-                    arch.Member<Task>(t => t.GetAwaiter()),
-                    arch.Member<Task<object>>(t => t.GetAwaiter()),
+                    arch.Member<ValueTask<object>>(t => t.Result),
                     arch.Member(typeof(TaskAwaiter), nameof(TaskAwaiter.GetResult)),
-                    arch.Member(typeof(TaskAwaiter<>), nameof(TaskAwaiter<>.GetResult))))
-            .Because("Blocking on a Task (.Result/.Wait/.GetResult) ties up a thread and can deadlock in a captured context; await instead.")
+                    arch.Member(typeof(TaskAwaiter<>), nameof(TaskAwaiter<>.GetResult)),
+                    arch.Member(typeof(ValueTaskAwaiter), nameof(ValueTaskAwaiter.GetResult)),
+                    arch.Member(typeof(ValueTaskAwaiter<>), nameof(ValueTaskAwaiter<>.GetResult))))
+            .Because("Blocking on a Task or ValueTask (.Result/.Wait/.GetResult) ties up a thread and can deadlock in a captured context; await instead.")
             .Citation("https://learn.microsoft.com/dotnet/csharp/asynchronous-programming/async-scenarios")
             .Fix("Await the call and make the method async; the legacy corner is grandfathered until the SDK exposes async.");
 
@@ -104,24 +105,26 @@ internal sealed class InlineNineSpec : IArchitectureSpec
             .Fix("Resolve the scoped or transient service per unit of work inside an IServiceScopeFactory scope, as ScopedDispatchRunner does; take only singleton-safe dependencies in the constructor.");
 
         arch.Rule("naming/async-suffix")
-            .Enforce(arch.Types.InNamespace("Meridian.Interchange.*").Methods.Returning(typeof(Task), typeof(Task<>))
+            .Enforce(arch.Types.InNamespace("Meridian.Interchange.*").Authored().Methods
+                .Returning(typeof(Task), typeof(Task<>), typeof(ValueTask), typeof(ValueTask<>))
                 .MustHaveSuffix("Async"))
-            .Because("Task-returning methods carry the Async suffix so callers see at the call site that a method must be awaited.")
+            .Because("Task- and ValueTask-returning methods carry the Async suffix so callers see at the call site that a method must be awaited.")
             .Citation("https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap")
             .Fix("Rename the method to end in Async.");
 
         arch.Rule("exceptions/no-general-catch")
             .Enforce(arch.Types.InNamespace("Meridian.Interchange.*")
                 .Except(arch.Types.DerivedFrom<BackgroundService>())
-                .MustNotCatch(typeof(Exception)))
-            .Because("Catching base Exception outside a top-level handler swallows the faults you meant to see; the dispatcher's poll loop is that handler, so scope the catch-all there and let other code catch only the specific types it can handle.")
+                .MustNotSwallow(typeof(Exception)))
+            .Because("Catching base Exception outside a top-level handler swallows the faults you meant to see; scope the catch-all to that handler and let other code catch only the specific types it can handle.")
             .Citation("https://learn.microsoft.com/dotnet/standard/design-guidelines/using-standard-exception-types")
             .Fix("Catch the specific exception you can handle; the only sanctioned catch-all is the dispatcher's poll loop, where OutboxDispatcher logs and continues to the next poll.");
 
         arch.Rule("async/accept-cancellation")
-            .Enforce(arch.Types.InNamespace("Meridian.Interchange.*").Methods.Returning(typeof(Task), typeof(Task<>))
+            .Enforce(arch.Types.InNamespace("Meridian.Interchange.*").Authored().Methods
+                .Returning(typeof(Task), typeof(Task<>), typeof(ValueTask), typeof(ValueTask<>))
                 .MustAcceptParameter(typeof(CancellationToken)))
-            .Because("Accepting a CancellationToken lets a caller stop in-flight async work and flow that request on to the calls it makes, so a Task-returning method without one cannot take part in cooperative cancellation.")
+            .Because("Accepting a CancellationToken lets a caller stop in-flight async work and flow that request on to the calls it makes, so a Task- or ValueTask-returning method without one cannot take part in cooperative cancellation.")
             .Citation("https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap")
             .Fix("Add a CancellationToken parameter and flow OutboxDispatcher's stoppingToken through the call chain, as ScopedDispatchRunner and OutboxProcessor already do.");
 

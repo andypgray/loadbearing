@@ -175,10 +175,10 @@ public static class AgentContextRenderer
 
     /// <summary>
     ///     A quarantined scope's context card (without the provenance line, which the splice pipeline adds
-    ///     once per file): the scope heading, the containment law and rationale, the load-bearing-
-    ///     weirdness dragons prose (inline <c>Dragons:</c> paragraph and/or a linked <c>Dragons doc</c>
-    ///     bullet — one of the two is spec-guaranteed), the sanctioned surface (omitted for
-    ///     a hermetic quarantine), and the <c>explain</c> pointer.
+    ///     once per file): the scope heading, a lede naming what the scope covers, the containment law and
+    ///     rationale, the load-bearing-weirdness dragons prose (inline <c>Dragons:</c> paragraph and/or a
+    ///     linked <c>Dragons doc</c> bullet — one of the two is spec-guaranteed), the sanctioned surface
+    ///     (omitted for a hermetic quarantine), and the <c>explain</c> pointer.
     /// </summary>
     /// <remarks>
     ///     This is the scoped, per-directory story the agents editing dragon territory read.
@@ -189,8 +189,6 @@ public static class AgentContextRenderer
         if (containmentRule.Scope is not { Role: ScopeRole.Containment } quarantine)
             throw new ArgumentException("ScopeCard requires a Quarantine containment rule.", nameof(containmentRule));
 
-        string scopeId = quarantine.ScopeId;
-
         var bullets = new List<string>
         {
             $"- {ProseFormat.Backtick(containmentRule.Id)} — {containmentRule.Sentence} {containmentRule.Because}"
@@ -199,9 +197,7 @@ public static class AgentContextRenderer
             bullets.Add($"- Sanctioned surface: {ProseFormat.JoinInventory(quarantine.Surface)}.");
 
         return ScopeCardBody(
-            $"## Quarantined scope {ProseFormat.Backtick(scopeId)}",
-            $"This directory holds the quarantined {ProseFormat.Backtick(scopeId)} scope. " +
-            "Here be dragons — do not spread references into it.",
+            "quarantined", "do not spread references into it.",
             bullets, quarantine, containmentRule.Id);
     }
 
@@ -215,9 +211,7 @@ public static class AgentContextRenderer
     /// <remarks>
     ///     The twin of <see cref="ScopeCard" /> for the posture with no containment law, so it names no
     ///     boundary and never tells the reader to keep out — a caution's whole point is that new callers
-    ///     are welcome and the weirdness is what wants reading first. The lede states the scoped selection
-    ///     because there is no containment sentence to state it: a quarantine card's law bullet names the
-    ///     subject, and a caution has no law.
+    ///     are welcome and the weirdness is what wants reading first.
     /// </remarks>
     public static string CautionCard(ArchRule tripwireRule)
     {
@@ -226,8 +220,6 @@ public static class AgentContextRenderer
             || tripwireRule.Scope is not { Role: ScopeRole.Tripwire } caution)
             throw new ArgumentException("CautionCard requires a Caution tripwire rule.", nameof(tripwireRule));
 
-        string scopeId = caution.ScopeId;
-
         var bullets = new List<string>
         {
             $"- {ProseFormat.Backtick(tripwireRule.Id)} — a change set touching this scope is flagged by " +
@@ -235,22 +227,27 @@ public static class AgentContextRenderer
         };
 
         return ScopeCardBody(
-            $"## Cautioned scope {ProseFormat.Backtick(scopeId)}",
-            $"This directory holds the cautioned {ProseFormat.Backtick(scopeId)} scope: " +
-            $"{SentenceRenderer.Reference(caution.Scoped)}. Here be dragons — the weirdness below is load-bearing; " +
-            "read it before you edit, and do not tidy it away.",
+            "cautioned",
+            "the weirdness below is load-bearing; read it before you edit, and do not tidy it away.",
             bullets, caution, tripwireRule.Id);
     }
 
     // The body both scope cards share, so they agree on shape by construction rather than by copy: the
     // posture's heading and lede, its own opening bullets, then the parts every scope card carries.
+    // The lede names what the scope covers because the card lands on a directory and `arch_context`
+    // returns it for every sibling there — a single-type scope inside a directory of ordinary code would
+    // otherwise claim the whole directory. It narrows the claim, not the placement.
     private static string ScopeCardBody(
-        string heading, string lede, List<string> bullets, ScopeData scope, string ruleId)
+        string posture, string warning, List<string> bullets, ScopeData scope, string ruleId)
     {
         // The linked long-form doc is a backticked solution-relative path (the spec stays the index),
         // not a rebased markdown link.
         if (scope.DragonsDoc is { } dragonsDoc) bullets.Add($"- Dragons doc: {ProseFormat.Backtick(dragonsDoc)}.");
         bullets.Add($"- Expand: {ProseFormat.Backtick($"loadbearing explain {ruleId}")}.");
+
+        var heading = $"## {ProseFormat.Capitalize(posture)} scope {ProseFormat.Backtick(scope.ScopeId)}";
+        string lede = $"This directory holds the {posture} {ProseFormat.Backtick(scope.ScopeId)} scope: " +
+                      $"{SentenceRenderer.Reference(scope.Scoped)}. Here be dragons — {warning}";
 
         var sections = new List<string> { heading, lede };
         if (scope.Dragons is { } dragons) sections.Add($"Dragons: {dragons}");

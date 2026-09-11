@@ -193,7 +193,15 @@ jobs:
       # is the only image that runs it at all. One more skips everywhere: the live agent-hook wrapper
       # comparison needs `.claude/arch-hook.sh`, which is gitignored, so no runner has ever had it.
       # Each skip carries its own reason in the log; that is where to read what a given leg left out.
+      #
+      # One fact reaches the network: the citation link check HEADs every page the committed context
+      # blocks cite. It is opt-in, and ubuntu is the single leg that opts in — one outward leg, the
+      # same shape as the manifest-version job's nuget.org read — so the other three skip with the
+      # reason rather than making a public run depend on learn.microsoft.com four times over. A
+      # runner that cannot reach the pages at all reports the same skip, naming them.
       - name: Test
+        env:
+          LOADBEARING_LINK_CHECK: ${{ matrix.os == 'ubuntu-latest' && 'true' || '' }}
         run: dotnet test Zphil.LoadBearing.slnx --no-build --output Detailed
 
   # Packs on Linux, then does two things with the result. First, asserts the MCP manifest lands at

@@ -97,7 +97,7 @@ Demurrage is in the map as a module and pinned again as a quarantined scope. It 
 
 ## Quarantined scope `demurrage/engine`
 
-This directory holds the quarantined `demurrage/engine` scope. Here be dragons — do not spread references into it.
+This directory holds the quarantined `demurrage/engine` scope: the Demurrage layer. Here be dragons — do not spread references into it.
 
 Dragons: Demurrage engine: it counts free-time then billable days between discharge and gate-out and prices them across tariff tiers. The free-time clock advances only on port working days, and billing is first-day-exclusive, last-day-inclusive per the carrier tariff sheet; counting calendar days instead, or 'correcting' that off-by-one, reprices every real container. The tariff tiers are non-contiguous and keyed by a day's billable ordinal, not by calendar span. Call in only through IDemurrageCalculator.
 

@@ -111,8 +111,8 @@ public static class DotNetGuidance
     }
 
     /// <summary>
-    ///     <c>async/no-sync-over-async</c> — nothing blocks on a <see cref="Task" /> via
-    ///     <c>Wait</c>/<c>Result</c>/<c>GetResult</c>.
+    ///     <c>async/no-sync-over-async</c> — nothing blocks on a <see cref="Task" /> or a
+    ///     <see cref="ValueTask" /> via <c>Wait</c>/<c>Result</c>/<c>GetResult</c>.
     /// </summary>
     /// <param name="arch">The spec's stage-machine entry point.</param>
     /// <param name="subject">The types the rule governs.</param>
@@ -125,13 +125,14 @@ public static class DotNetGuidance
         Constraint constraint = subject.MustNotUse(
             arch.Member(typeof(Task), nameof(Task.Wait)),
             arch.Member(typeof(Task<>), nameof(Task<>.Result)),
-            arch.Member(typeof(Task), nameof(Task.GetAwaiter)),
-            arch.Member(typeof(Task<>), nameof(Task<>.GetAwaiter)),
+            arch.Member(typeof(ValueTask<>), nameof(ValueTask<>.Result)),
             arch.Member(typeof(TaskAwaiter), nameof(TaskAwaiter.GetResult)),
-            arch.Member(typeof(TaskAwaiter<>), nameof(TaskAwaiter<>.GetResult)));
+            arch.Member(typeof(TaskAwaiter<>), nameof(TaskAwaiter<>.GetResult)),
+            arch.Member(typeof(ValueTaskAwaiter), nameof(ValueTaskAwaiter.GetResult)),
+            arch.Member(typeof(ValueTaskAwaiter<>), nameof(ValueTaskAwaiter<>.GetResult)));
 
         Declare(rule, constraint, posture,
-            "Blocking on a Task (.Result/.Wait/.GetResult) ties up a thread and can deadlock in a captured context; await instead.",
+            "Blocking on a Task or ValueTask (.Result/.Wait/.GetResult) ties up a thread and can deadlock in a captured context; await instead.",
             "https://learn.microsoft.com/dotnet/csharp/asynchronous-programming/async-scenarios",
             "Await the call and make the method async.",
             fix);
@@ -161,21 +162,23 @@ public static class DotNetGuidance
     }
 
     /// <summary>
-    ///     <c>naming/async-suffix</c> — <see cref="Task" />-returning methods of
-    ///     <paramref name="subject" /> carry the <c>Async</c> suffix.
+    ///     <c>naming/async-suffix</c> — the <see cref="Task" />- and <see cref="ValueTask" />-returning
+    ///     methods of <paramref name="subject" /> carry the <c>Async</c> suffix.
     /// </summary>
     /// <param name="arch">The spec's stage-machine entry point.</param>
-    /// <param name="subject">The types whose methods the rule governs; the pack applies the method projection.</param>
+    /// <param name="subject">The types whose methods the rule governs; the pack narrows to authored types and applies the method projection.</param>
     /// <param name="posture">Enforce, or Migrate with the project's counter-prior prose.</param>
     /// <param name="fix">A project-specific remediation hint, replacing the pack's generic one.</param>
     public static void AsyncSuffix(
         Arch arch, Selection subject, PackPosture posture, string? fix = null)
     {
         IRuleBuilder rule = arch.Rule("naming/async-suffix");
-        Constraint constraint = subject.Methods.Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async");
+        Constraint constraint = subject.Authored().Methods
+            .Returning(typeof(Task), typeof(Task<>), typeof(ValueTask), typeof(ValueTask<>))
+            .MustHaveSuffix("Async");
 
         Declare(rule, constraint, posture,
-            "Task-returning methods carry the Async suffix so callers see at the call site that a method must be awaited.",
+            "Task- and ValueTask-returning methods carry the Async suffix so callers see at the call site that a method must be awaited.",
             TaskAsyncPattern,
             "Rename the method to end in Async.",
             fix);
@@ -183,7 +186,7 @@ public static class DotNetGuidance
 
     /// <summary>
     ///     <c>exceptions/no-general-catch</c> — nothing outside
-    ///     <paramref name="topLevelHandler" /> catches base <see cref="Exception" />.
+    ///     <paramref name="topLevelHandler" /> catches and holds base <see cref="Exception" />.
     /// </summary>
     /// <param name="arch">The spec's stage-machine entry point.</param>
     /// <param name="subject">The types the rule governs.</param>
@@ -194,31 +197,33 @@ public static class DotNetGuidance
         Arch arch, Selection subject, Selection topLevelHandler, PackPosture posture, string? fix = null)
     {
         IRuleBuilder rule = arch.Rule("exceptions/no-general-catch");
-        Constraint constraint = subject.Except(topLevelHandler).MustNotCatch(typeof(Exception));
+        Constraint constraint = subject.Except(topLevelHandler).MustNotSwallow(typeof(Exception));
 
         Declare(rule, constraint, posture,
-            "Catching base Exception outside a top-level handler swallows the faults you meant to see; the dispatcher's poll loop is that handler, so scope the catch-all there and let other code catch only the specific types it can handle.",
+            "Catching base Exception outside a top-level handler swallows the faults you meant to see; scope the catch-all to that handler and let other code catch only the specific types it can handle.",
             "https://learn.microsoft.com/dotnet/standard/design-guidelines/using-standard-exception-types",
-            "Catch the specific exception you can handle; leave the catch-all to the top-level handler.",
+            "Catch the specific exception you can handle, filter with `when`, or rethrow after cleanup; leave the catch-all to the top-level handler.",
             fix);
     }
 
     /// <summary>
-    ///     <c>async/accept-cancellation</c> — <see cref="Task" />-returning methods of
-    ///     <paramref name="subject" /> accept a <see cref="CancellationToken" />.
+    ///     <c>async/accept-cancellation</c> — the <see cref="Task" />- and <see cref="ValueTask" />-returning
+    ///     methods of <paramref name="subject" /> accept a <see cref="CancellationToken" />.
     /// </summary>
     /// <param name="arch">The spec's stage-machine entry point.</param>
-    /// <param name="subject">The types whose methods the rule governs; the pack applies the method projection.</param>
+    /// <param name="subject">The types whose methods the rule governs; the pack narrows to authored types and applies the method projection.</param>
     /// <param name="posture">Enforce, or Migrate with the project's counter-prior prose.</param>
     /// <param name="fix">A project-specific remediation hint, replacing the pack's generic one.</param>
     public static void AcceptCancellation(
         Arch arch, Selection subject, PackPosture posture, string? fix = null)
     {
         IRuleBuilder rule = arch.Rule("async/accept-cancellation");
-        Constraint constraint = subject.Methods.Returning(typeof(Task), typeof(Task<>)).MustAcceptParameter(typeof(CancellationToken));
+        Constraint constraint = subject.Authored().Methods
+            .Returning(typeof(Task), typeof(Task<>), typeof(ValueTask), typeof(ValueTask<>))
+            .MustAcceptParameter<CancellationToken>();
 
         Declare(rule, constraint, posture,
-            "Accepting a CancellationToken lets a caller stop in-flight async work and flow that request on to the calls it makes, so a Task-returning method without one cannot take part in cooperative cancellation.",
+            "Accepting a CancellationToken lets a caller stop in-flight async work and flow that request on to the calls it makes, so a Task- or ValueTask-returning method without one cannot take part in cooperative cancellation.",
             TaskAsyncPattern,
             "Add a CancellationToken parameter and flow the caller's token through the call chain.",
             fix);

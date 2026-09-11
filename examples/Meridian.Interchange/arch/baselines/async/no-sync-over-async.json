@@ -1,12 +1,11 @@
 {
   "schemaVersion": 2,
-  "digest": "efe45dc856acd9ed806ac1325dd70b877ba48dc5844763543a99d02c88143363",
+  "digest": "1a7b8124ecd2808b9b3602daf0589555d297f2075b6513aa654c5755b6bd6561",
   "rules": {
     "async/no-sync-over-async": {
       "entries": [
         { "source": "T:Meridian.Interchange.Partners.LegacyManifestClient", "target": "M:System.Runtime.CompilerServices.TaskAwaiter`1.GetResult", "siteCount": 1 },
         { "source": "T:Meridian.Interchange.Partners.LegacyManifestClient", "target": "M:System.Threading.Tasks.Task.Wait(System.Threading.CancellationToken)", "siteCount": 1 },
-        { "source": "T:Meridian.Interchange.Partners.LegacyManifestClient", "target": "M:System.Threading.Tasks.Task`1.GetAwaiter", "siteCount": 1 },
         { "source": "T:Meridian.Interchange.Partners.LegacyManifestClient", "target": "P:System.Threading.Tasks.Task`1.Result", "siteCount": 1 }
       ]
     }

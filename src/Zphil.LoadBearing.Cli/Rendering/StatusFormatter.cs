@@ -152,7 +152,9 @@ internal static class StatusFormatter
             ? $", {uncounted} uncounted; run 'loadbearing baseline --accept-reductions' to record site counts"
             : string.Empty;
 
-        return $"Checked {report.RulesChecked} rules: {report.RulesPassed} passed, {report.RulesFailed} failed, " +
+        string rules = Plurals.Noun(report.RulesChecked, "rule");
+
+        return $"Checked {report.RulesChecked} {rules}: {report.RulesPassed} passed, {report.RulesFailed} failed, " +
                $"{report.RulesSkipped} skipped. Burndown: {remaining} grandfathered remaining" +
                $"{Sites(remaining, report.GrandfatheredSiteCount)}, " +
                $"{report.StaleBaselineEntryCount} fixed awaiting acceptance" +

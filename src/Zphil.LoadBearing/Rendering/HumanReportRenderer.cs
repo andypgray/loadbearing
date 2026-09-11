@@ -27,9 +27,13 @@ public static class HumanReportRenderer
         foreach (RuleResult result in report.Results) RenderRule(output, result, relativizer);
 
         output.WriteLine();
+
+        string rules = Plurals.Noun(report.RulesChecked, "rule");
+        string violations = Plurals.Noun(report.ViolationCount, "violation");
+        string warnings = Plurals.Noun(report.WarningCount, "warning");
         output.WriteLine(
-            $"Checked {report.RulesChecked} rules: {report.RulesPassed} passed, {report.RulesFailed} failed, " +
-            $"{report.RulesSkipped} skipped ({report.ViolationCount} violations, {report.WarningCount} warnings).");
+            $"Checked {report.RulesChecked} {rules}: {report.RulesPassed} passed, {report.RulesFailed} failed, " +
+            $"{report.RulesSkipped} skipped ({report.ViolationCount} {violations}, {report.WarningCount} {warnings}).");
     }
 
     /// <summary>

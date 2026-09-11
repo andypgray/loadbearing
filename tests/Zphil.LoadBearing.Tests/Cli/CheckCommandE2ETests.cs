@@ -173,7 +173,7 @@ public sealed class CheckCommandE2ETests
         // grandfather, so the report gains one skip line and no red anywhere.
         result.Out.ShouldNotContain("domain/retry-budget/containment");
         result.Out.ShouldNotContain("FAIL domain/retry-budget");
-        result.Out.ShouldContain("Checked 31 rules: 2 passed, 27 failed, 2 skipped (51 violations, 1 warnings).");
+        result.Out.ShouldContain("Checked 31 rules: 2 passed, 27 failed, 2 skipped (51 violations, 1 warning).");
     }
 
     [Fact]

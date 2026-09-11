@@ -139,7 +139,7 @@ public class AgentContextRendererTests
 
         const string expected =
             "## Quarantined scope `legacy/billing`\n\n" +
-            "This directory holds the quarantined `legacy/billing` scope. " +
+            "This directory holds the quarantined `legacy/billing` scope: types in `MyApp.Legacy.Billing.*`. " +
             "Here be dragons — do not spread references into it.\n\n" +
             "Dragons: Banker's rounding happens at line-item level, NOT invoice level. " +
             "Nightly reconciliation depends on this. Do not normalize.\n\n" +
@@ -172,6 +172,22 @@ public class AgentContextRendererTests
         card.ShouldContain(
             "must be referenced only by types in `MyApp.Legacy.Billing.*`, types named `BillingFacade` or " +
             "types in `MyApp.Legacy.Billing.Contracts.*`.");
+    }
+
+    [Fact]
+    public void ScopeCard_BareLayerSubject_ReadsInTheCollectiveVoice()
+    {
+        // The quarantine twin of the caution row below: one composer builds both ledes, so a bare layer
+        // handle keeps the collective voice ("the Billing layer") whichever posture minted the card.
+        ArchRule containment = Checker.Model(arch =>
+                arch.Scope("legacy/billing")
+                    .Quarantine(arch.Layer("Billing", "MyApp.Legacy.Billing.*"))
+                    .Dragons("Rounding is load-bearing.")
+                    .Because("Replacement scheduled."))
+            .Rule("legacy/billing/containment");
+
+        AgentContextRenderer.ScopeCard(containment)
+            .ShouldContain("This directory holds the quarantined `legacy/billing` scope: the Billing layer.");
     }
 
     [Fact]

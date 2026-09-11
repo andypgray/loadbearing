@@ -40,7 +40,8 @@ public sealed class CliMcpParityTests
     // the RenderCommandE2ETests.ScopeBody card without its provenance line (moves with that pin).
     private const string ExpectedScopeCard =
         "## Quarantined scope `legacy/billing`\n\n" +
-        "This directory holds the quarantined `legacy/billing` scope. Here be dragons — do not spread references into it.\n\n" +
+        "This directory holds the quarantined `legacy/billing` scope: types in `MyApp.Legacy.Billing.*`. " +
+        "Here be dragons — do not spread references into it.\n\n" +
         "Dragons: Banker's rounding happens at line-item level, NOT invoice level. " +
         "Nightly reconciliation depends on this. Do not normalize.\n\n" +
         "- `legacy/billing/containment` — Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or " +

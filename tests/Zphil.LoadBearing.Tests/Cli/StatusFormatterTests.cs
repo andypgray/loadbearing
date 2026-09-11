@@ -190,7 +190,7 @@ public sealed class StatusFormatterTests
                 + "0 fixed awaiting acceptance, 2 uncounted");
         lines.Last()
             .ShouldBe(
-                "Checked 1 rules: 1 passed, 0 failed, 0 skipped. Burndown: 2 grandfathered remaining (8 sites), "
+                "Checked 1 rule: 1 passed, 0 failed, 0 skipped. Burndown: 2 grandfathered remaining (8 sites), "
                 + "0 fixed awaiting acceptance, 2 uncounted; run 'loadbearing baseline --accept-reductions' "
                 + "to record site counts.");
     }

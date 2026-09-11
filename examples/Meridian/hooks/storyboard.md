@@ -100,7 +100,7 @@ FAIL data-access/no-inline-sql — Types in `Meridian.Web.Controllers.*` must no
   grandfathered: 12 (baselined; run 'loadbearing status' for burndown)
 pass time/inject-clock — Types in the Web layer, except types named `SystemClock`, must not use `DateTime.Now` or `DateTime.UtcNow`.
   grandfathered: 7 (baselined; run 'loadbearing status' for burndown)
-pass naming/async-suffix — Methods of the Domain or Web layers returning `Task` or `Task<TResult>` must be named `*Async`.
+pass naming/async-suffix — Methods of authored types in the Domain or Web layers returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` must be named `*Async`.
   grandfathered: 13 (baselined; run 'loadbearing status' for burndown)
 pass di/no-buildserviceprovider — Types must not use `ServiceCollectionContainerBuilderExtensions.BuildServiceProvider()`.
 pass clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway`, must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
@@ -146,7 +146,7 @@ pass data-access/no-inline-sql — Types in `Meridian.Web.Controllers.*` must no
   grandfathered: 12 (baselined; run 'loadbearing status' for burndown)
 pass time/inject-clock — Types in the Web layer, except types named `SystemClock`, must not use `DateTime.Now` or `DateTime.UtcNow`.
   grandfathered: 7 (baselined; run 'loadbearing status' for burndown)
-pass naming/async-suffix — Methods of the Domain or Web layers returning `Task` or `Task<TResult>` must be named `*Async`.
+pass naming/async-suffix — Methods of authored types in the Domain or Web layers returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` must be named `*Async`.
   grandfathered: 13 (baselined; run 'loadbearing status' for burndown)
 pass di/no-buildserviceprovider — Types must not use `ServiceCollectionContainerBuilderExtensions.BuildServiceProvider()`.
 pass clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway`, must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
@@ -182,7 +182,7 @@ pass data-access/no-inline-sql — Types in `Meridian.Web.Controllers.*` must no
   grandfathered: 12 (baselined; run 'loadbearing status' for burndown)
 pass time/inject-clock — Types in the Web layer, except types named `SystemClock`, must not use `DateTime.Now` or `DateTime.UtcNow`.
   grandfathered: 7 (baselined; run 'loadbearing status' for burndown)
-pass naming/async-suffix — Methods of the Domain or Web layers returning `Task` or `Task<TResult>` must be named `*Async`.
+pass naming/async-suffix — Methods of authored types in the Domain or Web layers returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` must be named `*Async`.
   grandfathered: 13 (baselined; run 'loadbearing status' for burndown)
 pass di/no-buildserviceprovider — Types must not use `ServiceCollectionContainerBuilderExtensions.BuildServiceProvider()`.
 pass clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway`, must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
@@ -190,7 +190,7 @@ pass clearance/engine/containment — Types in `Meridian.Clearance.*`, except `I
 warn clearance/engine/tripwire
   warning: Changed file 'src/Meridian.Clearance/ContainerNumberValidator.cs' is inside quarantined scope 'clearance/engine' — does the task actually require editing dragon territory? Dragons: loadbearing explain clearance/engine/tripwire.
 
-Checked 8 rules: 8 passed, 0 failed, 0 skipped (0 violations, 1 warnings).
+Checked 8 rules: 8 passed, 0 failed, 0 skipped (0 violations, 1 warning).
 ```
 
 Getting that paragraph in front of the agent is the whole of the tripwire. A warning never moves the

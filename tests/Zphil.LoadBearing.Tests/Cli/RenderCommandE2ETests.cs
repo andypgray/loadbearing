@@ -72,7 +72,8 @@ public sealed class RenderCommandE2ETests
     private const string ScopeBody =
         RenderSpecProvenance +
         "## Quarantined scope `legacy/billing`\n\n" +
-        "This directory holds the quarantined `legacy/billing` scope. Here be dragons — do not spread references into it.\n\n" +
+        "This directory holds the quarantined `legacy/billing` scope: types in `MyApp.Legacy.Billing.*`. " +
+        "Here be dragons — do not spread references into it.\n\n" +
         "Dragons: Banker's rounding happens at line-item level, NOT invoice level. " +
         "Nightly reconciliation depends on this. Do not normalize.\n\n" +
         "- `legacy/billing/containment` — Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or " +
@@ -160,7 +161,8 @@ public sealed class RenderCommandE2ETests
         RenderedLawText.LeavesNotCircularBullet +
         "- Expand any rule above with `loadbearing explain <rule-id>`.\n\n" +
         "## Quarantined scope `legacy/billing`\n\n" +
-        "This directory holds the quarantined `legacy/billing` scope. Here be dragons — do not spread references into it.\n\n" +
+        "This directory holds the quarantined `legacy/billing` scope: the Billing layer. " +
+        "Here be dragons — do not spread references into it.\n\n" +
         "Dragons: Banker's rounding happens at line-item level, NOT invoice level. " +
         "Nightly reconciliation depends on this. Do not normalize.\n\n" +
         "- `legacy/billing/containment` — Types in the Billing layer, except `IBillingFacade` or `BillingFacade`, " +
@@ -175,7 +177,7 @@ public sealed class RenderCommandE2ETests
     private const string WebShellScopeBody =
         QuarantinedSpecProvenance +
         "## Quarantined scope `legacy/web-shell`\n\n" +
-        "This directory holds the quarantined `legacy/web-shell` scope. " +
+        "This directory holds the quarantined `legacy/web-shell` scope: types in `MyApp.Web.*`. " +
         "Here be dragons — do not spread references into it.\n\n" +
         "Dragons: The shell's rendering path is order-sensitive. Drive it through OrderService only.\n\n" +
         "- `legacy/web-shell/containment` — Types in `MyApp.Web.*`, except types named `OrderService`, " +

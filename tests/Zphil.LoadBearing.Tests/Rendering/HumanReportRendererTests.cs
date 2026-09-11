@@ -15,8 +15,8 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 ///     The human failure-text renderer's violation arms (<see cref="HumanReportRenderer" />, the shared
 ///     CLI + xUnit-adapter surface): the unlocated <c>error:</c> (RuleError) and empty-subject lines, the
 ///     site-less Shape fallback, the unlocated-before-located ordering, the ratchet's grown trailer, the
-///     dragons lines beneath a fired scope tripwire, and the <c>Render</c> summary tail. Pinned strings are
-///     the spec.
+///     dragons lines beneath a fired scope tripwire, and the <c>Render</c> summary tail — down to how it
+///     inflects its counts and files a warned rule under <c>passed</c>. Pinned strings are the spec.
 /// </summary>
 public sealed class HumanReportRendererTests
 {
@@ -407,8 +407,29 @@ public sealed class HumanReportRendererTests
         HumanReportRenderer.Render(writer, report, Directory.GetCurrentDirectory());
         var output = writer.ToString();
 
-        output.ShouldContain("Checked 3 rules: 1 passed, 1 failed, 1 skipped (1 violations, 0 warnings).");
+        output.ShouldContain("Checked 3 rules: 1 passed, 1 failed, 1 skipped (1 violation, 0 warnings).");
         output.ShouldContain("skipped: no --diff-base diff context"); // the Skipped arm renders its reason
+    }
+
+    [Fact]
+    public void Render_WarnedRule_IsCountedAsPassedAndItsWarningsInTheTail()
+    {
+        // A warned rule is a passed rule — the posture is the severity, and a warning never moves the exit
+        // code — so 'warn' is the per-rule flag, the tail counts the warnings, and the passed figure stays
+        // equal to what a check's JSON report calls rulesPassed.
+        var report = new CheckReport(
+        [
+            new RuleResult(EnforceRule("r/pass"), RuleStatus.Passed, [], [], null, []),
+            Touched(SharedUtilitiesTripwire, CheckWarningKind.CautionedScopeTouched, "Helpers.cs")
+        ]);
+
+        var writer = new StringWriter { NewLine = "\n" };
+        HumanReportRenderer.Render(writer, report, Directory.GetCurrentDirectory());
+        var output = writer.ToString();
+
+        output.ShouldContain("warn shared/utilities/tripwire");
+        output.ShouldContain("Checked 2 rules: 2 passed, 0 failed, 0 skipped (0 violations, 1 warning).");
+        report.RulesPassed.ShouldBe(2); // the tail's passed figure, and the warned rule is one of the two
     }
 
     private static ArchRule EnforceRule(string id)

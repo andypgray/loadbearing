@@ -155,7 +155,7 @@ public sealed class FilteredSolutionE2ETests
         report.ShouldContain("\n  skipped: " + RuleSkipReason);
         // The whole verdict, so a skip that quietly became a pass — or a second rule that started skipping —
         // cannot hide behind the two fragments above.
-        report.ShouldContain("Checked 3 rules: 2 passed, 0 failed, 1 skipped (0 violations, 1 warnings).");
+        report.ShouldContain("Checked 3 rules: 2 passed, 0 failed, 1 skipped (0 violations, 1 warning).");
     }
 
     [Fact]

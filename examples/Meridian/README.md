@@ -24,7 +24,7 @@ The architecture is seven statements of ordinary C# in [arch/Meridian.ArchSpec/M
 | `naming/controllers` | Enforce | controllers are named `*Controller` |
 | `data-access/no-inline-sql` | Migrate | controllers must not open `SqlConnection` |
 | `time/inject-clock` | Migrate | Web must not read `DateTime.Now` / `UtcNow` |
-| `naming/async-suffix` | Migrate | `Task`-returning methods end in `Async` (from the pack) |
+| `naming/async-suffix` | Migrate | authored `Task`/`ValueTask`-returning methods end in `Async` (from the pack) |
 | `di/no-buildserviceprovider` | Enforce | no `BuildServiceProvider` while configuring (from the pack) |
 | `clearance/engine` | Quarantine | reach the module only via `IClearanceGateway` |
 
@@ -55,7 +55,7 @@ The same `naming/async-suffix` is `Enforce` in the [Interchange example](../Meri
 ### Migrations
 - `data-access/no-inline-sql` — Some existing code here still follows the OLD pattern: Controllers open SqlConnection and run inline SQL directly. That is grandfathered debt, not house style. New code must follow: Types in `Meridian.Web.Controllers.*` must not reference `SqlConnection` or `SqlCommand`. Data access behind a repository can be tested and swapped; SQL in the request path cannot. If you are already editing a grandfathered site and the migration is small, migrate it; otherwise do not grow the debt.
 - `time/inject-clock` — Some existing code here still follows the OLD pattern: Code reads the ambient clock directly. That is grandfathered debt, not house style. New code must follow: Types in the Web layer, except types named `SystemClock`, must not use `DateTime.Now` or `DateTime.UtcNow`. Cutoffs, demurrage, and ETA stamps read from the wall clock cannot be tested at a fixed instant; an injected IClock makes the moment an input. If you are already editing a grandfathered site and the migration is small, migrate it; otherwise do not grow the debt.
-- `naming/async-suffix` — Some existing code here still follows the OLD pattern: Repository and controller methods return Task without the Async suffix. That is grandfathered debt, not house style. New code must follow: Methods of the Domain or Web layers returning `Task` or `Task<TResult>` must be named `*Async`. Task-returning methods carry the Async suffix so callers see at the call site that a method must be awaited. See <https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap>. If you are already editing a grandfathered site and the migration is small, migrate it; otherwise do not grow the debt.
+- `naming/async-suffix` — Some existing code here still follows the OLD pattern: Repository and controller methods return Task without the Async suffix. That is grandfathered debt, not house style. New code must follow: Methods of authored types in the Domain or Web layers returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` must be named `*Async`. Task- and ValueTask-returning methods carry the Async suffix so callers see at the call site that a method must be awaited. See <https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap>. If you are already editing a grandfathered site and the migration is small, migrate it; otherwise do not grow the debt.
 
 ### Quarantined scopes
 - `clearance/engine` — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway`, must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`. The check-digit table implements a published external standard with no cleaner target shape; contain it behind the gateway rather than change it. Sanctioned surface: `IClearanceGateway`, `ClearanceGateway`.
@@ -103,7 +103,7 @@ The ISO 6346 check-digit table looks broken. It assigns A=10, B=12, C=13, and sk
 ```markdown
 ## Quarantined scope `clearance/engine`
 
-This directory holds the quarantined `clearance/engine` scope. Here be dragons — do not spread references into it.
+This directory holds the quarantined `clearance/engine` scope: types in `Meridian.Clearance.*`. Here be dragons — do not spread references into it.
 
 Dragons: ISO 6346 check digit: the letter-value table skips every multiple of 11 (A=10, B=12 … U=32); the gaps are load-bearing — linearizing the table breaks every real container number. Call in only through IClearanceGateway.
 ```

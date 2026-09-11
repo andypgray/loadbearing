@@ -45,11 +45,11 @@ which renders identically) rather than by `typeof()`.
 | `ReuseHttpClient` | `http/reuse-httpclient` | nothing outside the composition root constructs an `HttpClient` |
 | `NoServiceLocator` | `di/no-service-locator` | nothing outside the resolve seam resolves from an `IServiceProvider` |
 | `NoBuildServiceProvider` | `di/no-buildserviceprovider` | nothing builds a second container while configuring services |
-| `NoSyncOverAsync` | `async/no-sync-over-async` | nothing blocks on a `Task` |
+| `NoSyncOverAsync` | `async/no-sync-over-async` | nothing blocks on a `Task` or a `ValueTask` |
 | `NoCaptiveDependencies` | `di/no-captive-dependencies` | singletons inject nothing scoped or transient |
-| `AsyncSuffix` | `naming/async-suffix` | `Task`-returning methods carry the `Async` suffix |
-| `NoGeneralCatch` | `exceptions/no-general-catch` | only the top-level handler catches base `Exception` |
-| `AcceptCancellation` | `async/accept-cancellation` | `Task`-returning methods accept a `CancellationToken` |
+| `AsyncSuffix` | `naming/async-suffix` | authored `Task`/`ValueTask`-returning methods carry the `Async` suffix |
+| `NoGeneralCatch` | `exceptions/no-general-catch` | only the top-level handler swallows base `Exception` |
+| `AcceptCancellation` | `async/accept-cancellation` | authored `Task`/`ValueTask`-returning methods accept a `CancellationToken` |
 | `NoMappingAttributes` | `persistence/no-mapping-attributes` | persisted types carry no ORM mapping attribute |
 
 The method name is the rule-name half of the ID, PascalCased with the area dropped, so the
@@ -72,7 +72,7 @@ You own the selections: which types the rule governs, and which seam is exempt.
 
 You may override `Fix`. Remediation names local types, and the pack's generic hint cannot.
 Pass it as the last argument, not as a `.Fix(...)` trailer: pack methods return `void`, so exactly
-one `Because` and one `Fix` reach the rule and a second trailer will not compile.
+one `Because`, one `Citation` and one `Fix` reach the rule and a second trailer will not compile.
 
 ## Opting out, and colliding
 

@@ -86,7 +86,14 @@ jobs:
       - name: Build
         run: dotnet build Zphil.LoadBearing.slnx -c Release -p:RestoreLockedMode=true
 
+      # LOADBEARING_LINK_CHECK opts the citation link check in. It is off by default and ci.yml runs
+      # it on one leg of four, but the chore it automates is "re-verify the cited pages at first
+      # publish", and this job is that publish. A page that cannot be reached reports as a skip, so
+      # a network blip cannot fail a release; only a page that answers 404 or 410 does, which is the
+      # release this must not make.
       - name: Test
+        env:
+          LOADBEARING_LINK_CHECK: 'true'
         run: dotnet test Zphil.LoadBearing.slnx -c Release --no-build
 
       - name: Pack (produces four .nupkg + four .snupkg)

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Every page a rule cites is held to a live answer.** The URLs `.Citation(uri)` renders into the
+  committed context blocks are HEADed by a doc-hygiene gate, and one that answers 404 or 410 fails
+  the suite naming the file, the line and the rule behind it. The rendered blocks are the authority
+  rather than the spec sources, so the gate reads committed bytes and loads no workspace. It reaches
+  the network, so it is opt-in behind `LOADBEARING_LINK_CHECK`: unset, it reports itself skipped
+  with that reason, and a page it could not reach on a given run is a skip naming that page rather
+  than a red. CI opts in on its Linux leg.
+
 - **A rule can cite its source: `.Citation(uri)` on Enforce and Migrate rules.** The canonical
   page a rationale rests on gets a field of its own, beside the `Because` that used to carry it
   as a trailing URL. It is a noun trailer like `Fix` and `Purpose`, optional, and at most one per
@@ -256,6 +264,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The pack's three async rules say what the TAP page says.** `naming/async-suffix` and
+  `async/accept-cancellation` name `ValueTask` and `ValueTask<TResult>` beside `Task` and
+  `Task<TResult>`: the page they cite fixes the `Async` suffix and the `CancellationToken`
+  parameter for an awaitable return, and a `ValueTask` is one. Both also narrow their subject with
+  `.Authored()`, so pointing either at a web tier no longer reds every compiled Razor view for a
+  convention its generator does not follow — the rule reaches the code someone can rename.
+  `async/no-sync-over-async` drops its `Task.GetAwaiter` and `Task<TResult>.GetAwaiter` anchors and
+  gains `ValueTask<TResult>.Result`, `ValueTaskAwaiter.GetResult` and
+  `ValueTaskAwaiter<TResult>.GetResult`: `GetAwaiter` alone blocks nothing, and banning it beside
+  `GetResult` counted one blocking line as two baseline entries. The Interchange example's baseline
+  retires that duplicate and carries three entries for its three blocking lines. Rule IDs, postures
+  and citations are unchanged; every managed block quoting the three rules re-renders, and a
+  baseline keyed by member ID is unaffected in both directions, since `.Authored()` can only shrink
+  a subject and `ValueTask` only grow it.
+
+- **The pack's catch rule bans a swallowed catch, not every catch.** `DotNetGuidance.NoGeneralCatch`
+  declares `MustNotSwallow(typeof(Exception))` where it declared `MustNotCatch`, so a
+  `catch (Exception) when (…)` and a catch that ends in `throw` are lawful rather than violations.
+  That is what the page it cites says — it asks you not to catch base `Exception` "unless you intend
+  to rethrow" — and this was the one pack rule claiming more than its canon. Its reason no longer
+  names the Meridian dispatcher's poll loop, a consumer's fact sitting in text no consumer can
+  override; it names the top-level handler in the abstract instead. The default `Fix` gains the two
+  remedies the verb admits. The rule ID, the posture, the seam parameter and the citation are
+  unchanged, and the Interchange example stays green on the same `DerivedFrom<BackgroundService>()`
+  exemption. The rendered sentence reads "must not swallow" rather than "must not catch", so every
+  managed block quoting the rule re-renders.
+
 - **A `Where` and an `Except` on one subject render the `Where` first.** Whichever order they were
   written, the exception now canonicalizes last. `.Except(arch.Type<SqlConnection>()).Where(pred,
   "whose name contains a digit")` used to read "Types in `MyApp.*`, except `SqlConnection` whose
@@ -381,6 +416,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the target law, the rationale and the boy-scout policy — is unchanged, and the magnitude stays
   where it is measured, in `loadbearing status`. Re-rendering updates the root block and any layer
   card carrying a Migrate rule.
+
+- **A quarantine card's lede names what the scope covers.** The card file lands on a directory and
+  `arch_context` hands it to anyone editing a sibling there, so "This directory holds the quarantined
+  `demurrage/engine` scope." claimed the whole directory on behalf of a scope that may cover a single
+  type in it. The lede now states the scoped selection the way every other reference position does —
+  "…scope: the Demurrage layer." — which is what a caution card's lede has said since it was written.
+  Both ledes now come from one composer, so neither posture can drift from the other. The three
+  committed cards and the two walkthrough quotes re-render; no other line of any card moves, and
+  placement is unchanged.
+
+- **The `check` and `status` summary lines inflect their counts.** A run over one rule read
+  "Checked 1 rules", and a run that drew one warning read "1 warnings". Both tails now read their
+  nouns through the same inflection the per-rule lines already used, so a count of one reads
+  "Checked 1 rule" and "(1 violation, 1 warning)". Only the singular case moves: every quoted
+  `check` tail in the examples stands as it was, except the one warned run in the Meridian hooks
+  storyboard.
 
 ### Fixed
 

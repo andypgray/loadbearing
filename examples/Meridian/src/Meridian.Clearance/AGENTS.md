@@ -3,7 +3,7 @@
 
 ## Quarantined scope `clearance/engine`
 
-This directory holds the quarantined `clearance/engine` scope. Here be dragons — do not spread references into it.
+This directory holds the quarantined `clearance/engine` scope: types in `Meridian.Clearance.*`. Here be dragons — do not spread references into it.
 
 Dragons: ISO 6346 check digit: the letter-value table skips every multiple of 11 (A=10, B=12 … U=32); the gaps are load-bearing — linearizing the table breaks every real container number. Call in only through IClearanceGateway.
 

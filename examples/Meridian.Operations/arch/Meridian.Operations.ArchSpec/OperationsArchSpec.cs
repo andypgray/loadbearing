@@ -29,17 +29,19 @@ public sealed class OperationsArchSpec : IArchitectureSpec
             .Purpose("Host is the composition root: it wires the modules through their Contracts surfaces and " +
                      "serves the HTTP endpoints.");
 
+        Selection dispatchContracts = arch.Namespace("Meridian.Operations.Dispatch.Contracts.*");
+        Selection trackingContracts = arch.Namespace("Meridian.Operations.Tracking.Contracts.*");
+        Selection invoicingContracts = arch.Namespace("Meridian.Operations.Invoicing.Contracts.*");
+
         arch.Rule("modules/internals")
             .Enforce(arch.Each(dispatch, tracking, invoicing)
-                         .Except(arch.Namespace("Meridian.Operations.Dispatch.Contracts.*"),
-                                 arch.Namespace("Meridian.Operations.Tracking.Contracts.*"),
-                                 arch.Namespace("Meridian.Operations.Invoicing.Contracts.*"))
+                         .Except(dispatchContracts, trackingContracts, invoicingContracts)
                          .MustOnlyBeReferencedByItself())
             .Because("Every module is reached only through its Contracts surface, so the dispatch board and roster, the milestone store and log, and the invoice assembler and reconciler all stay swappable; a reference into any of them from another module turns a private implementation detail into a contract its owner can no longer revise without breaking a caller.")
             .Fix("Depend on the module's `Contracts` type — `IDispatchBoard`, `ITrackingLog`, `IInvoiceRun` — instead of reaching into its internals.");
 
         arch.Rule("modules/dispatch/outbound")
-            .Enforce(dispatch.MustOnlyReference(arch.Namespace("Meridian.Operations.Tracking.Contracts.*")))
+            .Enforce(dispatch.MustOnlyReference(trackingContracts))
             .Because("The module dependency graph is kept explicit and acyclic: dispatch consumes tracking's milestone contracts to gate a haulage leg and reaches nothing else, so the only arrow out of dispatch is the one drawn here and the monolith can still be split along its module lines.");
 
         arch.Rule("modules/tracking/outbound")
@@ -57,16 +59,14 @@ public sealed class OperationsArchSpec : IArchitectureSpec
         // baseline, so naming only the facade here would turn the same edge into an
         // un-grandfatherable red — two rules fighting over one reference.
         arch.Rule("modules/invoicing/outbound")
-            .Enforce(invoicing.MustOnlyReference(
-                arch.Namespace("Meridian.Operations.Tracking.Contracts.*"),
-                demurrage))
+            .Enforce(invoicing.MustOnlyReference(trackingContracts, demurrage))
             .Because("Invoicing prices a shipment from tracking's milestone contracts and the demurrage charge and integrates with nothing else, so billing's dependencies stay the two it actually needs and the module graph stays legible.");
 
         arch.Rule("modules/host/outbound")
             .Enforce(host.MustOnlyReference(
-                arch.Namespace("Meridian.Operations.Dispatch.Contracts.*"),
-                arch.Namespace("Meridian.Operations.Tracking.Contracts.*"),
-                arch.Namespace("Meridian.Operations.Invoicing.Contracts.*"),
+                dispatchContracts,
+                trackingContracts,
+                invoicingContracts,
                 arch.Type<IDemurrageCalculator>(),
                 arch.Type<DemurrageCalculator>()))
             .Because("The host is the composition root and the only place that sees every module at once; it wires them through their Contracts surfaces and the demurrage calculator facade alone, so no module's internals leak into the wiring and the boundaries the other rules draw are not quietly bypassed here.");
