@@ -509,14 +509,17 @@ internal static class ProcessFileFootprint
     }
 
     // Separator-guarded so a sibling directory sharing a name prefix ("...\build-cache") is not read as
-    // being inside the root ("...\build").
+    // being inside the root ("...\build"). The separators are literals rather than Path's constants
+    // because these strings are Windows path text wherever the comparison runs: the scan reads a Windows
+    // address space, but ExceptInjected is pure enough to be exercised off-Windows, where both host
+    // constants are '/' and a backslash-separated path would be judged under nothing at all.
     private static bool IsUnder(string path, string canonicalRoot)
     {
         if (!path.StartsWith(canonicalRoot, StringComparison.OrdinalIgnoreCase)) return false;
         if (path.Length == canonicalRoot.Length) return true;
 
         char next = path[canonicalRoot.Length];
-        return next == Path.DirectorySeparatorChar || next == Path.AltDirectorySeparatorChar;
+        return next is '\\' or '/';
     }
 
     private static void RequireNativeBitness(IntPtr process, int processId)
