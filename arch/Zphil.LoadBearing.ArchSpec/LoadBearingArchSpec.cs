@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
 using Microsoft.Build.Locator;
 using Zphil.LoadBearing.Fluent;
@@ -389,14 +388,15 @@ public sealed class LoadBearingArchSpec : IArchitectureSpec
             .Fix("Move the tool class into Zphil.LoadBearing.Cli.Mcp.Tools beside ArchTools; only the CLI " +
                  "references the MCP SDK.");
 
+        // One definition of a blocking wait, shared with the pack instead of copied beside it: this rule
+        // keeps its own subject, exemption and reason, and picks up whatever the pack's list gains. It
+        // arrives split because MustNotUse takes one member and the rest, not because the first differs.
+        (Member blockingWait, Member[] moreBlockingWaits) = DotNetGuidance.BlockingWaitAnchors(arch);
+
         arch.Rule("mcp/no-blocking-waits")
             .Enforce(arch.AnyOf(host, extraction)
                 .Except(arch.Types.Named("ServerShutdown"))
-                .MustNotUse(
-                    arch.Member<Task>(t => t.Wait()),
-                    arch.Member<Task<object>>(t => t.Result),
-                    arch.Member<TaskAwaiter>(a => a.GetResult()),
-                    arch.Member<TaskAwaiter<object>>(a => a.GetResult())))
+                .MustNotUse(blockingWait, moreBlockingWaits))
             .Because("The CLI and the extraction host are one long-lived MCP server as often as they are a " +
                      "one-shot command, and a blocking wait there costs twice: it holds a thread-pool thread " +
                      "for as long as the child process or workspace load it waits on, and it drops the " +

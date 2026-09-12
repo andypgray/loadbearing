@@ -139,20 +139,39 @@ public static class DotNetGuidance
         Arch arch, Selection subject, PackPosture posture, string? fix = null)
     {
         IRuleBuilder rule = arch.Rule("async/no-sync-over-async");
-        Constraint constraint = subject.MustNotUse(
-            arch.Member(typeof(Task), nameof(Task.Wait)),
-            arch.Member(typeof(Task<>), nameof(Task<>.Result)),
-            arch.Member(typeof(ValueTask<>), nameof(ValueTask<>.Result)),
-            arch.Member(typeof(TaskAwaiter), nameof(TaskAwaiter.GetResult)),
-            arch.Member(typeof(TaskAwaiter<>), nameof(TaskAwaiter<>.GetResult)),
-            arch.Member(typeof(ValueTaskAwaiter), nameof(ValueTaskAwaiter.GetResult)),
-            arch.Member(typeof(ValueTaskAwaiter<>), nameof(ValueTaskAwaiter<>.GetResult)));
+        (Member first, Member[] more) = BlockingWaitAnchors(arch);
+        Constraint constraint = subject.MustNotUse(first, more);
 
         Declare(rule, constraint, posture,
             "Blocking on a Task or ValueTask (.Result/.Wait/.GetResult) ties up a thread and can deadlock in a captured context; await instead.",
             "https://learn.microsoft.com/dotnet/csharp/asynchronous-programming/async-scenarios",
             "Await the call and make the method async.",
             fix);
+    }
+
+    /// <summary>
+    ///     The members <c>async/no-sync-over-async</c> bans, for a spec that writes its own blocking-wait
+    ///     rule — its own ID, its own reason, its own exempt seam — and still wants one definition of what
+    ///     blocking on a task is. The set is <c>Task.Wait</c>, <c>Result</c> on <c>Task&lt;T&gt;</c> and
+    ///     <c>ValueTask&lt;T&gt;</c>, and <c>GetResult</c> on the four task awaiters. Destructure it and
+    ///     spread it into the ban — <c>(Member blocking, Member[] more) = BlockingWaitAnchors(arch);</c>
+    ///     then <c>subject.MustNotUse(blocking, more)</c> — the split being the shape <c>MustNotUse</c>
+    ///     takes rather than two kinds of member. Call <see cref="NoSyncOverAsync" /> instead wherever the
+    ///     pack's own reason and subject fit; a rule built on this set picks up whatever is added to it
+    ///     later.
+    /// </summary>
+    /// <param name="arch">The <see cref="Arch" /> the spec is declaring on.</param>
+    /// <returns>The first banned member, and the rest.</returns>
+    public static (Member First, Member[] More) BlockingWaitAnchors(Arch arch)
+    {
+        return (arch.Member(typeof(Task), nameof(Task.Wait)), [
+            arch.Member(typeof(Task<>), nameof(Task<>.Result)),
+            arch.Member(typeof(ValueTask<>), nameof(ValueTask<>.Result)),
+            arch.Member(typeof(TaskAwaiter), nameof(TaskAwaiter.GetResult)),
+            arch.Member(typeof(TaskAwaiter<>), nameof(TaskAwaiter<>.GetResult)),
+            arch.Member(typeof(ValueTaskAwaiter), nameof(ValueTaskAwaiter.GetResult)),
+            arch.Member(typeof(ValueTaskAwaiter<>), nameof(ValueTaskAwaiter<>.GetResult))
+        ]);
     }
 
     /// <summary>

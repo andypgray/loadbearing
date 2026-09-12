@@ -9,6 +9,7 @@ using Zphil.LoadBearing.Cli.SpecLoading;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Internal;
+using Zphil.LoadBearing.Packs.DotNet;
 using Zphil.LoadBearing.Rendering;
 using Zphil.LoadBearing.Roslyn;
 using Zphil.LoadBearing.Roslyn.Diagnostics;
@@ -288,6 +289,24 @@ public sealed class SelfSpecTests
     }
 
     /// <summary>
+    ///     One definition of a blocking wait, held across two rules. <c>mcp/no-blocking-waits</c> keeps its
+    ///     own ID, subject, <c>ServerShutdown</c> exemption and reason — that is what makes it a local rule
+    ///     rather than a pack call — but it takes the member set from the pack instead of restating it, so
+    ///     widening the pack's ban cannot leave this repository's own spec the laxer of the two. It did:
+    ///     three <c>ValueTask</c> members were added to the pack and the copy here stood still. This is the
+    ///     pin that would have caught that, and it reds again if someone inlines the list.
+    /// </summary>
+    [Fact]
+    public void BlockingWaitBan_IsThePacksOwnMemberSet()
+    {
+        ArchitectureModel packed = Checker.Model(arch =>
+            DotNetGuidance.NoSyncOverAsync(arch, arch.Types, PackPosture.Enforce));
+
+        Anchors(SelfModel.Rule("mcp/no-blocking-waits"))
+            .ShouldBe(Anchors(packed.Rule("async/no-sync-over-async")));
+    }
+
+    /// <summary>
     ///     The sanctioned-broad-catcher pin: the discipline that holds an advisory channel empty by test,
     ///     applied to an exemption list. <c>exceptions/no-swallowed-broad-catches</c> carves seven type names
     ///     out of its own subject, and an exemption list is exactly the kind of thing that grows by one name at
@@ -511,6 +530,18 @@ public sealed class SelfSpecTests
         return !string.IsNullOrWhiteSpace(assemblyPath)
                && Path.IsPathRooted(assemblyPath)
                && !string.Equals(assemblyPath, project.OutputFilePath, PathComparison.Comparison);
+    }
+
+    // A rule's banned members as comparable text, the projection PackParityTests measures pack-and-inline
+    // agreement with: the resolved leaf, which is what has to match. Location is not read: it is
+    // diagnostics only, and both rules now capture it inside the pack's own file.
+    private static IReadOnlyList<string> Anchors(ArchRule rule)
+    {
+        if (rule.Constraint is not { } constraint) return [];
+
+        return constraint.MemberOperands
+            .Select(member => $"{member.DeclaringType.FullName}.{member.Name} (method: {member.IsMethod})")
+            .ToList();
     }
 
     private static IReadOnlyList<string> Names(IEnumerable<TypeNode> types)

@@ -74,6 +74,33 @@ You may override `Fix`. Remediation names local types, and the pack's generic hi
 Pass it as the last argument, not as a `.Fix(...)` trailer: pack methods return `void`, so exactly
 one `Because`, one `Citation` and one `Fix` reach the rule and a second trailer will not compile.
 
+## Sharing a definition without taking the rule
+
+Sometimes the rule is yours and only the list is the pack's. This repository's own
+`mcp/no-blocking-waits` bans the same members as `async/no-sync-over-async`, but its reason names
+what a block costs inside a long-lived MCP server and its subject exempts one type by name. Neither
+of those is something a consumer can pass to a pack method, so the rule is written locally.
+
+`BlockingWaitAnchors` hands that member set back for a local rule to ban. You keep the ID, the
+posture, the selections, the reason and the fix; the pack keeps one definition of what blocking on
+a task means, so a member added to it is added to both rules at once.
+
+```csharp
+Selection host = arch.Namespace("MyApp.Host.*");
+(Member blockingWait, Member[] moreBlockingWaits) = DotNetGuidance.BlockingWaitAnchors(arch);
+
+arch.Rule("host/no-blocking-waits")
+    .Enforce(host
+        .Except(arch.Types.Named("ShutdownDrain"))
+        .MustNotUse(blockingWait, moreBlockingWaits))
+    .Because("A blocking wait in the request path holds a thread for the whole call and drops the " +
+             "CancellationToken, so a client cancel leaves the work running.")
+    .Fix("Await the call and flow the CancellationToken.");
+```
+
+The set arrives split because `MustNotUse` takes one member and the rest, not because the first one
+differs from the others. It is the only export of this kind in the pack today.
+
 ## Opting out, and colliding
 
 Opting out is not calling the method. There is no suppression mechanism and no severity dial,

@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A rule pack can export the members a rule bans, not only the rule.** A codebase that must write
+  its own version of a pack rule (its reason names local stakes, or its subject needs a seam the pack
+  method does not take) had to restate the member list with it, and a restated list drifts from the
+  one it copied. `DotNetGuidance.BlockingWaitAnchors(arch)` hands back the seven members
+  `async/no-sync-over-async` bans, in the shape `MustNotUse` takes, so a local rule spreads them into
+  its own sentence and picks up whatever the pack adds later. This repository's own
+  `mcp/no-blocking-waits` is the first consumer: it keeps its ID, its subject, its `ServerShutdown`
+  exemption and its reason, and shares only the definition. Nothing rendered moves, that rule having
+  banned the same seven members in the same order already, and the pack still declares nine rules.
+
 - **A rule that matched nothing is no longer reported as a rule that ran.** A rule whose subject
   matched no types, or whose forbidden target did, was reported in the same words as a rule that had
   been measured against the code. Three surfaces now part them. `status` reads `not measured` where a

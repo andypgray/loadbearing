@@ -5,6 +5,7 @@ using Xunit;
 using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Packs.DotNet;
 using Zphil.LoadBearing.Tests.Checking;
+using Zphil.LoadBearing.Tests.DocHygiene;
 using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Packs;
@@ -58,9 +59,13 @@ public class DotNetGuidanceTests
     public void ApplyAll_CoversEveryPublicRuleMethod()
     {
         // The ratchet: add a tenth rule method and forget to wire it into ApplyAll, and this counts 9
-        // rules against 10 methods. Nothing else in the suite would notice.
+        // rules against 10 methods. Nothing else in the suite would notice. Returning void is what makes
+        // a method a rule method — the pack publishes that, since it is what makes a second trailer
+        // uncompilable — so the teeth stay on a tenth rule while a set the pack exports for a consumer's
+        // own rule to ban is not counted as one.
         List<string> ruleMethods = typeof(DotNetGuidance)
             .GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
+            .Where(method => method.ReturnType == typeof(void))
             .Where(method => method.Name != nameof(DotNetGuidance.ApplyAll))
             .Select(method => method.Name)
             .ToList();
@@ -168,12 +173,32 @@ public class DotNetGuidanceTests
     {
         // The anchor doctrine, pinned in the cheapest way that survives a reformat: an expression anchor
         // in the pack would be real syntax minting a use edge attributed to the pack's own type, which
-        // sits inside the cone this repo's spec governs. nameof operands mint nothing.
-        string source = File.ReadAllText(Path.Combine(
-            RepoRoot.Directory, "src", "Zphil.LoadBearing.Packs.DotNet", "DotNetGuidance.cs"));
+        // sits inside the cone this repo's spec governs. nameof operands mint nothing. Phrased over every
+        // tracked source in the pack rather than over the one file the doctrine was written for, so a
+        // second pack file cannot land outside it.
+        IReadOnlyList<string> sources = PackSources();
+        List<string> expressive = new();
+        foreach (string path in sources)
+        {
+            string source = RepoRoot.ReadText(path);
+            if (source.Contains("arch.Member<", StringComparison.Ordinal)
+                || source.Contains("arch.Member(()", StringComparison.Ordinal))
+                expressive.Add(path);
+        }
 
-        source.ShouldNotContain("arch.Member<");
-        source.ShouldNotContain("arch.Member(()");
+        // The sweep is held non-empty rather than trusted: a glob that matches nothing passes silently.
+        sources.ShouldNotBeEmpty("No tracked C# source was found in the pack project; the arm below swept nothing.");
+        expressive.ShouldReportNothing(
+            "Pack source(s) writing an expression member anchor, which is real syntax minting a use edge "
+            + "attributed to the pack's own type inside the cone this repository's spec governs");
+    }
+
+    // Every tracked C# source in the rule pack, repository-relative.
+    private static IReadOnlyList<string> PackSources()
+    {
+        return TrackedFiles.CSharp
+            .Where(static path => path.StartsWith("src/Zphil.LoadBearing.Packs.DotNet/", StringComparison.Ordinal))
+            .ToList();
     }
 
     private static void ApplyAll(Arch arch, PackPosture posture)

@@ -2275,10 +2275,11 @@ public sealed class ArchSpec : IArchitectureSpec
 
 ## 13. Composition: rule packs
 
-A rule pack is an ordinary class library. It exports static methods that take a caller's `Arch`
-and declare rules on it, and a consuming spec project references it and calls the ones it wants.
-There is no plugin host, no manifest, no include directive, and no discovery: a rule lands only
-where a spec calls for it. Every claim below is pinned by a test.
+A rule pack is an ordinary class library. It exports static methods that take a caller's `Arch`:
+most declare a rule on it, and some hand back material a caller's own rule is built from. A
+consuming spec project references the pack and calls the ones it wants. There is no plugin host,
+no manifest, no include directive, and no discovery: a rule lands only where a spec calls for it.
+Every claim below is pinned by a test.
 
 **Many spec classes, one `Arch`.** A build runs every discovered spec's `Define` against a single
 `Arch` instance, and rules land in the order the specs ran (§3.2). A pack call inside one spec and
@@ -2317,6 +2318,14 @@ the rule. Remediation names local types, so it does not. The override is a param
 trailer: a pack method returns `void`, which makes exactly one `Because`, one `Citation` and one
 `Fix` reach the rule and a second trailer uncompilable rather than a repeated-trailer error
 (§8 item 6).
+
+**A pack may export what a rule is about, not only the rule.** A codebase that must write its own
+version of a pack rule (its own ID, because the reason names local stakes; its own exempt seam) can
+still hold the pack's definition of what that rule governs. A pack method that hands back the
+banned members instead of declaring a rule leaves the consumer every stage of the sentence and
+shares only the list, so a member added to the pack's ban is added to both rules at once.
+`MustNotUse` takes one member and the rest (§3.3), so an exported set arrives in that shape and
+spreads into the call.
 
 **Anchor doctrine for a self-hosting pack.** A pack that ships inside a codebase it governs writes
 its member anchors as `arch.Member(typeof(X), nameof(X.M))`, never the expression form. An
