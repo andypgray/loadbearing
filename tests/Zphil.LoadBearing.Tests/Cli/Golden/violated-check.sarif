@@ -6,7 +6,7 @@
       "tool": {
         "driver": {
           "name": "LoadBearing",
-          "version": "0.7.0",
+          "version": "0.8.0",
           "informationUri": "https://github.com/andypgray/loadbearing",
           "rules": [
             {
