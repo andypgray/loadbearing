@@ -52,6 +52,11 @@ function Test-UnwrittenSince($listing, $since) {
 # per-edit path instead, which is what an existing PostToolUse wiring still gets.
 $hookEvent = if ($payload.hook_event_name) { $payload.hook_event_name } else { 'PostToolUse' }
 $turnEnd = $hookEvent -in @('Stop', 'SubagentStop')
+# What counts as code, spelled once for both branches below: the turn-end listing filter and the
+# per-edit payload gate ask the same question of different subjects, and a new extension has to
+# reach both. Anchored at the end, so foo.csx is not a match; the quote is optional because that is
+# how git status spells a path that needs quoting, and -match folds the case on its own.
+$codeFile = '\.(cs|csproj|props|targets|sln|slnx|razor|cshtml)"?$'
 # Empty while the hook may still block. 'report' is the counted cap: say so once and let the turn
 # end. 'silent' is the degraded mode with nowhere to count — the payload says this hook has already
 # blocked in this turn, which is the single round it can carry, so the turn ends without a word.
@@ -84,7 +89,6 @@ if ($turnEnd) {
     $stateful = Test-Path -LiteralPath $stateDir -PathType Container
 
     $headSha = git rev-parse HEAD 2>$null
-    $codeFile = '\.(cs|csproj|props|targets|sln|slnx|razor|cshtml)"?$'
     $listing = @(git status --porcelain=v1 -uall 2>$null | Where-Object { $_ -match $codeFile })
 
     # The skip, and the whole reason a question-and-answer turn is free: the last verdict still stands
@@ -119,7 +123,7 @@ else {
     # The check reads code, so an edit to anything else (docs, config, lockfiles) skips it; with no
     # payload (a hand-run), it runs.
     $editedFile = Get-HookPath $payload.tool_input.file_path
-    if ($editedFile -and $editedFile -notmatch '\.(cs|csproj|props|targets|sln|slnx|razor|cshtml)$') { exit 0 }
+    if ($editedFile -and $editedFile -notmatch $codeFile) { exit 0 }
 
     # Check the tree the edit landed in, not the tree this process happens to sit in. The hook runs in
     # the session's directory, and neither that nor CLAUDE_PROJECT_DIR need be where the edit went: an

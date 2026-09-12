@@ -79,6 +79,11 @@ case "$hook_event" in
   Stop | SubagentStop) turn_end=1 ;;
   *) turn_end=0 ;;
 esac
+# What counts as code, spelled once for both branches below: the turn-end listing filter and the
+# per-edit payload gate ask the same question of different subjects, and a new extension has to
+# reach both. Anchored at the end, so foo.csx is not a match; the quote is optional because that is
+# how git status spells a path that needs quoting, and -i on each grep is what folds the case.
+code_file='\.(cs|csproj|props|targets|sln|slnx|razor|cshtml)"?$'
 # Empty while the hook may still block. 'report' is the counted cap: say so once and let the turn
 # end. 'silent' is the degraded mode with nowhere to count — the payload says this hook has already
 # blocked in this turn, which is the single round it can carry, so the turn ends without a word.
@@ -107,18 +112,20 @@ if [ "$turn_end" = 1 ]; then
   mkdir -p "$state_dir" 2>/dev/null && [ -w "$state_dir" ] && stateful=1
 
   head_sha=$(git rev-parse HEAD 2>/dev/null)
-  listing=$(git status --porcelain=v1 -uall 2>/dev/null | grep -Ei '\.(cs|csproj|props|targets|sln|slnx|razor|cshtml)"?$')
+  listing=$(git status --porcelain=v1 -uall 2>/dev/null | grep -Ei "$code_file")
 
   # The skip, and the whole reason a question-and-answer turn is free: the last verdict still stands
   # if it was green, was taken at this HEAD, covered this listing, and nothing it covered has been
   # written since. A listing alone cannot see a file edited twice; the file's own timestamp can. Any
   # doubt — no state, no HEAD, a verdict that will not parse — runs the check. It never skips a red.
   if [ "$stateful" = 1 ] && [ -n "$head_sha" ] && [ -f "$verdict_file" ]; then
-    recorded=$(cat "$verdict_file" 2>/dev/null)
-    if [ "$(printf '%s\n' "$recorded" | sed -n 1p)" = 'green' ] &&
-      [ "$(printf '%s\n' "$recorded" | sed -n 2p)" = "$head_sha" ] &&
-      [ "$(printf '%s\n' "$recorded" | sed -n '3,$p')" = "$listing" ] &&
-      unwritten_since "$verdict_file"; then
+    # One open and three shell reads rather than a subshell per field: this is the path a turn
+    # that changed nothing takes, and it should cost nothing. $(cat) strips the trailing newline
+    # exactly as the capture that built $listing did, so the two compare as written.
+    { IFS= read -r recorded_state; IFS= read -r recorded_head; recorded_listing=$(cat); } \
+      2>/dev/null < "$verdict_file"
+    if [ "$recorded_state" = 'green' ] && [ "$recorded_head" = "$head_sha" ] &&
+      [ "$recorded_listing" = "$listing" ] && unwritten_since "$verdict_file"; then
       exit 0
     fi
   fi
@@ -144,10 +151,7 @@ else
   # payload (a hand-run), it runs.
   edited_file=$(hook_path file_path)
   if [ -n "$edited_file" ]; then
-    case "$(printf '%s' "$edited_file" | tr '[:upper:]' '[:lower:]')" in
-      *.cs | *.csproj | *.props | *.targets | *.sln | *.slnx | *.razor | *.cshtml) ;;
-      *) exit 0 ;;
-    esac
+    printf '%s\n' "$edited_file" | grep -Eiq "$code_file" || exit 0
   fi
 
   # Check the tree the edit landed in, not the tree this process happens to sit in. The hook runs in
