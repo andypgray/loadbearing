@@ -415,8 +415,15 @@ internal sealed class ExtractionCacheStore
 
         if (dirtyProjects.Count == 0)
         {
+            // The true keys differ from the decision keys only where a remap stood, so with no maps the pass
+            // above already computed every Merkle key and the memo answers each one without hashing.
+            bool remapped = mapsByProject.Count > 0;
+            IReadOnlyDictionary<string, string> promotedKeys = remapped ? trueContentKeys : decisionContentKeys;
+            Dictionary<string, string> promotedMemo =
+                remapped ? new Dictionary<string, string>(StringComparer.Ordinal) : decisionMemo;
+
             IReadOnlyList<ProjectCacheEntry> refreshedProjects = RefreshedProjects(
-                manifest.Projects, checkedByIndex, trueContentKeys, referencesByName);
+                manifest.Projects, checkedByIndex, promotedKeys, referencesByName, promotedMemo);
             PromoteIfChanged(manifest, refreshedStructural, refreshedProjects, replayedFragments);
             return CacheReadResult.Hit(replayedFragments, manifest.SpecResolutions, loadDiagnostics);
         }
@@ -433,15 +440,17 @@ internal sealed class ExtractionCacheStore
     /// <remarks>
     ///     The keys must be the true ones because that manifest is what the next validation stats against:
     ///     write the decision key and the next run compares a fresh hash to a stale key and calls the project
-    ///     dirty forever.
+    ///     dirty forever. Where no remap stood the two are the same string, so the caller hands the decision
+    ///     keys along with the <paramref name="memo" /> already holding their Merkle keys, and this pass
+    ///     degrades to one lookup per project instead of re-hashing the graph.
     /// </remarks>
     private static IReadOnlyList<ProjectCacheEntry> RefreshedProjects(
         IReadOnlyList<ProjectCacheEntry> projects,
         IReadOnlyList<ProjectCheck> checkedByIndex,
         IReadOnlyDictionary<string, string> trueContentKeys,
-        IReadOnlyDictionary<string, IReadOnlyList<string>> referencesByName)
+        IReadOnlyDictionary<string, IReadOnlyList<string>> referencesByName,
+        Dictionary<string, string> memo)
     {
-        var memo = new Dictionary<string, string>(StringComparer.Ordinal);
         var refreshed = new List<ProjectCacheEntry>(projects.Count);
         for (var index = 0; index < projects.Count; index++)
         {
@@ -496,6 +505,8 @@ internal sealed class ExtractionCacheStore
     private static IReadOnlySet<string> RemappedDocumentsOf(
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, LineMap>> mapsByProject, HashSet<string> dirtyProjects)
     {
+        if (mapsByProject.Count == 0) return NoDocuments;
+
         var moved = new HashSet<string>(PathComparison.Comparer);
         foreach ((string name, IReadOnlyDictionary<string, LineMap> maps) in mapsByProject)
         {
@@ -527,6 +538,13 @@ internal sealed class ExtractionCacheStore
         IReadOnlyList<FileStamp> RefreshedDocuments,
         IReadOnlyDictionary<string, LineMap>? Maps);
 
+    /// <summary>
+    ///     One document's verdict from the sweep: the hash each of its project's two content keys takes, the
+    ///     stamp to carry forward, and the line map a trivia-only edit produced. Both hashes leave together,
+    ///     so no outcome can feed one key and forget the other — the two lists are compared index-wise.
+    /// </summary>
+    private sealed record DocumentCheck(string? DecisionSha, string? TrueSha, FileStamp Refreshed, LineMap? Map);
+
     private ProjectCheck CheckProject(
         ProjectCacheEntry project, IReadOnlyDictionary<string, string?> structuralShaByPath, CancellationToken ct)
     {
@@ -541,75 +559,15 @@ internal sealed class ExtractionCacheStore
             ct.ThrowIfCancellationRequested();
             knownDocuments.Add(document.Path);
 
-            FileFreshness current = FileFreshness.Capture(document.Path);
-            if (!current.Exists)
+            DocumentCheck check = CheckDocument(document);
+            decisionShas.Add((document.Path, check.DecisionSha));
+            trueShas.Add((document.Path, check.TrueSha));
+            refreshedDocuments.Add(check.Refreshed);
+            if (check.Map is { } map)
             {
-                // A deleted document is a content change for its project (the MISSING sentinel drives the key).
-                decisionShas.Add((document.Path, null));
-                trueShas.Add((document.Path, null));
-                refreshedDocuments.Add(document with
-                {
-                    Exists = false, LastWriteTimeUtcTicks = 0, Length = 0, Sha256 = null, Promoted = false, Shape = null
-                });
-                continue;
+                maps ??= new Dictionary<string, LineMap>(PathComparison.Comparer);
+                maps[document.Path] = map;
             }
-
-            if (FileStamping.ToFreshness(document).MatchesStat(current) && document.Promoted)
-            {
-                decisionShas.Add((document.Path, document.Sha256)); // provably unchanged: trust the recorded hash
-                trueShas.Add((document.Path, document.Sha256));
-                refreshedDocuments.Add(document);
-                continue;
-            }
-
-            if (document.Shape is not { } recordedShape)
-            {
-                // No recorded shape — a structural-style stamp, or a document that was unreadable at capture.
-                // Nothing to compare, so the hash alone decides, exactly as this sweep always did.
-                string? sha = HashDuringValidation(document.Path);
-                decisionShas.Add((document.Path, sha));
-                trueShas.Add((document.Path, sha));
-                refreshedDocuments.Add(FileStamping.RefreshStamp(document.Path, current, sha));
-                continue;
-            }
-
-            (string Sha256, SourceShape Shape)? read = ReadDuringValidation(document.Path);
-            if (read is not { } fresh)
-            {
-                // Unreadable now: the MISSING sentinel, the same answer a failed hash has always given.
-                decisionShas.Add((document.Path, null));
-                trueShas.Add((document.Path, null));
-                refreshedDocuments.Add(FileStamping.RefreshStamp(document.Path, current, null));
-                continue;
-            }
-
-            if (string.Equals(fresh.Sha256, document.Sha256, StringComparison.Ordinal))
-            {
-                // A bare touch: the recorded shape still describes these bytes, so it rides forward and the
-                // next sweep is pure-stat.
-                decisionShas.Add((document.Path, document.Sha256));
-                trueShas.Add((document.Path, document.Sha256));
-                refreshedDocuments.Add(FileStamping.RefreshStamp(document.Path, current, document.Sha256, recordedShape));
-                continue;
-            }
-
-            LineMap? map = SourceShape.TryMapLines(recordedShape, fresh.Shape);
-            if (map is null)
-            {
-                // A real content change: both keys take the new hash, and the stamp the new shape.
-                decisionShas.Add((document.Path, fresh.Sha256));
-                trueShas.Add((document.Path, fresh.Sha256));
-                refreshedDocuments.Add(FileStamping.RefreshStamp(document.Path, current, fresh.Sha256, fresh.Shape));
-                continue;
-            }
-
-            // Trivia only: the decision key sees the hash the fragments were extracted from, the true key the
-            // hash on disk, and the map moves this document's sites.
-            decisionShas.Add((document.Path, document.Sha256));
-            trueShas.Add((document.Path, fresh.Sha256));
-            refreshedDocuments.Add(FileStamping.RefreshStamp(document.Path, current, fresh.Sha256, fresh.Shape));
-            maps ??= new Dictionary<string, LineMap>(PathComparison.Comparer);
-            maps[document.Path] = map;
         }
 
         // Capture and validation compute cone-adds through the one routine over the same known-document set,
@@ -624,6 +582,62 @@ internal sealed class ExtractionCacheStore
             : ComputeContentKey(project.ProjectName, trueShas, csprojSha, assetsSha, adds);
         return new ProjectCheck(
             project.ProjectName, project.ProjectReferences, decisionKey, trueKey, refreshedDocuments, maps);
+    }
+
+    private DocumentCheck CheckDocument(FileStamp document)
+    {
+        FileFreshness current = FileFreshness.Capture(document.Path);
+        if (!current.Exists)
+        {
+            // A deleted document is a content change for its project (the MISSING sentinel drives the key).
+            FileStamp refreshed = document with
+            {
+                Exists = false, LastWriteTimeUtcTicks = 0, Length = 0, Sha256 = null, Promoted = false, Shape = null
+            };
+            return new DocumentCheck(null, null, refreshed, null);
+        }
+
+        if (FileStamping.ToFreshness(document).MatchesStat(current) && document.Promoted)
+            // provably unchanged: trust the recorded hash
+            return new DocumentCheck(document.Sha256, document.Sha256, document, null);
+
+        if (document.Shape is not { } recordedShape)
+        {
+            // No recorded shape — a structural-style stamp, or a document that was unreadable at capture.
+            // Nothing to compare, so the hash alone decides, exactly as this sweep always did.
+            string? sha = HashDuringValidation(document.Path);
+            FileStamp refreshed = FileStamping.RefreshStamp(document.Path, current, sha);
+            return new DocumentCheck(sha, sha, refreshed, null);
+        }
+
+        (string Sha256, SourceShape Shape)? read = ReadDuringValidation(document.Path);
+        if (read is not { } fresh)
+        {
+            // Unreadable now: the MISSING sentinel, the same answer a failed hash has always given.
+            FileStamp refreshed = FileStamping.RefreshStamp(document.Path, current, null);
+            return new DocumentCheck(null, null, refreshed, null);
+        }
+
+        if (string.Equals(fresh.Sha256, document.Sha256, StringComparison.Ordinal))
+        {
+            // A bare touch: the recorded shape still describes these bytes, so it rides forward and the
+            // next sweep is pure-stat.
+            FileStamp refreshed = FileStamping.RefreshStamp(document.Path, current, document.Sha256, recordedShape);
+            return new DocumentCheck(document.Sha256, document.Sha256, refreshed, null);
+        }
+
+        LineMap? map = SourceShape.TryMapLines(recordedShape, fresh.Shape);
+        if (map is null)
+        {
+            // A real content change: both keys take the new hash, and the stamp the new shape.
+            FileStamp refreshed = FileStamping.RefreshStamp(document.Path, current, fresh.Sha256, fresh.Shape);
+            return new DocumentCheck(fresh.Sha256, fresh.Sha256, refreshed, null);
+        }
+
+        // Trivia only: the decision key sees the hash the fragments were extracted from, the true key the
+        // hash on disk, and the map moves this document's sites.
+        FileStamp remapped = FileStamping.RefreshStamp(document.Path, current, fresh.Sha256, fresh.Shape);
+        return new DocumentCheck(document.Sha256, fresh.Sha256, remapped, map);
     }
 
     // ContentKey(P) = hash over P's document hashes (path + sha, deleted ⇒ MISSING), its structural inputs

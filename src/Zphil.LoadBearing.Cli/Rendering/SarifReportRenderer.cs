@@ -217,7 +217,7 @@ internal static class SarifReportRenderer
     // than a sentence about this log.
     private static string ProjectSubject(int count)
     {
-        return $"{count} {Plurals.Noun(count, "project")}";
+        return Plurals.Counted(count, "project");
     }
 
     // The subject both partial-coverage notifications open with: the counted head, then what the solution
@@ -328,13 +328,23 @@ internal static class SarifReportRenderer
         IReadOnlyList<SarifLocation> locations = warning.File is { } file
             ? [new SarifLocation(new SarifPhysicalLocation(new SarifArtifactLocation(file, SrcRootBaseId), null))]
             : [];
-        var fingerprints = new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            [FingerprintKey] = $"v1||||{warning.File ?? string.Empty}|0"
-        };
+        Dictionary<string, string> fingerprints = Fingerprint(
+            string.Empty, string.Empty, string.Empty, warning.File ?? string.Empty, 0);
 
         return new SarifResult(
             ruleId, WarningLevel, new SarifMessage(warning.Message), locations, fingerprints, "new", null);
+    }
+
+    // The one fingerprint format, so a sixth slot or a v2 bump cannot reach one result kind and miss the
+    // other. A warning leaves the source, target and subject slots empty because it has no edge — written
+    // as three empty arguments rather than as four counted pipes in a literal.
+    private static Dictionary<string, string> Fingerprint(
+        string source, string target, string subject, string path, int ordinal)
+    {
+        return new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [FingerprintKey] = $"v1|{source}|{target}|{subject}|{path}|{ordinal}"
+        };
     }
 
     // One result per site. The partial fingerprint keys the alert as (ruleId, v1|source|target|subject|rel|ord)
@@ -361,10 +371,7 @@ internal static class SarifReportRenderer
             int ordinal = ordinals.GetValueOrDefault(relativePath);
             ordinals[relativePath] = ordinal + 1;
 
-            var fingerprints = new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                [FingerprintKey] = $"v1|{source}|{target}|{subject}|{relativePath}|{ordinal}"
-            };
+            Dictionary<string, string> fingerprints = Fingerprint(source, target, subject, relativePath, ordinal);
             var location = new SarifLocation(
                 new SarifPhysicalLocation(
                     new SarifArtifactLocation(relativePath, SrcRootBaseId),

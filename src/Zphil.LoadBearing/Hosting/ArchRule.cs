@@ -97,4 +97,15 @@ public sealed class ArchRule
     /// </summary>
     public string? BaselinePath => Migrate?.BaselinePath
                                    ?? (Scope is { Role: ScopeRole.Containment } containment ? containment.BaselinePath : null);
+
+    /// <summary>
+    ///     Gets whether this rule grandfathers existing violations rather than failing on them — true for a
+    ///     <c>Migrate</c> rule and for a quarantine's containment rule, false for <c>Enforce</c> and for a
+    ///     scope's tripwire.
+    /// </summary>
+    // Keyed on the payload rather than the posture: having a baseline to measure against IS what ratcheting
+    // means, and containment ratchets without the posture saying so. Every reader asking the question asks
+    // it through here, so a future posture that also ratchets is one edit rather than a hunt. A reader that
+    // needs the file itself reads BaselinePath instead — that is a different question.
+    public bool IsRatcheted => BaselinePath is not null;
 }

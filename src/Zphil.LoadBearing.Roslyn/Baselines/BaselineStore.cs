@@ -43,7 +43,7 @@ internal static class BaselineStore
         var sections = new Dictionary<string, RuleBaseline>(StringComparer.Ordinal);
         var cache = new Dictionary<string, BaselineDocument?>(StringComparer.Ordinal);
 
-        foreach (ArchRule rule in model.Rules.Where(r => r.BaselinePath is not null))
+        foreach (ArchRule rule in model.Rules.Where(r => r.IsRatcheted))
         {
             string absolutePath = ResolvePath(rule.BaselinePath!, solutionDirectory);
             if (!cache.TryGetValue(absolutePath, out BaselineDocument? document))

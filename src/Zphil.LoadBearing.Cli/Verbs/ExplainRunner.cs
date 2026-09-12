@@ -78,8 +78,7 @@ internal sealed class ExplainRunner(
     {
         var lead = $"Unknown rule ID '{ruleId}'";
 
-        return Refusals.StringifiedArrayRefusal(
-                   ruleId, lead, elements => Refusals.SingleValueAdvice("pass one rule ID", elements))
+        return Refusals.SingleValueRefusal(ruleId, lead, "pass one rule ID")
                ?? Refusals.RuleNotFound(lead, model);
     }
 }

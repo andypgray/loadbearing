@@ -31,6 +31,21 @@ internal static class Plurals
     }
 
     /// <summary>
+    ///     <paramref name="count" /> followed by <paramref name="noun" /> inflected for it — the counted
+    ///     phrase itself (<c>1 project</c>, <c>3 projects</c>), which is what a sentence that counts
+    ///     actually needs.
+    /// </summary>
+    /// <remarks>
+    ///     Here rather than at each renderer for the reason <see cref="Noun" /> is: the phrase is the unit
+    ///     every caller was composing by hand around it, so the space, the order and any future refinement
+    ///     (a thousands separator, a word for zero) have the same one owner the inflection does.
+    /// </remarks>
+    internal static string Counted(int count, string noun)
+    {
+        return count + " " + Noun(count, noun);
+    }
+
+    /// <summary>
     ///     The copula agreeing with <paramref name="count" />: <c>is</c> for exactly one, <c>are</c>
     ///     otherwise. The same rule as <see cref="Noun" /> applied to the verb, and a sentence that counts
     ///     usually needs both.

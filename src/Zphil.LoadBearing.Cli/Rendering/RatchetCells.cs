@@ -27,7 +27,7 @@ internal static class RatchetCells
     /// </summary>
     public static RatchetCellSplit? Of(RuleResult result)
     {
-        if (result.Rule.BaselinePath is null) return null;
+        if (!result.Rule.IsRatcheted) return null;
         if (SelectionWalk.FamilyNoun(result.Rule.Constraint?.Subject) is not { } family) return null;
 
         Dictionary<string, (int Remaining, int Sites)> held = Held(result.Grandfathered);

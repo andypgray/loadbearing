@@ -660,27 +660,28 @@ internal sealed class ConstraintEvaluator
         IReadOnlyList<SelectionAdmission> declared = DeclaredCells(family);
         int cellCount = declared.Count;
 
-        // The cell graph, materialized as the type pairs realizing each arrow: arrows[i, j] is what a
-        // reference from cell i into cell j is made of, and its emptiness is the absence of the arrow.
-        var arrows = new List<ReferenceEdge>[cellCount, cellCount];
+        // The cell graph as its arrows alone: crosses[i, j] is whether cell i references cell j at all.
+        // Which arrows EXIST is the whole of what the components need, and only an arrow whose two cells
+        // share one is ever a violation, so existence is asked with a walk that stops at its first edge and
+        // the type pairs realizing an arrow are collected below for the few arrows that red.
+        var crosses = new bool[cellCount, cellCount];
         for (var source = 0; source < cellCount; source++)
         for (var target = 0; target < cellCount; target++)
-            arrows[source, target] = source == target
-                ? new List<ReferenceEdge>()
-                : OutboundEdges(family.Subjects[source], declared[target], wantHit: true);
+            crosses[source, target] = source != target
+                                      && CrossesInto(family.Subjects[source], declared[target]);
 
-        int[] components = CellComponents.Of(cellCount, (source, target) => arrows[source, target].Count > 0);
+        int[] components = CellComponents.Of(cellCount, (source, target) => crosses[source, target]);
         Dictionary<int, string> circles = CircleDetails(layerCells, components);
 
         var violations = new List<Violation>();
         for (var source = 0; source < cellCount; source++)
         for (var target = 0; target < cellCount; target++)
         {
-            List<ReferenceEdge> arrow = arrows[source, target];
-            if (arrow.Count == 0 || components[source] != components[target]) continue;
+            if (!crosses[source, target] || components[source] != components[target]) continue;
 
             string detail = circles[components[source]];
             string cell = family.CellName(source);
+            List<ReferenceEdge> arrow = OutboundEdges(family.Subjects[source], declared[target], wantHit: true);
             foreach (ReferenceEdge edge in arrow)
                 violations.Add(Violation.Reference(edge.Source, edge.Target, edge.Sites, detail).InCell(cell));
         }
@@ -689,36 +690,27 @@ internal sealed class ConstraintEvaluator
     }
 
     // One detail sentence per component that holds a circle, naming its cells in family DECLARATION order —
-    // the order the rule's own sentence names them in, so the finding and the law read alike. A component of
-    // one cell holds no circle and mints nothing, which is why the caller skips an empty arrow before
-    // reaching in here: a cell IS in its own component, and arrows[i, i] is empty by construction.
+    // the order the rule's own sentence names them in, so the finding and the law read alike. Grouping over
+    // the cells in order is what carries that: a group keys on first appearance and holds its members in
+    // encounter order. A component of one cell holds no circle and mints nothing, which is why the caller
+    // skips an absent arrow before reaching in here: a cell IS in its own component, and crosses[i, i] is
+    // false by construction.
     private static Dictionary<int, string> CircleDetails(IReadOnlyList<Layer> cells, int[] components)
     {
-        var names = new Dictionary<int, List<string>>();
-        for (var cell = 0; cell < components.Length; cell++)
-        {
-            int component = components[cell];
-            if (!names.TryGetValue(component, out List<string>? members))
-            {
-                members = new List<string>();
-                names[component] = members;
-            }
-
-            members.Add(cells[cell].Name);
-        }
-
-        return names
-            .Where(component => component.Value.Count > 1)
+        return Enumerable.Range(0, components.Length)
+            .GroupBy(cell => components[cell], cell => cells[cell].Name)
+            .Select(component => (component.Key, Names: component.ToList()))
+            .Where(component => component.Names.Count > 1)
             .ToDictionary(
                 component => component.Key,
-                component => $"circular references among the {ProseFormat.JoinReferencesAnd(component.Value)} layers");
+                component => $"circular references among the {ProseFormat.JoinReferencesAnd(component.Names)} layers");
     }
 
     // The outbound reference walk the allow-list, the leaf and the cross-cell ban share, parameterized by
     // the polarity each asks with. External targets are exempt either way: the complement universe is
     // solution-declared, and a cell never holds an external type to be an "other" of.
     private List<Violation> Outbound(
-        SelectionAdmission subject, SelectionAdmission operand, bool wantHit, string? cell = null)
+        SelectionAdmission subject, SelectionAdmission operand, bool wantHit, string? cell)
     {
         return OutboundEdges(subject, operand, wantHit)
             .Select(edge => Violation.Reference(edge.Source, edge.Target, edge.Sites)
@@ -726,8 +718,9 @@ internal sealed class ConstraintEvaluator
             .ToList();
     }
 
-    // The walk itself, kept apart from the mint because the cycle gate needs the EDGES of an arrow before
-    // it knows whether that arrow lies on a circle — and only then whether they are violations at all.
+    // The walk itself, kept apart from the mint because the cycle gate wants the EDGES of an arrow without
+    // minting them — it learns only afterwards whether that arrow lies on a circle, and so whether they are
+    // violations at all.
     private List<ReferenceEdge> OutboundEdges(SelectionAdmission subject, SelectionAdmission operand, bool wantHit)
     {
         var edges = new List<ReferenceEdge>();
@@ -740,8 +733,23 @@ internal sealed class ConstraintEvaluator
         return edges;
     }
 
+    // The same walk asked only whether it would find anything, which is all the cell graph needs. The cycle
+    // gate tests every ordered pair of cells, and on a rule that passes no arrow it finds is evidence of
+    // anything, so stopping at the first edge is the difference between reading the solution's reference
+    // graph and collecting a copy of it.
+    private bool CrossesInto(SelectionAdmission subject, SelectionAdmission operand)
+    {
+        foreach (ReferenceEdge edge in Keyed(subject.Members, _edgesBySource.Lookup))
+            if (!edge.Target.IsExternal
+                && SelectionAdmission.CountsEdge(
+                    subject, operand, edge.Source, edge.Target, subjectAtSource: true, wantHit: true))
+                return true;
+
+        return false;
+    }
+
     // The inbound twin, keyed on the edge's target so the subject bounds ownership where it sits.
-    private List<Violation> Inbound(SelectionAdmission subject, SelectionAdmission allowed, string? cell = null)
+    private List<Violation> Inbound(SelectionAdmission subject, SelectionAdmission allowed, string? cell)
     {
         var violations = new List<Violation>();
         foreach (ReferenceEdge edge in Keyed(subject.Members, _edgesByTarget.Lookup))
@@ -955,27 +963,29 @@ internal sealed class ConstraintEvaluator
     {
         SelectionAdmission among =
             SelectionAdmission.Operands(_selections, constraint.Among, SelectionPosition.Subject);
-        ILookup<string, TypeNode> byName = among.Members.ToLookup(node => node.Name, StringComparer.Ordinal);
-        string template = constraint.Template;
+
+        // Bucketed into lists rather than a lookup's groupings, because the ambiguous arm walks the same
+        // counterparts a second time to site them: the bucket IS that walk's collection, so the two common
+        // arms — one counterpart, or none — cost a hash probe and allocate nothing per subject.
+        var byName = new Dictionary<string, List<TypeNode>>(StringComparer.Ordinal);
+        foreach (TypeNode node in among.Members)
+        {
+            if (!byName.TryGetValue(node.Name, out List<TypeNode>? carrying))
+            {
+                carrying = new List<TypeNode>();
+                byName[node.Name] = carrying;
+            }
+
+            carrying.Add(node);
+        }
 
         return Shape(subjects, subject =>
         {
-            // Materialized rather than held as the lookup's IEnumerable, because the ambiguous arm walks
-            // the same counterparts a second time to site them.
-            List<TypeNode> counterparts = byName[Derive(template, subject)].ToList();
-            if (counterparts.Count == 1) return null;
+            if (!byName.TryGetValue(constraint.Derive(subject.Name), out List<TypeNode>? counterparts))
+                return subject.DeclarationSites;
 
-            return counterparts.Count == 0 ? subject.DeclarationSites : CounterpartSites(counterparts);
+            return counterparts.Count == 1 ? null : CounterpartSites(counterparts);
         });
-    }
-
-    // The name one subject's template derives: every {Name} occurrence replaced by the subject's simple
-    // name. netstandard2.0's two-string Replace is ordinal by definition — there is no StringComparison
-    // overload to spell it with — which is the same match the spec-build placeholder check runs, so a
-    // '{name}' typo fails at build rather than deriving a constant name here.
-    private static string Derive(string template, TypeNode subject)
-    {
-        return template.Replace("{Name}", subject.Name);
     }
 
     // The ambiguous arm's evidence: every colliding counterpart's declaration, ordered the way a report

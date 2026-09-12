@@ -98,10 +98,8 @@ internal sealed class CheckRunner(
     private static void RefuseAStringifiedArrayDiffBase(string diffBase)
     {
         var lead = $"Cannot resolve changed files since '{diffBase}'";
-        string? refusal = Refusals.StringifiedArrayRefusal(
-            diffBase, lead, elements => Refusals.SingleValueAdvice("pass one git ref", elements));
-
-        if (refusal is not null) throw new UserErrorException(refusal);
+        if (Refusals.SingleValueRefusal(diffBase, lead, "pass one git ref") is { } refusal)
+            throw new UserErrorException(refusal);
     }
 
     // The check proper, over whichever pair of channels the caller handed it: the report and the human

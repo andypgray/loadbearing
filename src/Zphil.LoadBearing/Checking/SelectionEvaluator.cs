@@ -92,32 +92,51 @@ internal sealed class SelectionEvaluator
         return selection.Adjectives.Count > 0 || SelectionWalk.NounOf(selection) is not TypeNoun;
     }
 
+    /// <summary>
+    ///     The parts a compound selection resolves through, or null where it resolves by its own noun — a
+    ///     union's operands, a family's cells, a layer's definition (GRAMMAR §5.1, §4.1).
+    /// </summary>
+    /// <remarks>
+    ///     The one answer to which selections are compound, because two walks ask it: membership here, and
+    ///     provenance in <see cref="SelectionAdmission.Collect" />. Answered in one place so a fourth
+    ///     compound shape reaches both by being added once — a shape the provenance walk did not know about
+    ///     would fall through to the leaf and silently lose its parts' heads rather than fail.
+    ///     <para>
+    ///         The union arm comes first because a union has no single noun: reading
+    ///         <see cref="Selection.Noun" /> on one throws by design.
+    ///     </para>
+    ///     <para>
+    ///         Unmemoized on purpose, all three: a layer cell may carry a <c>Where</c> predicate through its
+    ///         definition, and a project family's cells are decided by a project selection that may carry
+    ///         one directly.
+    ///     </para>
+    /// </remarks>
+    internal IReadOnlyList<Selection>? Composite(Selection selection)
+    {
+        if (selection is UnionSelection union) return union.Parts;
+
+        return selection.Noun switch
+        {
+            EachNoun => Cells(selection),
+            // A layer is transparent to its definition: it names what the definition names, in the caller's
+            // position, and the layer's own adjectives narrow that afterwards — which is the compound fold
+            // over a single part.
+            LayerNoun { Definition: { } definition } => [definition],
+            _ => null
+        };
+    }
+
     internal HashSet<TypeNode> Evaluate(Selection selection, SelectionPosition position)
     {
-        // A union's operands and a family's cells differ in what they mean and not in how they combine
-        // (GRAMMAR §5.1): each part resolves in this same position, the memberships unite, and the enclosing
-        // selection's own adjectives narrow the union. The union arm comes first because a union has no
-        // single noun — reading Selection.Noun on one throws by design.
-        if (selection is UnionSelection union)
+        // A union's operands, a family's cells and a layer's definition differ in what they mean and not in
+        // how they combine (GRAMMAR §5.1): each part resolves in this same position, the memberships unite,
+        // and the enclosing selection's own adjectives narrow the union.
+        if (Composite(selection) is { } parts)
         {
-            var parts = new HashSet<TypeNode>();
-            foreach (Selection member in union.Parts) parts.UnionWith(Evaluate(member, position));
+            var members = new HashSet<TypeNode>();
+            foreach (Selection part in parts) members.UnionWith(Evaluate(part, position));
 
-            return Narrow(union, parts);
-        }
-
-        // A family is the union of its cells to every reader but the three that read the partition
-        // (GRAMMAR §5.1), so it resolves through the one place cells are minted rather than deriving them
-        // a second time. Dispatched here rather than in ByNoun because Cells needs the selection, not the
-        // noun; unmemoized on purpose, for the reason the definition-layer arm is — a layer cell may carry
-        // a Where predicate through its definition, and a project family's cells are decided by a project
-        // selection that may carry one directly.
-        if (selection.Noun is EachNoun)
-        {
-            var cells = new HashSet<TypeNode>();
-            foreach (Selection cell in Cells(selection)) cells.UnionWith(Evaluate(cell, position));
-
-            return Narrow(selection, cells);
+            return Narrow(selection, members);
         }
 
         return Narrow(selection, ByNoun(selection.Noun, position));
@@ -131,8 +150,16 @@ internal sealed class SelectionEvaluator
     ///     Exposed so a caller that already holds what the selection's noun resolves to can finish the
     ///     selection without resolving it a second time.
     /// </remarks>
+    // May hand back the very set it was given, so a caller must pass one it owns and must not go on
+    // mutating it afterwards. That is safe because a HashSet only ever reaches here from a compound fold —
+    // Evaluate's parts loop and SelectionAdmission.Folded, each of which allocates one, fills it and lets
+    // go. No ByNoun arm yields a HashSet: the universes are lists, the memo holds a list, and the rest are
+    // lazy Wheres. An adjective-free union or family is the common case, and copying its membership a
+    // second time bought nothing.
     internal HashSet<TypeNode> Narrow(Selection selection, IEnumerable<TypeNode> candidates)
     {
+        if (selection.Adjectives.Count == 0 && candidates is HashSet<TypeNode> owned) return owned;
+
         IEnumerable<TypeNode> current = candidates;
         foreach (SelectionAdjective adjective in selection.Adjectives) current = ApplyAdjective(current, adjective);
 
@@ -156,12 +183,6 @@ internal sealed class SelectionEvaluator
                 // arch.Types is solution-declared by definition (§5.1), so in subject position the universe
                 // already IS the answer; only the target universe (which holds externals) needs the filter.
                 return subject ? _solutionDeclared : Scanned(noun, position, () => universe.Where(t => !t.IsExternal));
-            case LayerNoun { Definition: { } definition }:
-                // A layer is transparent to its definition: it names what the definition names, in the
-                // caller's position, and the layer's own adjectives are applied by Evaluate afterwards.
-                // Unmemoized on purpose — the definition's own noun scan is memoized one level down, and a
-                // definition may carry a Where predicate, which every other adjective re-runs per call.
-                return Evaluate(definition, position);
             case LayerNoun layer:
                 return Scanned(noun, position, () =>
                 {

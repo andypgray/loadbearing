@@ -19,7 +19,7 @@ internal static class RatchetSurveyNotice
     public static IReadOnlyList<string> Lines(CheckReport report, bool anyRatchetedRule)
     {
         List<RuleResult> unratcheted = report.Results
-            .Where(r => r is { Status: RuleStatus.Failed, Rule.BaselinePath: null })
+            .Where(r => r is { Status: RuleStatus.Failed, Rule.IsRatcheted: false })
             .ToList();
 
         var lines = new List<string>();
@@ -33,10 +33,10 @@ internal static class RatchetSurveyNotice
         int violationCount = unratcheted.Sum(r => r.Violations.Count);
         string ruleVerb = Plurals.Verb(unratcheted.Count);
         lines.Add(
-            $"{unratcheted.Count} {Plurals.Noun(unratcheted.Count, "rule")} {ruleVerb} failing with no baseline to capture " +
-            $"({violationCount} {Plurals.Noun(violationCount, "violation")}):");
+            $"{Plurals.Counted(unratcheted.Count, "rule")} {ruleVerb} failing with no baseline to capture " +
+            $"({Plurals.Counted(violationCount, "violation")}):");
         foreach (RuleResult result in unratcheted)
-            lines.Add($"  {result.Rule.Id} — {result.Violations.Count} {Plurals.Noun(result.Violations.Count, "violation")}");
+            lines.Add($"  {result.Rule.Id} — {Plurals.Counted(result.Violations.Count, "violation")}");
         lines.Add(
             "Enforce carries no baseline, so 'check' stays red on these until each is fixed at the source — " +
             "in the code, in the rule, or by re-posturing the debt as Migrate or Quarantine.");

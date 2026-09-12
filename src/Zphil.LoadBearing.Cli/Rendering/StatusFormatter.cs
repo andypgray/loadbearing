@@ -68,7 +68,7 @@ internal static class StatusFormatter
     // the diagnosis. A ratchet row is the only one that reports rot as a number that looks like progress.
     private static string? UnmeasuredLine(RuleResult result)
     {
-        if (result.Rule.BaselinePath is null || !result.SelectionMatchedNothing) return null;
+        if (!result.Rule.IsRatcheted || !result.SelectionMatchedNothing) return null;
 
         var diagnosis = "  not measured: the rule's selection matched nothing, so these entries are untested, not fixed.";
         return Cure(result) is { } cure ? $"{diagnosis} {cure}" : diagnosis;
@@ -122,7 +122,7 @@ internal static class StatusFormatter
         // later would have to grow to earn the burndown line. Containment ratchets like Migrate but never
         // suggests promotion — RuleResult.Promotable already gates that on the posture, so the label is the
         // only thing left for the posture to supply.
-        return result.Rule.BaselinePath is not null
+        return result.Rule.IsRatcheted
             ? RatchetLine(result, result.Rule.Posture.ToString().ToLowerInvariant())
             : EnforceLine(result);
     }
@@ -150,8 +150,8 @@ internal static class StatusFormatter
     private static string EnforceLine(RuleResult result)
     {
         var details = new List<string>();
-        if (result.Violations.Count > 0) details.Add($"{result.Violations.Count} {Plurals.Noun(result.Violations.Count, "violation")}");
-        if (result.Warnings.Count > 0) details.Add($"{result.Warnings.Count} {Plurals.Noun(result.Warnings.Count, "warning")}");
+        if (result.Violations.Count > 0) details.Add($"{Plurals.Counted(result.Violations.Count, "violation")}");
+        if (result.Warnings.Count > 0) details.Add($"{Plurals.Counted(result.Warnings.Count, "warning")}");
 
         return details.Count > 0
             ? $"{Marker(result)} {result.Rule.Id} — {string.Join(", ", details)}"

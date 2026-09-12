@@ -11,12 +11,14 @@ namespace Zphil.LoadBearing;
 /// </summary>
 public sealed class Layer : Selection
 {
-    private readonly LayerNoun _noun;
+    private readonly LayerRegistration _registration;
 
-    internal Layer(Arch owner, LayerNoun noun)
+    // The registration rather than the noun alone, so Purpose writes to the state this handle was minted
+    // beside instead of asking the Arch to find it again.
+    internal Layer(Arch owner, LayerRegistration registration)
         : base(owner)
     {
-        _noun = noun;
+        _registration = registration;
     }
 
     /// <summary>
@@ -28,13 +30,13 @@ public sealed class Layer : Selection
     /// </summary>
     public Layer Purpose(string prose)
     {
-        Owner.AddLayerPurpose(_noun, prose);
+        _registration.Purposes.Add(prose);
         return this;
     }
 
-    internal string Name => _noun.Name;
+    internal string Name => _registration.Noun.Name;
 
-    internal override SelectionNoun Noun => _noun;
+    internal override SelectionNoun Noun => _registration.Noun;
 
     internal override IReadOnlyList<SelectionAdjective> Adjectives => Array.Empty<SelectionAdjective>();
 }

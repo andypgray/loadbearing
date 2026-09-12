@@ -122,39 +122,23 @@ internal sealed class SelectionAdmission
 
     /// <summary>
     ///     One selection resolved in one position, carrying the heads that admitted each conflated node it
-    ///     matched. A union is collected part by part and folded through <see cref="Folded" />, so the
-    ///     heads survive a level of nesting the union's own noun could never state.
+    ///     matched. A compound selection is collected part by part and folded through <see cref="Folded" />,
+    ///     so the heads survive a level of nesting the enclosing noun could never state.
     /// </summary>
     internal static SelectionAdmission Collect(
         SelectionEvaluator selections, Selection selection, SelectionPosition position)
     {
-        // The union arm comes first because a union has no single noun — reading Selection.Noun on one
-        // throws by design (GRAMMAR §5.1) — and because its heads are its parts'.
-        if (selection is UnionSelection union)
-            return Folded(selections, union, CollectAll(selections, union.Parts, position));
-
-        // A layer takes its definition's stance (GRAMMAR §4.1): the definition is collected in this same
-        // position and its heads are kept, so a project-defined layer names its nodes at that project
-        // exactly as the bare project noun would, and the layer's own adjectives gate what survives.
-        // Narrowed from the definition's own membership rather than re-evaluated through the layer noun,
-        // whose arm would resolve the definition a second time — it is memoized nowhere.
-        if (selection.Noun is LayerNoun { Definition: { } definition })
-        {
-            SelectionAdmission defined = Collect(selections, definition, position);
-            HashSet<TypeNode> layerMembers = selections.Narrow(selection, defined.Members);
-            return new SelectionAdmission(layerMembers, Merge([defined], layerMembers));
-        }
-
-        // A family takes each cell's stance (GRAMMAR §5.1), which is why it shares the union arm's fold:
-        // the cells are collected in this same position and folded, so a project cell stages its project
-        // head and a file compiled into two cells is judged at each. Spec-build item 27 keeps a family out
-        // of every position but the rule subject, and the subject path collects its cells itself (it has
-        // emptiness and the partition to report on the way) — so this arm exists to keep the fold total
-        // over the noun hierarchy rather than because some caller reaches it. Without it a family would
-        // fall through to the leaf below and lose its cells' heads, which is the silent wrong answer
-        // rather than a loud one.
-        if (selection.Noun is EachNoun)
-            return Folded(selections, selection, CollectAll(selections, selections.Cells(selection), position));
+        // Every compound selection takes its parts' stance and folds them (GRAMMAR §5.1, §4.1), which is
+        // why one arm serves all three: a union's heads are its operands', a family's are its cells' — so a
+        // project cell stages its project head and a file compiled into two cells is judged at each — and a
+        // layer's are its definition's, so a project-defined layer names its nodes at that project exactly
+        // as the bare project noun would. The enclosing selection's own adjectives gate what survives.
+        // Totality over the noun hierarchy is the point rather than any one caller: spec-build item 27
+        // keeps a family out of every position but the rule subject, and the subject path collects its
+        // cells itself. A compound shape that fell through to the leaf below would lose its parts' heads,
+        // which is the silent wrong answer rather than a loud one.
+        if (selections.Composite(selection) is { } parts)
+            return Folded(selections, selection, CollectAll(selections, parts, position));
 
         HashSet<TypeNode> members = selections.Evaluate(selection, position);
         return new SelectionAdmission(members, Stage(selections, selection, members));

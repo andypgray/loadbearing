@@ -122,7 +122,7 @@ internal sealed class BaselineRunner(
         if (request.Add)
             return AddEntry(request, report, source.SolutionDirectory);
 
-        List<RuleResult> ratchetResults = report.Results.Where(r => r.Rule.BaselinePath is not null).ToList();
+        List<RuleResult> ratchetResults = report.Results.Where(r => r.Rule.IsRatcheted).ToList();
         if (ratchetResults.Count == 0)
         {
             foreach (string line in RatchetSurveyNotice.Lines(report, anyRatchetedRule: false))
@@ -178,7 +178,10 @@ internal sealed class BaselineRunner(
         RuleResult? result = report.Results.FirstOrDefault(r => string.Equals(r.Rule.Id, ruleId, StringComparison.Ordinal));
         if (result is null)
             throw new UserErrorException($"rule '{ruleId}' is not in the spec.");
-        if (result.Rule.BaselinePath is null)
+        // The path rather than IsRatcheted, though they answer the same question: this site needs the file
+        // too, and binding it here is what lets the resolve below read a value instead of re-reading a
+        // nullable property.
+        if (result.Rule.BaselinePath is not { } baselinePath)
             throw new UserErrorException(
                 $"rule '{ruleId}' is not ratcheted — only Migrate and Quarantine containment rules carry baselines.");
 
@@ -186,7 +189,7 @@ internal sealed class BaselineRunner(
             throw new UserErrorException(
                 $"cannot add to rule '{ruleId}' — the rule has an empty subject or an evaluation error.");
 
-        string path = BaselineStore.ResolvePath(result.Rule.BaselinePath, solutionDirectory);
+        string path = BaselineStore.ResolvePath(baselinePath, solutionDirectory);
         BaselineDocument? existing = BaselineStore.TryReadDocument(path);
         if (existing is null || !existing.Sections.TryGetValue(ruleId, out IReadOnlyList<BaselineEntry>? existingEntries))
             throw new UserErrorException($"no baseline section for '{ruleId}' — run 'loadbearing baseline --init' first.");
@@ -400,17 +403,17 @@ internal sealed class BaselineRunner(
         // lowered or first recorded a count tightened the baseline as surely as one that removed an entry.
         if (removed + lowered + recorded == 0) output.WriteLine($"{ruleId}: nothing to accept.");
         if (removed > 0)
-            output.WriteLine($"{ruleId}: accepted {removed} {Plurals.Noun(removed, "reduction")}.");
+            output.WriteLine($"{ruleId}: accepted {Plurals.Counted(removed, "reduction")}.");
         if (lowered > 0)
-            output.WriteLine($"{ruleId}: lowered the site count on {lowered} {Plurals.Noun(lowered, "entry")}.");
+            output.WriteLine($"{ruleId}: lowered the site count on {Plurals.Counted(lowered, "entry")}.");
         if (recorded > 0)
-            output.WriteLine($"{ruleId}: recorded the site count on {recorded} {Plurals.Noun(recorded, "entry")}.");
+            output.WriteLine($"{ruleId}: recorded the site count on {Plurals.Counted(recorded, "entry")}.");
         if (additions > 0)
             output.WriteLine(
-                $"{ruleId}: refused {additions} {Plurals.Noun(additions, "addition")} — a captured baseline grows only via 'loadbearing baseline --add', one attributed entry at a time.");
+                $"{ruleId}: refused {Plurals.Counted(additions, "addition")} — a captured baseline grows only via 'loadbearing baseline --add', one attributed entry at a time.");
         if (grew > 0)
             output.WriteLine(
-                $"{ruleId}: refused site growth on {grew} {Plurals.Noun(grew, "entry")} — a grandfathered pair grows only via 'loadbearing baseline --add', one attributed entry at a time.");
+                $"{ruleId}: refused site growth on {Plurals.Counted(grew, "entry")} — a grandfathered pair grows only via 'loadbearing baseline --add', one attributed entry at a time.");
 
         return true;
     }

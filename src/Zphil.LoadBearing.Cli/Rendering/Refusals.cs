@@ -124,4 +124,21 @@ internal static class Refusals
     {
         return elements.Count == 1 ? $"{advice}: '{elements[0]}'" : advice;
     }
+
+    /// <summary>
+    ///     The stringified-array refusal for a scalar parameter — <see cref="StringifiedArrayRefusal" />
+    ///     over <see cref="SingleValueAdvice" /> — or <c>null</c> when <paramref name="value" /> is not an
+    ///     array and the caller's own refusal should answer.
+    /// </summary>
+    /// <remarks>
+    ///     The pairing is spelled here because <see cref="SingleValueAdvice" /> takes the noun first and so
+    ///     cannot be passed as a method group; every scalar caller was writing the same closure out, and a
+    ///     copied one is how a path parameter comes to advise "pass one git ref". The glob twin needs no
+    ///     such pairing — <see cref="GlobListAdvice" /> is already the shape the refusal takes. Text only,
+    ///     with no throw: a caller that has its own fallback reads this through <c>??</c>.
+    /// </remarks>
+    internal static string? SingleValueRefusal(string value, string lead, string advice)
+    {
+        return StringifiedArrayRefusal(value, lead, elements => SingleValueAdvice(advice, elements));
+    }
 }

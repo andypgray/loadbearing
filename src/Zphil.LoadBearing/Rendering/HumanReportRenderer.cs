@@ -93,7 +93,7 @@ public static class HumanReportRenderer
             foreach (string line in ViolationLines(result, relativizer))
                 output.WriteLine($"  {line}");
 
-        if (result.Rule.BaselinePath is not null) RenderRatchetLines(output, result);
+        if (result.Rule.IsRatcheted) RenderRatchetLines(output, result);
 
         foreach (CheckWarning warning in result.Warnings)
         {

@@ -1,4 +1,5 @@
 using Zphil.LoadBearing.Model;
+using Zphil.LoadBearing.Prose;
 
 namespace Zphil.LoadBearing.Checking;
 
@@ -141,6 +142,6 @@ internal static class AuthoringHints
 
     private static string Sentence(string clause)
     {
-        return char.ToUpperInvariant(clause[0]) + clause.Substring(1) + ".";
+        return ProseFormat.Capitalize(clause) + ".";
     }
 }

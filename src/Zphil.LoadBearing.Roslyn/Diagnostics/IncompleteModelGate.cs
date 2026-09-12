@@ -333,17 +333,12 @@ internal static class IncompleteModelGate
     // which projects failed has no business saying "one or more".
     private static string Failed(WorkspaceDiagnostics diagnostics)
     {
-        return Counted(diagnostics.FailedProjects.Count);
+        return Plurals.Counted(diagnostics.FailedProjects.Count, "project");
     }
 
     private static string Unrestored(WorkspaceDiagnostics diagnostics)
     {
-        return Counted(diagnostics.RestoreFailedProjects.Count);
-    }
-
-    private static string Counted(int count)
-    {
-        return $"{count} {Plurals.Noun(count, "project")}";
+        return Plurals.Counted(diagnostics.RestoreFailedProjects.Count, "project");
     }
 
     // A surface's whole refusal: one EvidenceBlock per cause it has, load failures first. Both ledes are

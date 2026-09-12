@@ -230,7 +230,7 @@ public static class ArchChecker
             // A ratcheted rule — Migrate, or Quarantine containment (which reifies a real
             // MustOnlyBeReferencedBy constraint and so evaluates exactly like Enforce) — partitions
             // against its baseline; everything else is plain Enforce law (GRAMMAR §7).
-            return rule.BaselinePath is not null
+            return rule.IsRatcheted
                 ? Ratchet(rule, violations, warnings, coverage, baselines)
                 : Enforce(rule, violations, warnings, coverage);
         }
@@ -359,7 +359,7 @@ public static class ArchChecker
             .Where(diff.Contains)
             .Select(diff.SolutionRelative)
             .OrderBy(path => path, StringComparer.Ordinal)
-            .Select(path => new CheckWarning(kind, TripwireMessage(path, scopeId, caution), path))
+            .Select(path => new CheckWarning(kind, TripwireMessage(path, scopeId, rule.Id, caution), path))
             .ToList();
 
         return new RuleResult(rule, RuleStatus.Passed, Array.Empty<Violation>(), touched);
@@ -367,14 +367,16 @@ public static class ArchChecker
 
     // The two postures word the same finding differently because they ask different things of the reader: a
     // quarantine asks whether the task requires being here at all, a caution only that the dragons be read
-    // before editing. Both name the tripwire as the way to read them.
-    private static string TripwireMessage(string relativePath, string scopeId, bool caution)
+    // before editing. Both name the tripwire as the way to read them. The scope names itself in prose; the
+    // command names the RULE, which is the tripwire's own id rather than a second spelling of how one is
+    // minted from a scope — text the reader is told to paste must not go stale against that mint.
+    private static string TripwireMessage(string relativePath, string scopeId, string ruleId, bool caution)
     {
         return caution
             ? $"Changed file '{relativePath}' is inside cautioned scope '{scopeId}' — read the dragons before " +
-              $"editing: loadbearing explain {scopeId}/tripwire."
+              $"editing: loadbearing explain {ruleId}."
             : $"Changed file '{relativePath}' is inside quarantined scope '{scopeId}' — does the task actually " +
-              $"require editing dragon territory? Dragons: loadbearing explain {scopeId}/tripwire.";
+              $"require editing dragon territory? Dragons: loadbearing explain {ruleId}.";
     }
 
     // A rule the narrowed run never had in view: its subject selection matched nothing, and nothing is
@@ -393,7 +395,7 @@ public static class ArchChecker
     private static RuleResult NarrowedSkip(
         ArchRule rule, IReadOnlyList<CheckWarning> warnings, BaselineIndex baselines, NarrowedUniverse narrowing)
     {
-        bool captured = rule.BaselinePath is not null && baselines.TryGet(rule.Id, out _);
+        bool captured = rule.IsRatcheted && baselines.TryGet(rule.Id, out _);
         return new RuleResult(
             rule, RuleStatus.Skipped, Array.Empty<Violation>(), warnings, narrowing.RuleSkipReason,
             baselineCaptured: captured);

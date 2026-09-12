@@ -149,11 +149,11 @@ internal static class SpecValidator
 
         CheckCitations(rule, errors);
         CheckForeign(selections, target, arch, errors);
-        CheckForeignProjects(rule, arch, errors);
-        CheckProjectPatterns(rule, errors);
-        CheckTargetFrameworks(rule, errors);
+        CheckForeignProjects(rule, target, arch, errors);
+        CheckProjectPatterns(rule, target, errors);
+        CheckTargetFrameworks(rule, target, errors);
         CheckCounterpartTemplate(rule, errors);
-        CheckMembers(rule, arch, errors);
+        CheckMembers(rule, target, arch, errors);
         CheckMemberReturning(rule, errors);
         CheckMemberAcceptParameter(rule, errors);
         CheckHierarchyAnchors(rule, errors);
@@ -237,9 +237,11 @@ internal static class SpecValidator
         IEnumerable<Selection> operands, ErrorTarget target, Arch arch, List<SpecValidationError> errors)
     {
         List<Selection> roots = operands.ToList();
-        CheckForeign(roots.SelectMany(SelectionWalk.ExpandSelection), target, arch, errors);
+        List<Selection> expanded = roots.SelectMany(SelectionWalk.ExpandSelection).ToList();
+
+        CheckForeign(expanded, target, arch, errors);
         CheckPatterns(roots.SelectMany(SelectionPatterns), target, errors);
-        CheckLifetimes(roots.SelectMany(SelectionWalk.ExpandSelection), target, errors);
+        CheckLifetimes(expanded, target, errors);
     }
 
     private static void CheckPatterns(
@@ -460,7 +462,8 @@ internal static class SpecValidator
     // one reaches nothing on a project constraint, whose Subject is null. The walk includes the Except
     // payloads, which is the one way a project selection nests and therefore the one way a foreign one can
     // hide inside a local subject.
-    private static void CheckForeignProjects(RuleRegistration rule, Arch arch, List<SpecValidationError> errors)
+    private static void CheckForeignProjects(
+        RuleRegistration rule, ErrorTarget target, Arch arch, List<SpecValidationError> errors)
     {
         if (rule.Constraint is null) return;
 
@@ -469,8 +472,7 @@ internal static class SpecValidator
             selections.Select(selection => (selection.Owner, rule.Location));
 
         ReportFirstForeign(
-            candidates, arch, Code.ForeignProjectSelection, "A project selection",
-            new ErrorTarget(rule.Id, rule.Location), errors);
+            candidates, arch, Code.ForeignProjectSelection, "A project selection", target, errors);
     }
 
     // GRAMMAR §8 item 23: the blank check over a project subject's own operands — the .Named names and the
@@ -478,7 +480,8 @@ internal static class SpecValidator
     // opposite directions (a blank name matches nothing, a blank glob matches everything) and the catalog
     // entry has to be able to say so. The labels come off PatternKind all the same, so the noun a project
     // operand is named by cannot drift from the noun the type-side walk names the same thing by.
-    private static void CheckProjectPatterns(RuleRegistration rule, List<SpecValidationError> errors)
+    private static void CheckProjectPatterns(
+        RuleRegistration rule, ErrorTarget target, List<SpecValidationError> errors)
     {
         if (rule.Constraint is null) return;
 
@@ -487,34 +490,35 @@ internal static class SpecValidator
             switch (adjective)
             {
                 case ProjectNamedAdjective named:
-                    foreach (string name in named.Names) CheckProjectPattern(name, PatternKind.ProjectName, rule, errors);
+                    foreach (string name in named.Names) CheckProjectPattern(name, PatternKind.ProjectName, target, errors);
 
                     break;
                 case ProjectMatchingAdjective matching:
-                    foreach (string glob in matching.Globs) CheckProjectPattern(glob, PatternKind.ProjectNamePattern, rule, errors);
+                    foreach (string glob in matching.Globs) CheckProjectPattern(glob, PatternKind.ProjectNamePattern, target, errors);
 
                     break;
             }
     }
 
     private static void CheckProjectPattern(
-        string value, PatternKind kind, RuleRegistration rule, List<SpecValidationError> errors)
+        string value, PatternKind kind, ErrorTarget target, List<SpecValidationError> errors)
     {
         if (!string.IsNullOrWhiteSpace(value)) return;
 
-        ReportBlank(Code.BlankProjectPattern, kind.Label, new ErrorTarget(rule.Id, rule.Location), errors);
+        ReportBlank(Code.BlankProjectPattern, kind.Label, target, errors);
     }
 
     // GRAMMAR §8 item 24: MustOnlyTarget's own operands. A blank moniker matches nothing, so it narrows the
     // allow-list silently — the rule stays green until a project targets the framework the author meant to
     // permit, which is exactly the class of slip the catalog exists to catch at build.
-    private static void CheckTargetFrameworks(RuleRegistration rule, List<SpecValidationError> errors)
+    private static void CheckTargetFrameworks(
+        RuleRegistration rule, ErrorTarget target, List<SpecValidationError> errors)
     {
-        if (rule.Constraint is not MustOnlyTargetConstraint target) return;
+        if (rule.Constraint is not MustOnlyTargetConstraint targeting) return;
 
-        foreach (string framework in target.Frameworks)
+        foreach (string framework in targeting.Frameworks)
             if (string.IsNullOrWhiteSpace(framework))
-                ReportBlank(Code.BlankTargetFramework, "target framework", new ErrorTarget(rule.Id, rule.Location), errors);
+                ReportBlank(Code.BlankTargetFramework, "target framework", target, errors);
     }
 
     // GRAMMAR §8 item 26: MustHaveExactlyOneCounterpart's name template. A template with no {Name} in it is
@@ -528,7 +532,8 @@ internal static class SpecValidator
 
         string template = counterpart.Template;
         if (string.IsNullOrWhiteSpace(template)) return;
-        if (template.IndexOf("{Name}", StringComparison.Ordinal) >= 0) return;
+        if (template.IndexOf(MustHaveExactlyOneCounterpartConstraint.NamePlaceholder, StringComparison.Ordinal) >= 0)
+            return;
 
         errors.Add(new SpecValidationError(Code.CounterpartTemplateWithoutPlaceholder, rule.Id,
             $"The counterpart name template '{template}' on '{rule.Id}' contains no '{{Name}}' placeholder, so every "
@@ -561,16 +566,17 @@ internal static class SpecValidator
     // that its anchor declares it. A member error renders at the member's own arch.Member(...) call site
     // when it has one, falling back to the consuming rule's anchor for a verb-minted member (which carries
     // no location — GRAMMAR §8, items 11–13/18).
-    private static void CheckMembers(RuleRegistration rule, Arch arch, List<SpecValidationError> errors)
+    private static void CheckMembers(
+        RuleRegistration rule, ErrorTarget target, Arch arch, List<SpecValidationError> errors)
     {
         IReadOnlyList<Member> members = rule.Constraint?.MemberOperands ?? Array.Empty<Member>();
         if (members.Count == 0) return;
 
         IEnumerable<(Arch Owner, SpecSourceLocation? Location)> candidates =
-            members.Select(member => (member.Owner, Location: member.Location ?? rule.Location));
-        if (ReportFirstForeign(candidates, arch, Code.ForeignMember, "A member", new ErrorTarget(rule.Id, rule.Location), errors)) return;
+            members.Select(member => (member.Owner, Location: member.Location ?? target.Location));
+        if (ReportFirstForeign(candidates, arch, Code.ForeignMember, "A member", target, errors)) return;
 
-        foreach (Member member in members) CheckMember(member, rule.Id, rule.Location, errors);
+        foreach (Member member in members) CheckMember(member, target, errors);
     }
 
     // GRAMMAR §8 item 14: a member `.Returning` anchor is definition-level, so a closed-generic anchor
@@ -715,18 +721,20 @@ internal static class SpecValidator
                     target.Location));
     }
 
-    private static void CheckMember(Member member, string id, SpecSourceLocation? ruleLocation, List<SpecValidationError> errors)
+    private static void CheckMember(Member member, ErrorTarget rule, List<SpecValidationError> errors)
     {
         // The member's own arch.Member(...) call site steers the diagnostic when present; a verb-minted
-        // member has none, so it attributes to the consuming rule's anchor.
-        SpecSourceLocation? location = member.Location ?? ruleLocation;
+        // member has none, so it attributes to the consuming rule's anchor. The id stays the rule's either
+        // way — a member is never the thing a spec error is addressed to.
+        var target = new ErrorTarget(rule.Id, member.Location ?? rule.Location);
 
         // A member minted from an unresolvable anchor expression (GRAMMAR §8, item 12's expression sibling):
         // the resolver stored the diagnostic core; report it before touching the anchor. A poisoned Member's
         // anchor accessors throw if read (fail closed), so this short-circuit is the only sanctioned path.
         if (member.PoisonError is not null)
         {
-            errors.Add(new SpecValidationError(Code.MemberExpressionUnresolvable, id, $"{member.PoisonError} (used by '{id}').", location));
+            errors.Add(new SpecValidationError(Code.MemberExpressionUnresolvable, target.Id,
+                $"{member.PoisonError} (used by '{target.Id}').", target.Location));
             return;
         }
 
@@ -734,8 +742,8 @@ internal static class SpecValidator
 
         if (string.IsNullOrWhiteSpace(member.Name))
         {
-            errors.Add(new SpecValidationError(Code.BlankMemberName, id,
-                $"Blank member name on a member of '{display}' (used by '{id}').", location));
+            errors.Add(new SpecValidationError(Code.BlankMemberName, target.Id,
+                $"Blank member name on a member of '{display}' (used by '{target.Id}').", target.Location));
             return;
         }
 
@@ -745,14 +753,14 @@ internal static class SpecValidator
         Type? declaringBase = FindDeclaringBase(anchor, member.Name);
         if (declaringBase != null)
         {
-            errors.Add(new SpecValidationError(Code.MemberNotDeclared, id,
+            errors.Add(new SpecValidationError(Code.MemberNotDeclared, target.Id,
                 $"'{display}' does not declare '{member.Name}'; it is declared on base type '{SafeFullDisplay(declaringBase)}' — " +
-                $"use typeof({TypeofForm(declaringBase)}) (used by '{id}').", location));
+                $"use typeof({TypeofForm(declaringBase)}) (used by '{target.Id}').", target.Location));
             return;
         }
 
-        errors.Add(new SpecValidationError(Code.MemberNotDeclared, id,
-            $"'{display}' does not declare a member named '{member.Name}' (used by '{id}').", location));
+        errors.Add(new SpecValidationError(Code.MemberNotDeclared, target.Id,
+            $"'{display}' does not declare a member named '{member.Name}' (used by '{target.Id}').", target.Location));
     }
 
     // The first base type / interface (each normalized to its generic definition) that declares the

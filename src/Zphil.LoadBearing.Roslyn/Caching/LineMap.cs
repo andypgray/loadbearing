@@ -24,11 +24,10 @@ internal sealed class LineMap : IEquatable<LineMap>
     internal LineMap(int[] newLineByOldLine)
     {
         _newLineByOldLine = newLineByOldLine;
-        IsIdentity = IsIdentityMapping(newLineByOldLine);
     }
 
     /// <summary>Whether every mapped line maps to itself — the shape a whitespace-only edit produces.</summary>
-    internal bool IsIdentity { get; }
+    internal bool IsIdentity => IsIdentityMapping(_newLineByOldLine);
 
     /// <summary>
     ///     Whether the map has an entry for <paramref name="oldLine" />, setting <paramref name="newLine" />

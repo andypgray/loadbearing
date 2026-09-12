@@ -105,13 +105,17 @@ public static class LayerContextResolver
     // MATCHING cell rather than the subject's own head, which is what places one family rule's card at
     // each cell's own directory. Its owning Arch is borrowed from the same subject (every selection in
     // one build shares the single Arch, and the evaluator never reads the owner).
+    // A plain refined selection rather than a Layer: the evaluator reads a noun and its adjectives, which
+    // is all of what this is, while a Layer is the AUTHOR's handle on a declared layer and carries that
+    // layer's registration. Nothing declares this one, so there is no registration for it to carry.
     private static Selection BareLayer(ArchRule anchoredRule, LayerDefinition layer)
     {
         // Both bangs and the third are IsAnchoredOn's: it already read this constraint's subject and
         // matched a cell on it, which no rule with a null constraint and no project-subject rule (whose
         // Subject is null, GRAMMAR §4.10) can do. Only an anchored rule reaches here.
         Selection subject = anchoredRule.Constraint!.Subject!;
-        return new Layer(subject.Owner, MatchingCell(subject.Noun, layer.Name)!);
+        return new RefinedSelection(
+            subject.Owner, MatchingCell(subject.Noun, layer.Name)!, Array.Empty<SelectionAdjective>());
     }
 
     // The noun head naming this layer: the head itself, the family cell carrying the name, or null.

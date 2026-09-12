@@ -117,7 +117,7 @@ internal static class GraphFormatter
     {
         string membership = project.SolutionMember == false ? " (not a solution member)" : "";
         string generated = project.Generated > 0 ? $" ({project.Generated} generated)" : "";
-        var line = $"  {project.Name}{membership} — {project.Types} {Plurals.Noun(project.Types, "type")}{generated}";
+        var line = $"  {project.Name}{membership} — {Plurals.Counted(project.Types, "type")}{generated}";
 
         // At index grain the line stops here, matching what the document's own row keeps: a project's name,
         // whether the solution declares it, and how big it is. What it declares and what it targets are

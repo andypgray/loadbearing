@@ -84,18 +84,6 @@ public sealed class Arch
         return Register(new LayerNoun(name, definition));
     }
 
-    /// <summary>Appends a <c>Purpose</c> to the registration of the layer minted with <paramref name="noun" />.</summary>
-    /// <remarks>
-    ///     The lookup always succeeds: <see cref="Zphil.LoadBearing.Layer" />'s constructor is internal, the
-    ///     two <c>Layer</c> overloads are the only mints, and every
-    ///     <see cref="Zphil.LoadBearing.Layer" /> built later over a layer subject reuses the same
-    ///     <see cref="LayerNoun" /> instance — so there is no null branch and no defensive throw.
-    /// </remarks>
-    internal void AddLayerPurpose(LayerNoun noun, string prose)
-    {
-        LayerRegistration registration = _layers.First(candidate => ReferenceEquals(candidate.Noun, noun));
-        registration.Purposes.Add(prose);
-    }
 
     /// <summary>
     ///     Selects the types whose namespace matches a glob, such as
@@ -347,11 +335,13 @@ public sealed class Arch
         return new ScopeBuilder(registration);
     }
 
-    // The tail both Layer overloads share: one registration in authoring order, one handle over the noun
-    // the registration holds, so the purpose lookup finds it by reference whichever form minted it.
+    // The tail both Layer overloads share: one registration in authoring order, and the handle over that
+    // same registration, so a Purpose written on the handle lands in the declared layer whichever form
+    // minted it.
     private Layer Register(LayerNoun noun)
     {
-        _layers.Add(new LayerRegistration(noun));
-        return new Layer(this, noun);
+        var registration = new LayerRegistration(noun);
+        _layers.Add(registration);
+        return new Layer(this, registration);
     }
 }
