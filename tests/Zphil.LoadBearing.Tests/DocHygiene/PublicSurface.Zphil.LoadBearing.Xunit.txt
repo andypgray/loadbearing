@@ -1,0 +1,1 @@
+Zphil.LoadBearing.Xunit.ArchRuleTests`1

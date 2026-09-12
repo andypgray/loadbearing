@@ -14,6 +14,16 @@
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <Description>The LoadBearing xUnit adapter: derive a test class from ArchRuleTests&lt;TSpec&gt; and every rule in the architecture spec becomes an individually named xUnit test, with failure text identical to the loadbearing CLI. Requires xunit.v3 4.0.0 or later, which runs on Microsoft.Testing.Platform rather than VSTest, and a .NET SDK on the test host (the checker loads the target solution through MSBuildWorkspace).</Description>
         <PackageTags>architecture;architecture-as-code;xunit;testing;fitness-functions;dependency-rules;layering;csharp;dotnet</PackageTags>
+
+        <!-- ApiCompat at pack time against the published package, strict (additions report too).
+             The Core csproj carries the reasoning for all of it; this is the second of the two
+             assemblies a consumer's own project compiles against, so it gets the same treatment.
+             The other two packages are deliberate exemptions — .Roslyn says in its own Description
+             that it is not for direct reference, and .Cli is PackAsTool — and
+             PublicSurfaceSyncTests holds each exemption to that recorded reason. -->
+        <EnablePackageValidation>true</EnablePackageValidation>
+        <PackageValidationBaselineVersion>0.7.0</PackageValidationBaselineVersion>
+        <EnableStrictModeForBaselineValidation>true</EnableStrictModeForBaselineValidation>
     </PropertyGroup>
 
     <ItemGroup>

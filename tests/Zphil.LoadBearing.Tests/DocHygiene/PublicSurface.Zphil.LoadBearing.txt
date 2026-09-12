@@ -1,0 +1,191 @@
+Zphil.LoadBearing.Accessibility
+    Public = 0
+    Internal = 1
+    Protected = 2
+    ProtectedInternal = 3
+    PrivateProtected = 4
+    Private = 5
+Zphil.LoadBearing.Arch
+Zphil.LoadBearing.Baselines.BaselineConventions
+Zphil.LoadBearing.Baselines.BaselineEntry
+Zphil.LoadBearing.Baselines.BaselineFormat
+Zphil.LoadBearing.Baselines.BaselineIndex
+Zphil.LoadBearing.Baselines.RuleBaseline
+Zphil.LoadBearing.Baselines.SymbolIds
+Zphil.LoadBearing.Checking.ArchChecker
+Zphil.LoadBearing.Checking.CheckReport
+Zphil.LoadBearing.Checking.CheckWarning
+Zphil.LoadBearing.Checking.CheckWarningKind
+    InertTarget = 0
+    QuarantinedScopeTouched = 1
+    CautionedScopeTouched = 2
+Zphil.LoadBearing.Checking.DiffContext
+Zphil.LoadBearing.Checking.RatchetCell
+Zphil.LoadBearing.Checking.RatchetCellSplit
+Zphil.LoadBearing.Checking.RuleResult
+Zphil.LoadBearing.Checking.RuleStatus
+    Passed = 0
+    Failed = 1
+    Skipped = 2
+Zphil.LoadBearing.Checking.Violation
+Zphil.LoadBearing.Checking.ViolationKind
+    Reference = 0
+    Shape = 1
+    MemberUse = 2
+    MemberShape = 3
+    Construction = 4
+    Injection = 5
+    Catch = 6
+    Throw = 7
+    Expose = 8
+    ProjectShape = 9
+    EmptySubject = 10
+    RuleError = 11
+Zphil.LoadBearing.Codebase.CatchEdge
+Zphil.LoadBearing.Codebase.CodebaseModel
+Zphil.LoadBearing.Codebase.ConstructorEdge
+Zphil.LoadBearing.Codebase.ExposureEdge
+Zphil.LoadBearing.Codebase.ExternalEdgeSummary
+Zphil.LoadBearing.Codebase.GraphSummarizer
+Zphil.LoadBearing.Codebase.GraphSummary
+Zphil.LoadBearing.Codebase.InjectionEdge
+Zphil.LoadBearing.Codebase.MemberEdge
+Zphil.LoadBearing.Codebase.MemberKind
+    Method = 0
+    Property = 1
+    Field = 2
+    Event = 3
+Zphil.LoadBearing.Codebase.MemberNode
+Zphil.LoadBearing.Codebase.MemberReference
+Zphil.LoadBearing.Codebase.MultiplyDeclaredTypeSummary
+Zphil.LoadBearing.Codebase.NamespaceCount
+Zphil.LoadBearing.Codebase.PackageReference
+Zphil.LoadBearing.Codebase.ProjectEdgeSummary
+Zphil.LoadBearing.Codebase.ProjectNode
+Zphil.LoadBearing.Codebase.ProjectSummary
+Zphil.LoadBearing.Codebase.ReferenceEdge
+Zphil.LoadBearing.Codebase.ServiceRegistration
+Zphil.LoadBearing.Codebase.ShadowedName
+Zphil.LoadBearing.Codebase.ShadowedTypeSummary
+Zphil.LoadBearing.Codebase.SourceLocation
+Zphil.LoadBearing.Codebase.ThrowEdge
+Zphil.LoadBearing.Codebase.TypeConstruction
+Zphil.LoadBearing.Codebase.TypeNode
+Zphil.LoadBearing.Constraint
+Zphil.LoadBearing.Discovery.SpecDiscovery
+Zphil.LoadBearing.Discovery.SpecDiscoveryException
+Zphil.LoadBearing.FieldSelectionConstraints
+Zphil.LoadBearing.Fluent.FieldSelection
+Zphil.LoadBearing.Fluent.ICautionedScope
+Zphil.LoadBearing.Fluent.IEnforceRule
+Zphil.LoadBearing.Fluent.IMigrateRule
+Zphil.LoadBearing.Fluent.IQuarantinedScope
+Zphil.LoadBearing.Fluent.MemberSelection
+Zphil.LoadBearing.Fluent.MethodSelection
+Zphil.LoadBearing.Fluent.NamespacePattern
+Zphil.LoadBearing.Fluent.ProjectSelection
+Zphil.LoadBearing.Fluent.PropertySelection
+Zphil.LoadBearing.Fluent.TypeNamePattern
+Zphil.LoadBearing.Hosting.ArchModelBuilder
+Zphil.LoadBearing.Hosting.ArchRule
+Zphil.LoadBearing.Hosting.ArchitectureModel
+Zphil.LoadBearing.Hosting.LayerDefinition
+Zphil.LoadBearing.Hosting.MigrateData
+Zphil.LoadBearing.Hosting.ScopeData
+Zphil.LoadBearing.IArchitectureSpec
+Zphil.LoadBearing.IAttributeInfo
+Zphil.LoadBearing.IMemberInfo
+Zphil.LoadBearing.IParameterInfo
+Zphil.LoadBearing.IProjectInfo
+Zphil.LoadBearing.IRuleBuilder
+Zphil.LoadBearing.IScopeBuilder
+Zphil.LoadBearing.ITypeInfo
+Zphil.LoadBearing.Layer
+Zphil.LoadBearing.Lifetime
+    Singleton = 0
+    Scoped = 1
+    Transient = 2
+Zphil.LoadBearing.Member
+Zphil.LoadBearing.MemberSelectionAdjectives
+Zphil.LoadBearing.MemberSelectionConstraints
+Zphil.LoadBearing.MethodSelectionConstraints
+Zphil.LoadBearing.MigrationPolicy
+    MigrateIfSmall = 0
+    AlwaysMigrate = 1
+    NeverMigrate = 2
+Zphil.LoadBearing.Posture
+    Enforce = 0
+    Migrate = 1
+    Quarantine = 2
+    Caution = 3
+Zphil.LoadBearing.ProjectSelectionAdjectives
+Zphil.LoadBearing.ProjectSelectionConstraints
+Zphil.LoadBearing.PropertySelectionConstraints
+Zphil.LoadBearing.Rendering.AgentContextRenderer
+Zphil.LoadBearing.Rendering.ContextCard
+Zphil.LoadBearing.Rendering.ContextComposition
+Zphil.LoadBearing.Rendering.ContextFile
+Zphil.LoadBearing.Rendering.ContextFileComposer
+Zphil.LoadBearing.Rendering.DiagramComposer
+Zphil.LoadBearing.Rendering.DiagramScope
+Zphil.LoadBearing.Rendering.GraphDiagramRenderer
+Zphil.LoadBearing.Rendering.HumanReportRenderer
+Zphil.LoadBearing.Rendering.LawDiagramRenderer
+Zphil.LoadBearing.Rendering.LayerContextResolver
+Zphil.LoadBearing.Rendering.LayerPlacement
+Zphil.LoadBearing.Rendering.MalformedManagedBlockException
+Zphil.LoadBearing.Rendering.ManagedBlock
+Zphil.LoadBearing.Rendering.PathFormat
+Zphil.LoadBearing.Rendering.PathFormat+Relativizer
+Zphil.LoadBearing.Rendering.ScopePlacement
+Zphil.LoadBearing.Rendering.ScopedContextResolver
+Zphil.LoadBearing.Rendering.WriteOutcome
+    Wrote = 0
+    Unchanged = 1
+Zphil.LoadBearing.ScopeRole
+    Containment = 0
+    Tripwire = 1
+Zphil.LoadBearing.Selection
+Zphil.LoadBearing.SelectionAdjectives
+Zphil.LoadBearing.SelectionConstraints
+Zphil.LoadBearing.TypeKind
+    Class = 0
+    Interface = 1
+    Struct = 2
+    Enum = 3
+    Delegate = 4
+Zphil.LoadBearing.Validation.SpecSourceLocation
+Zphil.LoadBearing.Validation.SpecValidationError
+Zphil.LoadBearing.Validation.SpecValidationErrorCode
+    DuplicateId = 0
+    IdExtendsScope = 1
+    MissingPosture = 2
+    MissingBecause = 3
+    MissingDragons = 4
+    BlankProse = 5
+    MultiLineProse = 6
+    RepeatedCall = 7
+    MalformedId = 8
+    EmptyBoundary = 9
+    DuplicateLayerName = 10
+    ForeignSelection = 11
+    BlankMemberName = 12
+    MemberNotDeclared = 13
+    ForeignMember = 14
+    MemberReturningClosedGeneric = 15
+    BlankPattern = 16
+    UnanchoredSubtreePattern = 17
+    RepeatedPosture = 18
+    MemberExpressionUnresolvable = 19
+    UndefinedLifetime = 20
+    MemberAcceptParameterClosedGeneric = 21
+    HierarchyAnchorWrongCategory = 22
+    ForeignProjectSelection = 23
+    BlankProjectPattern = 24
+    BlankTargetFramework = 25
+    CounterpartTemplateWithoutPlaceholder = 26
+    FamilyMisplaced = 27
+    EachOtherWithoutFamily = 28
+    CircularReferencesNeedLayerFamily = 29
+    MalformedCitation = 30
+Zphil.LoadBearing.Validation.SpecValidationException

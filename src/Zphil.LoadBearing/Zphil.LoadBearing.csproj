@@ -18,6 +18,40 @@
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <Description>The LoadBearing spec contract: a fluent C# builder and reified rule model for describing .NET architecture — layers, scopes, and rules, each with a posture (Enforce for the law, Migrate for ratcheted debt with a grandfathered baseline, Quarantine for code contained rather than touched). Architecture spec projects reference this package; checking and rendering come from the loadbearing tool (Zphil.LoadBearing.Cli) or the xUnit adapter (Zphil.LoadBearing.Xunit). netstandard2.0 with zero dependencies, so a spec project can target anything from net48 up.</Description>
         <PackageTags>architecture;architecture-as-code;fitness-functions;dependency-rules;layering;tech-debt;legacy;csharp;dotnet</PackageTags>
+
+        <!-- ApiCompat, at pack time, against the bytes actually on nuget.org — not against a text
+             file this repo also writes, which can only say what someone last approved. A published
+             NuGet version can never be replaced, only unlisted, and this is the contract package
+             every consumer's spec compiles against, so the moment worth checking is the moment the
+             nupkg is built. The SDK loads the comparison task from inside itself and fetches the
+             baseline with a PackageDownload, which is a different MSBuild item from
+             PackageReference — so the self-spec rule packaging/core-carries-nothing stays green and
+             the nuspec <dependencies> stays empty, which is what lets both READMEs keep claiming
+             zero dependencies.
+
+             Strict mode compares in both directions, so an ADDITION reports as well as a removal.
+             That is the half worth paying for here: a removal breaks a consumer loudly at their next
+             build, while an addition is the thing that silently becomes permanent. It is also what
+             lets the committed surface pin in tests/ stay at type-and-enum grain rather than
+             enumerating every member: with member additions reported here, pinning them there would
+             move that file on roughly half of all commits to say the same thing twice.
+
+             What this check does NOT give is locality. It runs at pack time, which in practice is one
+             CI job and the release gate, so the pin exists to red in the suite beside the edit. An
+             enum renumbering reports here as CP0011 and without strict mode, being a break rather
+             than a growth (measured 2026-09-12) — but it is also the one surface change that breaks
+             no compile anywhere, so it is the one most worth catching in seconds.
+
+             The baseline lags <Version> by design: it names the last PUBLISHED version, so between
+             releases it sits equal to <Version> and the accumulated delta is visible. Bumping it is
+             part of the release ritual, deliberately NOT a fifth site in ManifestVersionTests'
+             four-way version equality; PublicSurfaceSyncTests asserts only that it is no newer.
+
+             Acknowledgement is CompatibilitySuppressions.xml, regenerated with
+             -p:ApiCompatGenerateSuppressionFile=true and reviewed per symbol. -->
+        <EnablePackageValidation>true</EnablePackageValidation>
+        <PackageValidationBaselineVersion>0.7.0</PackageValidationBaselineVersion>
+        <EnableStrictModeForBaselineValidation>true</EnableStrictModeForBaselineValidation>
     </PropertyGroup>
 
     <ItemGroup>
