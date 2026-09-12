@@ -104,8 +104,7 @@ public sealed class TripwireSemanticsTests
     {
         RuleResult tripwire = Tripwire(new DiffContext("/repo", ["App.Client/User.cs"]));
 
-        tripwire.ShouldHavePassed();
-        tripwire.Warnings.ShouldBeEmpty();
+        tripwire.ShouldHavePassedClean();
     }
 
     [Fact]
@@ -168,8 +167,7 @@ public sealed class TripwireSemanticsTests
     {
         RuleResult tripwire = CautionTripwire(new DiffContext("/repo", ["App.Client/User.cs"]));
 
-        tripwire.ShouldHavePassed();
-        tripwire.Warnings.ShouldBeEmpty();
+        tripwire.ShouldHavePassedClean();
     }
 
     [Fact]

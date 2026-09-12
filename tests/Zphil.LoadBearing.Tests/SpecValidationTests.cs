@@ -243,10 +243,9 @@ public class SpecValidationTests
     {
         SpecValidationException ex = BuildExpectingFailure(new DuplicateLayerSpec());
 
-        ex.ShouldHaveError(Code.DuplicateLayerName)
-            .RuleId.ShouldBeNull();
-        ex.ShouldHaveError(Code.DuplicateLayerName)
-            .Message.ShouldBe("Duplicate layer name 'Dup'.");
+        SpecValidationError error = ex.ShouldHaveError(Code.DuplicateLayerName);
+        error.RuleId.ShouldBeNull();
+        error.Message.ShouldBe("Duplicate layer name 'Dup'.");
     }
 
     [Theory]
@@ -498,10 +497,9 @@ public class SpecValidationTests
         // validated at their declaration (spec-wide, null rule ID, named by layer), used or not.
         SpecValidationException ex = BuildExpectingFailure(new BlankLayerGlobSpec());
 
-        ex.ShouldHaveError(Code.BlankPattern)
-            .RuleId.ShouldBeNull();
-        ex.ShouldHaveError(Code.BlankPattern)
-            .Message.ShouldBe("Blank namespace pattern on layer 'Bad'.");
+        SpecValidationError error = ex.ShouldHaveError(Code.BlankPattern);
+        error.RuleId.ShouldBeNull();
+        error.Message.ShouldBe("Blank namespace pattern on layer 'Bad'.");
     }
 
     [Fact]
@@ -511,10 +509,9 @@ public class SpecValidationTests
         // spec-wide, null rule ID, named by layer, and with no file:line prefix because there is no anchor.
         SpecValidationException ex = BuildExpectingFailure(new BlankLayerPurposeSpec());
 
-        ex.ShouldHaveError(Code.BlankProse)
-            .RuleId.ShouldBeNull();
-        ex.ShouldHaveError(Code.BlankProse)
-            .Message.ShouldBe("Blank purpose on layer 'Core'.");
+        SpecValidationError error = ex.ShouldHaveError(Code.BlankProse);
+        error.RuleId.ShouldBeNull();
+        error.Message.ShouldBe("Blank purpose on layer 'Core'.");
     }
 
     [Fact]
@@ -522,10 +519,9 @@ public class SpecValidationTests
     {
         SpecValidationException ex = BuildExpectingFailure(new MultiLineLayerPurposeSpec());
 
-        ex.ShouldHaveError(Code.MultiLineProse)
-            .RuleId.ShouldBeNull();
-        ex.ShouldHaveError(Code.MultiLineProse)
-            .Message.ShouldBe("Multi-line purpose on layer 'Core'; prose fields are single-line.");
+        SpecValidationError error = ex.ShouldHaveError(Code.MultiLineProse);
+        error.RuleId.ShouldBeNull();
+        error.Message.ShouldBe("Multi-line purpose on layer 'Core'; prose fields are single-line.");
     }
 
     [Fact]
@@ -533,10 +529,9 @@ public class SpecValidationTests
     {
         SpecValidationException ex = BuildExpectingFailure(new RepeatedLayerPurposeSpec());
 
-        ex.ShouldHaveError(Code.RepeatedCall)
-            .RuleId.ShouldBeNull();
-        ex.ShouldHaveError(Code.RepeatedCall)
-            .Message.ShouldBe("Repeated .Purpose(...) on layer 'Core'.");
+        SpecValidationError error = ex.ShouldHaveError(Code.RepeatedCall);
+        error.RuleId.ShouldBeNull();
+        error.Message.ShouldBe("Repeated .Purpose(...) on layer 'Core'.");
     }
 
     [Fact]
@@ -555,10 +550,9 @@ public class SpecValidationTests
     {
         SpecValidationException ex = BuildExpectingFailure(new DeadSubtreeLayerSpec());
 
-        ex.ShouldHaveError(Code.UnanchoredSubtreePattern)
-            .RuleId.ShouldBeNull();
-        ex.ShouldHaveError(Code.UnanchoredSubtreePattern)
-            .Message
+        SpecValidationError error = ex.ShouldHaveError(Code.UnanchoredSubtreePattern);
+        error.RuleId.ShouldBeNull();
+        error.Message
             .ShouldBe("The namespace pattern 'MyApp.*.Svc.*' on layer 'Bad' has a trailing `.*` subtree " +
                       "operator but its literal prefix contains a `*`, which never matches; anchor the subtree on a literal prefix.");
     }
@@ -570,11 +564,10 @@ public class SpecValidationTests
         // rule ID, named by layer, and found whether or not any rule ever names the layer (§8 item 10).
         SpecValidationException ex = BuildExpectingFailure(new ForeignLayerDefinitionSpec());
 
-        ex.ShouldHaveError(Code.ForeignSelection)
-            .RuleId.ShouldBeNull();
-        ex.ShouldHaveError(Code.ForeignSelection)
-            .Message.ShouldBe(
-                "A selection used by layer 'Foreign' was minted on a different Arch instance; it is not registered with this model.");
+        SpecValidationError error = ex.ShouldHaveError(Code.ForeignSelection);
+        error.RuleId.ShouldBeNull();
+        error.Message.ShouldBe(
+            "A selection used by layer 'Foreign' was minted on a different Arch instance; it is not registered with this model.");
     }
 
     [Fact]
@@ -584,10 +577,9 @@ public class SpecValidationTests
         // noun the type-side walk names it by.
         SpecValidationException ex = BuildExpectingFailure(new BlankProjectNameLayerDefinitionSpec());
 
-        ex.ShouldHaveError(Code.BlankPattern)
-            .RuleId.ShouldBeNull();
-        ex.ShouldHaveError(Code.BlankPattern)
-            .Message.ShouldBe("Blank project name on layer 'Bad'.");
+        SpecValidationError error = ex.ShouldHaveError(Code.BlankPattern);
+        error.RuleId.ShouldBeNull();
+        error.Message.ShouldBe("Blank project name on layer 'Bad'.");
     }
 
     [Fact]
@@ -595,11 +587,10 @@ public class SpecValidationTests
     {
         SpecValidationException ex = BuildExpectingFailure(new UndefinedLifetimeLayerDefinitionSpec());
 
-        ex.ShouldHaveError(Code.UndefinedLifetime)
-            .RuleId.ShouldBeNull();
-        ex.ShouldHaveError(Code.UndefinedLifetime)
-            .Message.ShouldBe("'(Lifetime)7' is not a defined Lifetime — " +
-                              "use Lifetime.Singleton, Lifetime.Scoped, or Lifetime.Transient (used by layer 'Wiring').");
+        SpecValidationError error = ex.ShouldHaveError(Code.UndefinedLifetime);
+        error.RuleId.ShouldBeNull();
+        error.Message.ShouldBe("'(Lifetime)7' is not a defined Lifetime — " +
+                               "use Lifetime.Singleton, Lifetime.Scoped, or Lifetime.Transient (used by layer 'Wiring').");
     }
 
     [Fact]

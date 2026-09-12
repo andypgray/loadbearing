@@ -363,41 +363,32 @@ public sealed class BaselineStoreTests : IDisposable
         ex.Message.ShouldNotContain("failed its integrity check");
     }
 
-    [Fact]
-    public void TryReadDocument_SealThatIsNotSixteenLowercaseHex_IsMalformed()
-    {
-        string shortPath = WriteEntryDoc(
-            "short.json", """{ "source": "T:A", "target": "T:B", "seal": "abc" }""");
-        string upperPath = WriteEntryDoc(
-            "upper.json", """{ "source": "T:A", "target": "T:B", "seal": "ABCDEF0123456789" }""");
-        string numberPath = WriteEntryDoc(
-            "number.json", """{ "source": "T:A", "target": "T:B", "seal": 16 }""");
+    // Two of the three seal shapes below are one diagnosis and the third is another, so the expected message
+    // is a column of the table rather than a line in the body.
+    private const string NotSixteenHexSeal = "has a 'seal' that is not 16 lowercase hex characters.";
 
-        Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(shortPath))
-            .Message.ShouldContain("has a 'seal' that is not 16 lowercase hex characters.");
-        Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(upperPath))
-            .Message.ShouldContain("has a 'seal' that is not 16 lowercase hex characters.");
-        Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(numberPath))
-            .Message.ShouldContain("has a non-string 'seal'.");
+    [Theory]
+    [InlineData("""{ "source": "T:A", "target": "T:B", "seal": "abc" }""", NotSixteenHexSeal)]
+    [InlineData("""{ "source": "T:A", "target": "T:B", "seal": "ABCDEF0123456789" }""", NotSixteenHexSeal)]
+    [InlineData("""{ "source": "T:A", "target": "T:B", "seal": 16 }""", "has a non-string 'seal'.")]
+    public void TryReadDocument_SealThatIsNotSixteenLowercaseHex_IsMalformed(string entryJson, string expected)
+    {
+        string path = WriteEntryDoc("seal.json", entryJson);
+
+        Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path))
+            .Message.ShouldContain(expected);
     }
 
-    [Fact]
-    public void TryReadDocument_SiteCountThatIsNotAWholeNumberAtLeastOne_Throws()
+    [Theory]
+    [InlineData("""{ "source": "T:A", "target": "T:B", "siteCount": 0, "seal": "0000000000000000" }""")]
+    [InlineData("""{ "source": "T:A", "target": "T:B", "siteCount": "2", "seal": "0000000000000000" }""")]
+    [InlineData("""{ "source": "T:A", "target": "T:B", "siteCount": 2.5, "seal": "0000000000000000" }""")]
+    public void TryReadDocument_SiteCountThatIsNotAWholeNumberAtLeastOne_Throws(string entryJson)
     {
-        string zeroPath = WriteEntryDoc(
-            "zero.json", """{ "source": "T:A", "target": "T:B", "siteCount": 0, "seal": "0000000000000000" }""");
-        string stringPath = WriteEntryDoc(
-            "string.json", """{ "source": "T:A", "target": "T:B", "siteCount": "2", "seal": "0000000000000000" }""");
-        string fractionPath = WriteEntryDoc(
-            "fraction.json", """{ "source": "T:A", "target": "T:B", "siteCount": 2.5, "seal": "0000000000000000" }""");
+        string path = WriteEntryDoc("site-count.json", entryJson);
 
-        const string expected = "has a 'siteCount' that is not an integer of at least 1.";
-        Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(zeroPath))
-            .Message.ShouldContain(expected);
-        Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(stringPath))
-            .Message.ShouldContain(expected);
-        Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(fractionPath))
-            .Message.ShouldContain(expected);
+        Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path))
+            .Message.ShouldContain("has a 'siteCount' that is not an integer of at least 1.");
     }
 
     [Fact]

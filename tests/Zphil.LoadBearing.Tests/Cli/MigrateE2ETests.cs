@@ -1,3 +1,5 @@
+using System.Text.Json;
+using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Tests.TestSupport;
 
@@ -42,8 +44,14 @@ public sealed class MigrateE2ETests
         // Belt-and-braces: the burndown confirms both remain grandfathered and none went stale.
         CliResult status = await CliRunner.InvokeAsync(
             "status", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--json");
-        status.Out.ShouldContain("\"remaining\": 2");
-        status.Out.ShouldContain("\"stale\": 0");
+        JsonElement ratchet = CheckJson.Rule(status.Out, "data-access/no-inline-sql")
+            .GetProperty("ratchet");
+        ratchet.GetProperty("remaining")
+            .GetInt32()
+            .ShouldBe(2);
+        ratchet.GetProperty("stale")
+            .GetInt32()
+            .ShouldBe(0);
     }
 
     [Fact]
@@ -82,12 +90,20 @@ public sealed class MigrateE2ETests
         machine.Out.ShouldHaveViolationAtSites(
             "data-access/no-inline-sql", ("source", "MyApp.Web.InvoiceController"), 3);
         // The allowance beside the measurement, which is what tells a reader the red is growth rather than a
-        // pair nobody ever baselined.
-        machine.Out.ShouldContain("\"grandfatheredSiteCount\": 2");
+        // pair nobody ever baselined — read off this rule's own violation, since the count alone would match
+        // any rule's block.
+        CheckJson.Violations(machine.Out, "data-access/no-inline-sql")
+            .ShouldHaveSingleItem()
+            .GetProperty("grandfatheredSiteCount")
+            .GetInt32()
+            .ShouldBe(2);
 
         // Code scanning already has an alert for this pair from the run that baselined it, so the state is
         // `updated` rather than `new`, and the entry's suppression no longer rides with it.
         string sarif = await File.ReadAllTextAsync(sarifPath, Ct);
-        sarif.ShouldContain("\"baselineState\": \"updated\"");
+        sarif.SarifResults()
+            .Select(result => result.GetProperty("baselineState")
+                .GetString())
+            .ShouldContain("updated");
     }
 }

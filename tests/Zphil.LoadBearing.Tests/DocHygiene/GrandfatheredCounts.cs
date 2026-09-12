@@ -446,6 +446,14 @@ internal static class GrandfatheredCounts
     }
 
     /// <summary>
+    ///     How a count reads where a gate scans prose for one, captured as <c>count</c>: a number word,
+    ///     hyphenated above twenty, or a numeral. It sits beside <see cref="IsCountWord" /> because the two
+    ///     must agree about what a count token looks like, and a copy of the fragment that stopped agreeing
+    ///     would make its gate go quiet rather than red.
+    /// </summary>
+    internal const string CountToken = @"(?<count>[A-Za-z][a-z]*(-[a-z]+)?|\d+)";
+
+    /// <summary>
     ///     Whether <paramref name="written" /> is a count as this repository's prose spells one: a number
     ///     word in running or sentence-initial case, or a numeral.
     /// </summary>

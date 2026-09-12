@@ -40,57 +40,6 @@ namespace Zphil.LoadBearing.Tests.Mcp;
 [Collection("Serial")]
 public sealed class CliMcpParityTests
 {
-    // The AgentContextRenderer.ScopeCard body arch_context returns for the quarantined legacy/billing scope —
-    // the RenderCommandE2ETests.ScopeBody card without its provenance line (moves with that pin).
-    private const string ExpectedScopeCard =
-        "## Quarantined scope `legacy/billing`\n\n" +
-        "This directory holds the quarantined `legacy/billing` scope: types in `MyApp.Legacy.Billing.*`. " +
-        "Here be dragons — do not spread references into it.\n\n" +
-        "Dragons: Banker's rounding happens at line-item level, NOT invoice level. " +
-        "Nightly reconciliation depends on this. Do not normalize.\n\n" +
-        "- `legacy/billing/containment` — Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or " +
-        "`BillingFacade`, must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or " +
-        "`BillingFacade`. Replacement scheduled (BillingV2, ADR-019); not worth stabilizing.\n" +
-        "- Sanctioned surface: `IBillingFacade`, `BillingFacade`.\n" +
-        "- Expand: `loadbearing explain legacy/billing/containment`.";
-
-    // The AgentContextRenderer.CautionCard body arch_context returns for the cautioned domain/retry-budget
-    // scope — the RenderCommandE2ETests.DomainCautionBody card without its provenance line (moves with that
-    // pin). The other scope posture over the same spec, so one harness covers both.
-    private const string ExpectedCautionCard =
-        "## Cautioned scope `domain/retry-budget`\n\n" +
-        "This directory holds the cautioned `domain/retry-budget` scope: types named `RetryPolicy`. " +
-        "Here be dragons — the weirdness below is load-bearing; read it before you edit, and do not " +
-        "tidy it away.\n\n" +
-        "Dragons: RetryPolicy's broad catch is filtered on purpose: the `when` clause is what keeps it green " +
-        "under the unfiltered-catch rule, and it is the fixture's one sanctioned broad handler. Keep the " +
-        "filter; add cases beside it, never inside it.\n\n" +
-        "- `domain/retry-budget/tripwire` — a change set touching this scope is flagged by " +
-        "`check --diff-base <ref>`. The retry budget is the one place the domain sanctions a broad catch, " +
-        "and every caller relies on the filter.\n" +
-        "- Expand: `loadbearing explain domain/retry-budget/tripwire`.";
-
-    // The AgentContextRenderer.LayerCard bodies arch_context returns for the MyApp.Web directory of
-    // MyAppLayerSpec — no provenance line (that is a render file-splice concern), mirroring the
-    // quarantined-scope card above. Two cards, because two layers are placed there: the Web layer, defined
-    // as its project, and the Reporting layer that refines it. Both cover the queried path, and the tool
-    // returns whichever cards do.
-    private const string ExpectedWebLayerCards =
-        "## Layer `Web`\n\n" +
-        "This directory holds the `Web` layer. The HTTP surface: controllers and the views they serve. " +
-        "Its architecture rules:\n\n" +
-        "- `layering/web-not-billing` — The Web layer must not reference types in `MyApp.Legacy.Billing.*`. " +
-        "The web layer must reach billing only through the sanctioned facade.\n" +
-        "- Expand any rule above with `loadbearing explain <rule-id>`.\n\n" +
-        "## Layer `Reporting`\n\n" +
-        "This directory holds the `Reporting` layer. Its architecture rules:\n\n" +
-        "- `layering/reporting-not-billing` — The Reporting layer must not reference types in " +
-        "`MyApp.Legacy.Billing.*`. The reporting slice takes its numbers from the domain, never from the " +
-        "legacy biller.\n" +
-        RenderedLawText.LeavesBullet +
-        RenderedLawText.LeavesNotCircularBullet +
-        "- Expand any rule above with `loadbearing explain <rule-id>`.";
-
     // The truncator's own token → character multiple, restated here because the budget row has to work
     // backwards from a character count to the token budget a client would declare. The two preconditions it
     // asserts on the resulting cap are what keep this honest if the multiple ever moves.
@@ -212,7 +161,7 @@ public sealed class CliMcpParityTests
             "arch_context", new Dictionary<string, object?> { ["path"] = "MyApp.Legacy.Billing/BillingCalculator.cs" }, cancellationToken: Ct);
         inScope.ShouldHaveTextContent()
             .NormalizedTrimmed()
-            .ShouldBe(ExpectedScopeCard);
+            .ShouldBe(RenderedLawText.BillingScopeCard);
 
         // A path inside the cautioned scope → that scope's card body. Same tool, same spec, the other scope
         // posture: what an agent reads before editing dragon territory does not depend on whether the
@@ -221,7 +170,7 @@ public sealed class CliMcpParityTests
             "arch_context", new Dictionary<string, object?> { ["path"] = "MyApp.Domain/RetryPolicy.cs" }, cancellationToken: Ct);
         inCaution.ShouldHaveTextContent()
             .NormalizedTrimmed()
-            .ShouldBe(ExpectedCautionCard);
+            .ShouldBe(RenderedLawText.DomainCautionCard);
 
         // A path no scope covers → the pinned pointer line (echoing the query path). The RenderSpec's
         // Domain/Web layers carry no anchored rules, so no layer card competes here.
@@ -266,7 +215,7 @@ public sealed class CliMcpParityTests
             "arch_context", new Dictionary<string, object?> { ["path"] = "MyApp.Web/HomeController.cs" }, cancellationToken: Ct);
         inLayer.ShouldHaveTextContent()
             .NormalizedTrimmed()
-            .ShouldBe(ExpectedWebLayerCards);
+            .ShouldBe(RenderedLawText.WebLayerCards);
 
         // A path no layer or quarantined scope covers → the reworded pointer line (echoing the query path).
         CallToolResult outScope = await harness.Client.CallToolAsync(

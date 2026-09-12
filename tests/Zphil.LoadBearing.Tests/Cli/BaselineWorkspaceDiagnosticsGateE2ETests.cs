@@ -1,6 +1,5 @@
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Cli.Verbs;
 using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
 using Zphil.LoadBearing.Tests.TestSupport;
@@ -262,10 +261,13 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
         IReadOnlyList<string>? failedProjects = null)
     {
         var source = new DiagnosticInjectingSolutionSource(diagnostics, failedProjects);
-        var request = new CheckRequest(
-            workspace.SolutionPath, CliRunner.ViolatedSpecDll, false, false, null,
-            SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath), true, null,
-            allowWorkspaceDiagnostics, null, null, DocumentGrain.Full);
+        CheckRequest request = CheckRequests.For(
+                workspace.SolutionPath, CliRunner.ViolatedSpecDll,
+                SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath))
+            with
+            {
+                NoCache = true, AllowWorkspaceDiagnostics = allowWorkspaceDiagnostics
+            };
 
         return CliResult.CapturedAsync((output, error) => new CheckRunner(output, error, source, new FakeEnvironment()).RunAsync(request, Ct));
     }

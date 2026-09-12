@@ -14,10 +14,20 @@ namespace Zphil.LoadBearing.Tests.Cli;
 [Collection("Serial")]
 public sealed class StatusCommandE2ETests
 {
+    // The violated-spec burndown, run once for the whole class on each of its two channels. Every fact below
+    // asserts a different slice of one report from a byte-identical command line, over paths that are
+    // run-stable statics and a fixture tree status never writes to — so re-running per fact bought five
+    // identical extractions and no isolation. The Lazy defers each run until the first fact that needs it.
+    private static readonly Lazy<Task<CliResult>> ViolatedHuman = new(() =>
+        CliRunner.InvokeAsync("status", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll));
+
+    private static readonly Lazy<Task<CliResult>> ViolatedJson = new(() =>
+        CliRunner.InvokeAsync("status", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json"));
+
     [Fact]
     public async Task Status_ViolatedSpec_PrintsBurndownAndExitsZero()
     {
-        CliResult result = await CliRunner.InvokeAsync("status", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
+        CliResult result = await ViolatedHuman.Value;
 
         // The Invoice pair covers two DataTable sites, so the burndown states them: the pair count is what
         // the baseline holds and the site count is what the work is. Services-behind-contracts below is one
@@ -43,7 +53,7 @@ public sealed class StatusCommandE2ETests
     [Fact]
     public async Task Status_FamilyRuleWithABaseline_NamesTheCellsItsDebtSitsIn()
     {
-        CliResult result = await CliRunner.InvokeAsync("status", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
+        CliResult result = await ViolatedHuman.Value;
 
         // The row is the row every ratcheted rule prints; the sub-line under it is the family's addition,
         // keyed by the word one cell is and listing only the cells with something left. MyApp.Domain is a
@@ -62,7 +72,7 @@ public sealed class StatusCommandE2ETests
         // layering/web-cuts-not-circular is a family of layers. One sub-line in the whole report is what says
         // the split reads tolerated debt rather than violations, and reads it off the baseline rather than
         // off the noun.
-        CliResult result = await CliRunner.InvokeAsync("status", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
+        CliResult result = await ViolatedHuman.Value;
 
         result.ShouldSucceed("FAIL layering/projects-independent — 5 violations");
         result.Out.Split('\n')
@@ -73,8 +83,7 @@ public sealed class StatusCommandE2ETests
     [Fact]
     public async Task Status_FamilyRuleJson_SplitsTheRatchetByCellAndLeavesEveryOtherRuleAlone()
     {
-        CliResult result = await CliRunner.InvokeAsync(
-            "status", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json");
+        CliResult result = await ViolatedJson.Value;
 
         using JsonDocument document = result.ShouldHaveJsonStdout();
         JsonElement[] rules = document.RootElement.GetProperty("rules")
@@ -110,8 +119,7 @@ public sealed class StatusCommandE2ETests
     [Fact]
     public async Task Status_ViolatedSpecJson_MatchesGolden()
     {
-        CliResult result = await CliRunner.InvokeAsync(
-            "status", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json");
+        CliResult result = await ViolatedJson.Value;
 
         result.ShouldSucceed();
         result.Out.ShouldMatchGolden("violated-status.json");

@@ -117,7 +117,37 @@ public sealed class BaselineMergeTests : IDisposable
     /// </summary>
     private static string KeepOneSide(string merged, bool takeOurs)
     {
+        return string.Join("\n", ResolveConflicts(merged, (ours, theirs) => takeOurs ? ours : theirs));
+    }
+
+    /// <summary>
+    ///     <paramref name="merged" /> resolved the way two payoffs of one rule resolve: inside each
+    ///     conflict keep the lines <em>both</em> sides kept — an entry either branch paid off is absent from
+    ///     that branch's side, so the intersection is what neither paid off — then close the last entry's
+    ///     line. Choosing whole lines and one comma is the whole of the hand resolution.
+    /// </summary>
+    private static string KeepWhatBothSidesKept(string merged)
+    {
+        List<string> kept = ResolveConflicts(merged, (ours, theirs) => ours.Where(theirs.Contains));
+
+        int last = kept.FindLastIndex(line => line.StartsWith(EntryIndent, StringComparison.Ordinal));
+        kept[last] = kept[last]
+            .TrimEnd(',');
+        return string.Join("\n", kept);
+    }
+
+    /// <summary>
+    ///     The lines of <paramref name="merged" /> with every conflict replaced by whatever
+    ///     <paramref name="resolve" /> makes of the two sides it collected, and the markers dropped. Which
+    ///     lines survive is the whole of a hand resolution, so the walk is spelled once and each resolution
+    ///     above is only its own choice.
+    /// </summary>
+    private static List<string> ResolveConflicts(
+        string merged, Func<List<string>, List<string>, IEnumerable<string>> resolve)
+    {
         var kept = new List<string>();
+        var ours = new List<string>();
+        var theirs = new List<string>();
         bool? side = null; // null outside a conflict, true in ours, false in theirs
         foreach (string line in merged.Split('\n'))
         {
@@ -135,45 +165,7 @@ public sealed class BaselineMergeTests : IDisposable
 
             if (line.StartsWith(">>>>>>>", StringComparison.Ordinal))
             {
-                side = null;
-                continue;
-            }
-
-            if (side is null || side == takeOurs) kept.Add(line);
-        }
-
-        return string.Join("\n", kept);
-    }
-
-    /// <summary>
-    ///     <paramref name="merged" /> resolved the way two payoffs of one rule resolve: inside each
-    ///     conflict keep the lines <em>both</em> sides kept — an entry either branch paid off is absent from
-    ///     that branch's side, so the intersection is what neither paid off — then close the last entry's
-    ///     line. Choosing whole lines and one comma is the whole of the hand resolution.
-    /// </summary>
-    private static string KeepWhatBothSidesKept(string merged)
-    {
-        var kept = new List<string>();
-        var ours = new List<string>();
-        var theirs = new List<string>();
-        bool? side = null;
-        foreach (string line in merged.Split('\n'))
-        {
-            if (line.StartsWith("<<<<<<<", StringComparison.Ordinal))
-            {
-                side = true;
-                continue;
-            }
-
-            if (line.StartsWith("=======", StringComparison.Ordinal))
-            {
-                side = false;
-                continue;
-            }
-
-            if (line.StartsWith(">>>>>>>", StringComparison.Ordinal))
-            {
-                kept.AddRange(ours.Where(theirs.Contains));
+                kept.AddRange(resolve(ours, theirs));
                 ours.Clear();
                 theirs.Clear();
                 side = null;
@@ -185,10 +177,7 @@ public sealed class BaselineMergeTests : IDisposable
             else theirs.Add(line);
         }
 
-        int last = kept.FindLastIndex(line => line.StartsWith(EntryIndent, StringComparison.Ordinal));
-        kept[last] = kept[last]
-            .TrimEnd(',');
-        return string.Join("\n", kept);
+        return kept;
     }
 
     /// <summary>

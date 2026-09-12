@@ -72,12 +72,15 @@ internal static class Checker
     ///     through the same internal seam, so a test can put a selection that matched nothing in front of a
     ///     model that is smaller than the codebase rather than in front of a spec defect.
     /// </summary>
-    public static CheckReport Run(
-        string source, IncompleteModel? incompleteModel, Action<Arch> define)
+    public static CheckReport Run(CodebaseModel codebase, IncompleteModel? incompleteModel, Action<Arch> define)
     {
-        return ArchChecker.Check(
-            Model(define).Rules, CompilationFactory.Extract(source), BaselineIndex.Empty, null, null,
-            incompleteModel);
+        return ArchChecker.Check(Model(define).Rules, codebase, BaselineIndex.Empty, null, null, incompleteModel);
+    }
+
+    /// <summary>The same partial-model run, extracting <paramref name="source" /> first.</summary>
+    public static CheckReport Run(string source, IncompleteModel? incompleteModel, Action<Arch> define)
+    {
+        return Run(CompilationFactory.Extract(source), incompleteModel, define);
     }
 
     /// <summary>The reified model of a one-off spec — for the tests whose subject is the model, not the check.</summary>
@@ -173,6 +176,19 @@ internal static class Checker
     {
         return new ArchitectureModel(
             [new ArchRule(ruleId, Posture.Enforce, "b", null, "sentence", constraint, null, null)], []);
+    }
+
+    /// <summary>
+    ///     A metadata-only rule built by hand — no constraint, migrate or scope payload — for the renderer
+    ///     rows whose subject is what a rule carries rather than what checking it produced.
+    ///     <paramref name="because" /> and <paramref name="sentence" /> are placeholders; a row that asserts
+    ///     on either says so by passing it.
+    /// </summary>
+    public static ArchRule Rule(
+        string id, Posture posture = Posture.Enforce, string because = "b", string? fix = null,
+        string sentence = "s", string? citation = null)
+    {
+        return new ArchRule(id, posture, because, fix, sentence, null, null, null, citation);
     }
 
     /// <summary>The single rule result — most specs under test carry exactly one rule.</summary>
@@ -296,17 +312,21 @@ internal static class Checker
         return HumanReportRenderer.RuleBlock(result, Directory.GetCurrentDirectory());
     }
 
-    /// <summary>This report rendered as the check verb's <c>--json</c> document — the product's wire format.</summary>
+    /// <summary>
+    ///     This report rendered as the check verb's <c>--json</c> document at <paramref name="grain" /> —
+    ///     the product's wire format, full by default.
+    /// </summary>
     /// <remarks>
     ///     The solution directory is the current directory, and the solution and spec names are fixed
     ///     placeholders every wire-shape pin shares: none of them is what such an assertion is about, so
-    ///     spelling them once here keeps the pins reading as the slot claims they are.
+    ///     spelling them once here keeps the pins reading as the slot claims they are. The grain is the one
+    ///     slot a caller does vary, so it is a parameter rather than a second spelling of the whole call.
     /// </remarks>
-    public static string JsonReport(this CheckReport report)
+    public static string JsonReport(this CheckReport report, DocumentGrain grain = DocumentGrain.Full)
     {
         return JsonReportRenderer.Document(
             report, Directory.GetCurrentDirectory(), "S.sln", "Spec.dll", null, [], WorkspaceDiagnostics.None, [],
-            DocumentGrain.Full);
+            grain);
     }
 
     /// <summary>

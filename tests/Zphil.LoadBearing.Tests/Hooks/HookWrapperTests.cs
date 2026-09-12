@@ -60,7 +60,7 @@ public sealed class HookWrapperTests
         + "  Probe.cs:10 -- second report line, so the multi-line path is covered";
 
     /// <summary>Written by the stub into the project directory: proof that the check was actually invoked.</summary>
-    private const string Sentinel = "loadbearing-ran.txt";
+    internal const string Sentinel = "loadbearing-ran.txt";
 
     private const string CodeEditPayload = """{"tool_input":{"file_path":"src/Zphil.LoadBearing/Probe.cs"}}""";
     private const string DocsEditPayload = """{"tool_input":{"file_path":"docs/notes.md"}}""";
@@ -92,7 +92,7 @@ public sealed class HookWrapperTests
     {
         HookRun run = Fire(interpreter, payload: "", stubExit: 0);
 
-        run.Result.ExitCode.ShouldBe(0);
+        run.ShouldExitWith(0);
         // On exit 0 the tool writes the PostToolUse hook document (--hook-json) and the wrapper is a
         // passthrough of it: Claude Code parses an exit-0 hook's stdout, so what the check wrote has to
         // arrive there verbatim, unprefixed and not diverted to stderr. The stub stands in for the tool,
@@ -112,7 +112,7 @@ public sealed class HookWrapperTests
         // that speaks on every edit is a hook people turn off.
         HookRun run = Fire(interpreter, payload: "", stubExit: 0, quiet: true);
 
-        run.Result.ExitCode.ShouldBe(0);
+        run.ShouldExitWith(0);
         run.Result.StandardOutput.ShouldBeEmpty();
         run.Result.StandardError.ShouldBeEmpty();
     }
@@ -125,7 +125,7 @@ public sealed class HookWrapperTests
         HookRun run = Fire(interpreter, payload: "", stubExit: 1);
 
         // 2 is how a Claude Code hook blocks, and the report on stderr is what the agent reads to self-correct.
-        run.Result.ExitCode.ShouldBe(2);
+        run.ShouldExitWith(2);
         run.Result.StandardError.NormalizedLines()
             .ShouldContain(CannedReport);
     }
@@ -139,7 +139,7 @@ public sealed class HookWrapperTests
 
         // Not 2: LoadBearing's own error is a config problem the user sees, not a violation the agent is
         // told to "fix".
-        run.Result.ExitCode.ShouldBe(1);
+        run.ShouldExitWith(1);
         run.Result.StandardError.NormalizedLines()
             .ShouldStartWith("loadbearing config error:");
     }
@@ -151,8 +151,8 @@ public sealed class HookWrapperTests
     {
         HookRun run = Fire(interpreter, DocsEditPayload, stubExit: 0);
 
-        run.Result.ExitCode.ShouldBe(0);
-        ShouldNotHaveRunIn(run.ProjectDirectory,
+        run.ShouldExitWith(0);
+        run.ShouldNotHaveRunTheCheckIn(run.ProjectDirectory,
             "A docs edit must not pay for a check — the wrapper's payload filter should have returned "
             + "before invoking loadbearing at all.");
     }
@@ -165,8 +165,8 @@ public sealed class HookWrapperTests
         // The payload path is relative, which is the fallback the guard reads as project-relative.
         HookRun run = Fire(interpreter, CodeEditPayload, stubExit: 0);
 
-        run.Result.ExitCode.ShouldBe(0);
-        ShouldHaveRunIn(run.ProjectDirectory,
+        run.ShouldExitWith(0);
+        run.ShouldHaveRunTheCheckIn(run.ProjectDirectory,
             "A .cs edit must reach the check, and the sentinel only lands if the wrapper both invoked "
             + "loadbearing and changed to CLAUDE_PROJECT_DIR first.");
     }
@@ -176,18 +176,17 @@ public sealed class HookWrapperTests
     [InlineData(Pwsh)]
     public void AbsolutePayloadInsideTheProjectDirectory_RunsTheCheck(string interpreter)
     {
-        HookSandbox sandbox = Arrange();
         // A real repository, because this is the everyday path: both sides resolve to the same working
         // tree and the run proceeds. Without one they resolve to nothing, which proceeds by fallback and
         // would pass just as well with the comparison inverted.
-        InitialiseRepository(sandbox);
+        HookSandbox sandbox = ArrangeRepository();
         string edited = Path.Combine(sandbox.ProjectDirectory, "src", "Probe.cs");
         Directory.CreateDirectory(Path.GetDirectoryName(edited)!);
 
         HookRun run = Fire(interpreter, sandbox, PayloadNaming(edited), stubExit: 0);
 
-        run.Result.ExitCode.ShouldBe(0);
-        ShouldHaveRunIn(run.ProjectDirectory,
+        run.ShouldExitWith(0);
+        run.ShouldHaveRunTheCheckIn(run.ProjectDirectory,
             "This is the payload shape Claude Code actually sends: an absolute path, JSON-escaped, inside "
             + "the project directory and in its working tree. Nothing about it should stop the check.");
     }
@@ -203,8 +202,8 @@ public sealed class HookWrapperTests
 
         HookRun run = Fire(interpreter, sandbox, PayloadNaming(edited), stubExit: 0);
 
-        run.Result.ExitCode.ShouldBe(0);
-        ShouldNotHaveRunIn(run.ProjectDirectory,
+        run.ShouldExitWith(0);
+        run.ShouldNotHaveRunTheCheckIn(run.ProjectDirectory,
             "An edit outside CLAUDE_PROJECT_DIR must not buy a check of the project: the verdict would be "
             + "about code the edit never touched. This is also the leg that covers a file in no repository "
             + "at all, a scratch directory being the everyday case.");
@@ -215,14 +214,13 @@ public sealed class HookWrapperTests
     [InlineData(Pwsh)]
     public void PayloadInALinkedWorktree_SkipsTheCheck(string interpreter)
     {
-        HookSandbox sandbox = Arrange();
-        InitialiseRepository(sandbox);
+        HookSandbox sandbox = ArrangeRepository();
         string worktree = AddLinkedWorktree(sandbox);
 
         HookRun run = Fire(interpreter, sandbox, PayloadNaming(Path.Combine(worktree, "Probe.cs")), stubExit: 0);
 
-        run.Result.ExitCode.ShouldBe(0);
-        ShouldNotHaveRunIn(run.ProjectDirectory,
+        run.ShouldExitWith(0);
+        run.ShouldNotHaveRunTheCheckIn(run.ProjectDirectory,
             "A session in the main checkout writing to a worktree by absolute path is inside the project "
             + "directory by path and in a different working tree by git. Only the second answer is the "
             + "right one, so the check must not run.");
@@ -233,14 +231,13 @@ public sealed class HookWrapperTests
     [InlineData(Pwsh)]
     public void SessionInsideALinkedWorktree_SkipsTheCheck(string interpreter)
     {
-        HookSandbox sandbox = Arrange();
-        InitialiseRepository(sandbox);
+        HookSandbox sandbox = ArrangeRepository();
         string worktree = AddLinkedWorktree(sandbox);
 
         HookRun run = Fire(interpreter, sandbox, payload: "", stubExit: 0, workingDirectory: worktree);
 
-        run.Result.ExitCode.ShouldBe(0);
-        ShouldNotHaveRunIn(run.ProjectDirectory,
+        run.ShouldExitWith(0);
+        run.ShouldNotHaveRunTheCheckIn(run.ProjectDirectory,
             "With no payload the current directory stands in for the edited file, so a hand-run inside a "
             + "worktree opts itself out rather than checking the main checkout CLAUDE_PROJECT_DIR names.");
     }
@@ -250,15 +247,14 @@ public sealed class HookWrapperTests
     [InlineData(Pwsh)]
     public void SessionInASubdirectoryOfTheProject_RunsTheCheck(string interpreter)
     {
-        HookSandbox sandbox = Arrange();
-        InitialiseRepository(sandbox);
+        HookSandbox sandbox = ArrangeRepository();
         string subdirectory = Path.Combine(sandbox.ProjectDirectory, "src");
         Directory.CreateDirectory(subdirectory);
 
         HookRun run = Fire(interpreter, sandbox, payload: "", stubExit: 0, workingDirectory: subdirectory);
 
-        run.Result.ExitCode.ShouldBe(0);
-        ShouldHaveRunIn(run.ProjectDirectory,
+        run.ShouldExitWith(0);
+        run.ShouldHaveRunTheCheckIn(run.ProjectDirectory,
             "A session below the repository root is in the project's own working tree and must be checked. "
             + "Asking git which tree each side is in answers that identically from any depth, which a "
             + "comparison of git's own directory spellings does not.");
@@ -271,8 +267,8 @@ public sealed class HookWrapperTests
     {
         HookRun run = Fire(interpreter, Arrange(), payload: "", stubExit: 0, withProjectDirectory: false);
 
-        run.Result.ExitCode.ShouldBe(0);
-        ShouldHaveRunIn(run.WorkingDirectory,
+        run.ShouldExitWith(0);
+        run.ShouldHaveRunTheCheckIn(run.WorkingDirectory,
             "A hand-run outside Claude Code has no CLAUDE_PROJECT_DIR to compare anything against, so the "
             + "guard steps aside and the check runs where the run was launched.");
     }
@@ -282,15 +278,14 @@ public sealed class HookWrapperTests
     [InlineData(Pwsh)]
     public void StopPayload_RedRule_BlocksWithExitTwoAndTheReportOnStderr(string interpreter)
     {
-        HookSandbox sandbox = Arrange();
-        InitialiseRepository(sandbox);
+        HookSandbox sandbox = ArrangeRepository();
         string session = NewSession();
 
         HookRun run = Fire(interpreter, sandbox, StopPayload(sandbox, session), stubExit: 1);
 
         // Same 2 the per-edit shape blocks with, and at the turn boundary it means something stronger: the
         // agent said it was done and the hook refuses the stop, with the report as the reason to keep going.
-        run.Result.ExitCode.ShouldBe(2);
+        run.ShouldExitWith(2);
         run.Result.StandardError.NormalizedLines()
             .ShouldContain(CannedReport);
         // Both files are written before the wrapper exits, because the next stop's decisions are theirs: the
@@ -307,15 +302,14 @@ public sealed class HookWrapperTests
     [InlineData(Pwsh)]
     public void StopPayload_CleanRunWithWarnings_PassesTheDocumentThrough(string interpreter)
     {
-        HookSandbox sandbox = Arrange();
-        InitialiseRepository(sandbox);
+        HookSandbox sandbox = ArrangeRepository();
         string session = NewSession();
 
         HookRun run = Fire(interpreter, sandbox, StopPayload(sandbox, session), stubExit: 0);
 
         // A tripwire warning has no verdict to change and everything to say. Exit 0 with the document on
         // stdout is how Claude Code turns it into one continuation of the turn rather than a block.
-        run.Result.ExitCode.ShouldBe(0);
+        run.ShouldExitWith(0);
         run.Result.StandardOutput.NormalizedLines()
             .ShouldContain(CannedReport);
         run.Result.StandardError.ShouldBeEmpty();
@@ -332,14 +326,13 @@ public sealed class HookWrapperTests
     [InlineData(Pwsh)]
     public void StopPayload_CleanSilentRun_StaysSilent(string interpreter)
     {
-        HookSandbox sandbox = Arrange();
-        InitialiseRepository(sandbox);
+        HookSandbox sandbox = ArrangeRepository();
         string session = NewSession();
 
         HookRun run = Fire(interpreter, sandbox, StopPayload(sandbox, session), stubExit: 0, quiet: true);
 
         // The everyday turn: the check is clean, the hook says nothing, and the stop stands.
-        run.Result.ExitCode.ShouldBe(0);
+        run.ShouldExitWith(0);
         run.Result.StandardOutput.ShouldBeEmpty();
         run.Result.StandardError.ShouldBeEmpty();
         ReadState(sandbox, session, "verdict")
@@ -355,14 +348,14 @@ public sealed class HookWrapperTests
     [InlineData(Pwsh)]
     public void StopPayload_UnchangedGreenTree_SkipsTheCheck(string interpreter)
     {
-        HookSandbox sandbox = Arrange();
-        InitialiseRepository(sandbox);
+        HookSandbox sandbox = ArrangeRepository();
         WriteProbe(sandbox);
         string session = NewSession();
         string payload = StopPayload(sandbox, session);
 
-        Fire(interpreter, sandbox, payload, stubExit: 0, quiet: true);
-        ShouldHaveRunIn(sandbox.ProjectDirectory, "The first stop has no verdict to trust, so it checks.");
+        HookRun first = Fire(interpreter, sandbox, payload, stubExit: 0, quiet: true);
+        first.ShouldHaveRunTheCheckIn(
+            sandbox.ProjectDirectory, "The first stop has no verdict to trust, so it checks.");
         File.Delete(Path.Combine(sandbox.ProjectDirectory, Sentinel));
 
         HookRun second = Fire(interpreter, sandbox, payload, stubExit: 0, quiet: true);
@@ -370,9 +363,9 @@ public sealed class HookWrapperTests
         // The whole reason a question-and-answer turn is free. Nothing about the tree has moved since the
         // green verdict — same HEAD, same changed-code listing, nothing written since — so there is no
         // question left for a check to answer, and a hook that ran one anyway would cost the turn a minute.
-        second.Result.ExitCode.ShouldBe(0);
+        second.ShouldExitWith(0);
         second.Result.StandardOutput.ShouldBeEmpty();
-        ShouldNotHaveRunIn(
+        second.ShouldNotHaveRunTheCheckIn(
             sandbox.ProjectDirectory,
             "A second stop over an unchanged tree with a green verdict must not spend a check at all.");
     }
@@ -382,8 +375,7 @@ public sealed class HookWrapperTests
     [InlineData(Pwsh)]
     public void StopPayload_EditedTree_ChecksAgain(string interpreter)
     {
-        HookSandbox sandbox = Arrange();
-        InitialiseRepository(sandbox);
+        HookSandbox sandbox = ArrangeRepository();
         string probe = WriteProbe(sandbox);
         string session = NewSession();
         string payload = StopPayload(sandbox, session);
@@ -396,9 +388,9 @@ public sealed class HookWrapperTests
         Backdate(StatePath(sandbox, session, "verdict"));
         File.AppendAllText(probe, "\n// edited after the verdict\n");
 
-        Fire(interpreter, sandbox, payload, stubExit: 0, quiet: true);
+        HookRun second = Fire(interpreter, sandbox, payload, stubExit: 0, quiet: true);
 
-        ShouldHaveRunIn(
+        second.ShouldHaveRunTheCheckIn(
             sandbox.ProjectDirectory,
             "A file the verdict covered was written after it, so the verdict no longer speaks for the tree "
             + "and the check has to run again.");
@@ -409,8 +401,7 @@ public sealed class HookWrapperTests
     [InlineData(Pwsh)]
     public void StopPayload_RedVerdict_NeverSkips(string interpreter)
     {
-        HookSandbox sandbox = Arrange();
-        InitialiseRepository(sandbox);
+        HookSandbox sandbox = ArrangeRepository();
         WriteProbe(sandbox);
         string session = NewSession();
         string payload = StopPayload(sandbox, session);
@@ -422,8 +413,8 @@ public sealed class HookWrapperTests
 
         // The skip is an optimisation over a verdict that was clean. A red one is the state the hook exists
         // to keep saying out loud, and a tree that has not changed is precisely a tree still carrying it.
-        second.Result.ExitCode.ShouldBe(2);
-        ShouldHaveRunIn(
+        second.ShouldExitWith(2);
+        second.ShouldHaveRunTheCheckIn(
             sandbox.ProjectDirectory, "A red verdict is never skipped, however unchanged the tree is.");
     }
 
@@ -432,20 +423,19 @@ public sealed class HookWrapperTests
     [InlineData(Pwsh)]
     public void StopPayload_AtTheRoundCap_StopsBlocking(string interpreter)
     {
-        HookSandbox sandbox = Arrange();
-        InitialiseRepository(sandbox);
+        HookSandbox sandbox = ArrangeRepository();
         string session = NewSession();
         string payload = StopPayload(sandbox, session);
 
         for (var round = 0; round < 3; round++)
             Fire(interpreter, sandbox, payload, stubExit: 1)
-                .Result.ExitCode.ShouldBe(2, $"Round {round + 1} is inside the cap and still blocks.");
+                .ShouldExitWith(2, $"Round {round + 1} is inside the cap and still blocks.");
 
         HookRun capped = Fire(interpreter, sandbox, payload, stubExit: 1);
 
         // A rule the agent cannot satisfy would otherwise be a loop the user watches. At the cap the hook
         // says so on stderr and exits 1, which is not a block: the user reads it and the turn ends.
-        capped.Result.ExitCode.ShouldBe(1);
+        capped.ShouldExitWith(1);
         capped.Result.StandardError.NormalizedLines()
             .ShouldStartWith("loadbearing: still red after 3 rounds; not blocking again.");
         capped.Result.StandardError.NormalizedLines()
@@ -455,7 +445,7 @@ public sealed class HookWrapperTests
 
         // The count is per prompt, so the next thing the user asks for starts with its own three rounds
         // rather than inheriting a stand-down from the work before it.
-        nextPrompt.Result.ExitCode.ShouldBe(2);
+        nextPrompt.ShouldExitWith(2);
     }
 
     [Theory]
@@ -463,8 +453,7 @@ public sealed class HookWrapperTests
     [InlineData(Pwsh)]
     public void StopPayload_InAWorktreeSession_ChecksTheWorktree(string interpreter)
     {
-        HookSandbox sandbox = Arrange();
-        InitialiseRepository(sandbox);
+        HookSandbox sandbox = ArrangeRepository();
         string worktree = AddLinkedWorktree(sandbox);
 
         HookRun run = Fire(
@@ -473,9 +462,9 @@ public sealed class HookWrapperTests
         // The per-edit guard skips a worktree because the edit belongs to a tree the hook does not speak
         // for. At a stop the worktree *is* the session's tree, so the answer inverts: check it, and check it
         // there. The config values are root-relative, which is what lets one wrapper serve both trees.
-        run.Result.ExitCode.ShouldBe(0);
-        ShouldHaveRunIn(worktree, "A session inside a linked worktree must have its own tree checked.");
-        ShouldNotHaveRunIn(
+        run.ShouldExitWith(0);
+        run.ShouldHaveRunTheCheckIn(worktree, "A session inside a linked worktree must have its own tree checked.");
+        run.ShouldNotHaveRunTheCheckIn(
             sandbox.ProjectDirectory,
             "and checked there — a verdict about the main checkout would be about code this session never "
             + "touched.");
@@ -486,8 +475,7 @@ public sealed class HookWrapperTests
     [InlineData(Pwsh)]
     public void SubagentStopPayload_BehavesAsStop(string interpreter)
     {
-        HookSandbox sandbox = Arrange();
-        InitialiseRepository(sandbox);
+        HookSandbox sandbox = ArrangeRepository();
         string session = NewSession();
 
         HookRun run = Fire(
@@ -495,7 +483,7 @@ public sealed class HookWrapperTests
 
         // A worker claiming to be done is the same claim at a smaller scale, and its edits are in the tree
         // by the time it makes it. One branch serves both events rather than two that could drift.
-        run.Result.ExitCode.ShouldBe(2);
+        run.ShouldExitWith(2);
         run.Result.StandardError.NormalizedLines()
             .ShouldContain(CannedReport);
         ReadState(sandbox, session, "verdict")
@@ -507,8 +495,7 @@ public sealed class HookWrapperTests
     [InlineData(Pwsh)]
     public void StopPayload_UnwritableStateDir_HonoursStopHookActive(string interpreter)
     {
-        HookSandbox sandbox = Arrange();
-        InitialiseRepository(sandbox);
+        HookSandbox sandbox = ArrangeRepository();
         // A file where the state root should be: everything under it fails to open, on both interpreters.
         string blocked = Path.Combine(sandbox.Root, "state-root-is-a-file");
         File.WriteAllText(blocked, "not a directory");
@@ -520,7 +507,7 @@ public sealed class HookWrapperTests
         // With nowhere to count rounds the wrapper degrades to the one round the payload itself carries:
         // stop_hook_active says this hook has already blocked in this turn, so it stands down rather than
         // blocking a second time on a count it cannot keep.
-        run.Result.ExitCode.ShouldBe(0);
+        run.ShouldExitWith(0);
         run.Result.StandardError.ShouldBeEmpty();
     }
 
@@ -697,14 +684,39 @@ public sealed class HookWrapperTests
     }
 
     /// <summary>
+    ///     The same sandbox with a git repository under its project directory: what every row that fires at
+    ///     a working tree wants, and the only shape in which a linked worktree can be added or a turn-end
+    ///     verdict can have a HEAD to record.
+    /// </summary>
+    private static HookSandbox ArrangeRepository()
+    {
+        HookSandbox sandbox = Arrange();
+        InitialiseRepository(sandbox);
+
+        return sandbox;
+    }
+
+    /// <summary>
     ///     Makes the sandbox's project directory a git repository with one empty commit — enough for a
     ///     working tree to exist and for a worktree to be added, and nothing more.
     /// </summary>
+    /// <remarks>
+    ///     Two child processes rather than four: the identity rides on the commit as <c>-c</c> overrides
+    ///     beside the signing one, rather than being written into the repository by a pair of
+    ///     <c>git config</c> runs first. Making this one commit succeed whatever the host's global git
+    ///     config says is all it is ever for — nothing here commits again, and every git command the
+    ///     wrappers themselves run is a read. Every row in the file pays this twice over, once per
+    ///     interpreter.
+    /// </remarks>
     private static void InitialiseRepository(HookSandbox sandbox)
     {
-        GitCommand.InitRepository(sandbox.ProjectDirectory);
+        GitCommand.Run(sandbox.ProjectDirectory, "init");
         GitCommand.Run(
-            sandbox.ProjectDirectory, "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "baseline");
+            sandbox.ProjectDirectory,
+            "-c", "user.email=loadbearing-test@example.invalid",
+            "-c", "user.name=LoadBearing Test",
+            "-c", "commit.gpgsign=false",
+            "commit", "--allow-empty", "-m", "baseline");
     }
 
     /// <summary>
@@ -802,18 +814,6 @@ public sealed class HookWrapperTests
             .AddSeconds(-10));
     }
 
-    private static void ShouldHaveRunIn(string directory, string because)
-    {
-        File.Exists(Path.Combine(directory, Sentinel))
-            .ShouldBeTrue(because);
-    }
-
-    private static void ShouldNotHaveRunIn(string directory, string because)
-    {
-        File.Exists(Path.Combine(directory, Sentinel))
-            .ShouldBeFalse(because);
-    }
-
     /// <summary>
     ///     Writes the stub <c>loadbearing</c> the wrappers resolve off <c>PATH</c>: it records that it ran,
     ///     prints the canned two-line report unless <c>STUB_QUIET</c> is set, and exits <c>STUB_EXIT</c>.
@@ -852,9 +852,13 @@ public sealed class HookWrapperTests
         string ProjectDirectory,
         string StubDirectory,
         string StateDirectory);
-
-    private readonly record struct HookRun(
-        ChildProcess.ProcessResult Result,
-        string ProjectDirectory,
-        string WorkingDirectory);
 }
+
+/// <summary>
+///     One wrapper run: what the child process did, the project directory it was anchored to, and the
+///     directory it was launched from — the three things an assertion about a run has to be able to name.
+/// </summary>
+internal readonly record struct HookRun(
+    ChildProcess.ProcessResult Result,
+    string ProjectDirectory,
+    string WorkingDirectory);

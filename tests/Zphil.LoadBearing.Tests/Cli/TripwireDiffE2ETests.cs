@@ -80,6 +80,26 @@ public sealed class TripwireDiffE2ETests
                 await CliRunner.InvokeAsync([.. args, "--hook-json", "--hook-event", "Stop"]));
         });
 
+    // One tree carrying both halves of a red run — a touched tracked file inside the scope and a new interior
+    // reference from outside it — read on the two channels that have to agree about it. The hook-mode row
+    // wants a subset of this arrange, so the tree, its reload and the two runs are the pair's rather than one
+    // each; and the tripwire warning the touch adds is text the byte-identity claim below now also covers.
+    private static readonly Lazy<Task<(CliResult Human, CliResult Hook)>> Red = new(async () =>
+    {
+        using var repo = new TempGitRepo();
+        // Touch a tracked file inside the quarantined scope (tripwire warning) ...
+        File.AppendAllText(repo.PathOf("MyApp.Legacy.Billing", "BillingCalculator.cs"), "\n// touched by the tripwire test\n");
+        // ... and add a NEW interior reference from outside the scope (containment red).
+        FixtureEdits.AppendMemberLine(
+            repo.PathOf("MyApp.Web", "HomeController.cs"), "    public BillingCalculator NewCalculator() => new BillingCalculator();");
+
+        string[] args =
+            ["check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD"];
+        return (
+            await CliRunner.InvokeAsync(args),
+            await CliRunner.InvokeAsync([.. args, "--hook-json"]));
+    });
+
     [Fact]
     public async Task CheckDiffBase_UntrackedFileInQuarantinedScope_WarnsAndExitsZero()
     {
@@ -97,15 +117,7 @@ public sealed class TripwireDiffE2ETests
     [Fact]
     public async Task CheckDiffBase_ContainmentRedPlusTouch_ExitsOneWithBoth()
     {
-        using var repo = new TempGitRepo();
-        // Touch a tracked file inside the quarantined scope (tripwire warning) ...
-        File.AppendAllText(repo.PathOf("MyApp.Legacy.Billing", "BillingCalculator.cs"), "\n// touched by the tripwire test\n");
-        // ... and add a NEW interior reference from outside the scope (containment red).
-        FixtureEdits.AppendMemberLine(
-            repo.PathOf("MyApp.Web", "HomeController.cs"), "    public BillingCalculator NewCalculator() => new BillingCalculator();");
-
-        CliResult result = await CliRunner.InvokeAsync(
-            "check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD");
+        CliResult result = (await Red.Value).Human;
 
         // Exit code is containment-driven only; the tripwire warning rides alongside.
         result.ShouldReportViolations("FAIL legacy/billing/containment");
@@ -224,16 +236,7 @@ public sealed class TripwireDiffE2ETests
     {
         // Hook mode shapes the exit-0 channel and nothing else: on a red rule the wrapper needs the report to
         // put on stderr and block with, so this run must be byte-identical to the same run without the flag.
-        using var repo = new TempGitRepo();
-        FixtureEdits.AppendMemberLine(
-            repo.PathOf("MyApp.Web", "HomeController.cs"),
-            "    public BillingCalculator NewCalculator() => new BillingCalculator();");
-
-        CliResult hook = await CliRunner.InvokeAsync(
-            "check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD",
-            "--hook-json");
-        CliResult plain = await CliRunner.InvokeAsync(
-            "check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD");
+        (CliResult plain, CliResult hook) = await Red.Value;
 
         hook.ShouldReportViolations("FAIL legacy/billing/containment");
         hook.ShouldMatchTheOutputOf(plain);

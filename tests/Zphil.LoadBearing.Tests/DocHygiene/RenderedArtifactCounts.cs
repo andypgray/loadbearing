@@ -71,7 +71,7 @@ internal static class RenderedArtifactCounts
     ///     of it rounded to.
     /// </summary>
     private static readonly Regex ArtifactClaim = new(
-        @"\b(?<count>[A-Za-z][a-z]*(-[a-z]+)?|\d+) committed artifacts\b",
+        $@"\b{GrandfatheredCounts.CountToken} committed artifacts\b",
         RegexOptions.CultureInvariant);
 
     /// <summary>
@@ -79,7 +79,7 @@ internal static class RenderedArtifactCounts
     ///     writes it: one sentence counts the files and the other counts the directories holding them.
     /// </summary>
     private static readonly Regex CardClaim = new(
-        @"\b(?<count>[A-Za-z][a-z]*(-[a-z]+)?|\d+) (?:per-directory cards|directories under)\b",
+        $@"\b{GrandfatheredCounts.CountToken} (?:per-directory cards|directories under)\b",
         RegexOptions.CultureInvariant);
 
     /// <summary>
@@ -90,7 +90,7 @@ internal static class RenderedArtifactCounts
     {
         return TrackedFiles.Markdown
             .Where(static path => !path.StartsWith(ExampleRoot, StringComparison.Ordinal))
-            .Where(static path => IsRenderTarget(FileNameOf(path)))
+            .Where(static path => IsRenderTarget(Path.GetFileName(path)))
             .Where(CarriesAManagedBlock)
             .ToList();
     }
@@ -104,7 +104,7 @@ internal static class RenderedArtifactCounts
         return CommittedArtifacts()
             .Where(static path => path.Contains('/'))
             .Where(static path => string.Equals(
-                FileNameOf(path), ContextFileComposer.FileName, StringComparison.Ordinal))
+                Path.GetFileName(path), ContextFileComposer.FileName, StringComparison.Ordinal))
             .ToList();
     }
 
@@ -160,11 +160,5 @@ internal static class RenderedArtifactCounts
     private static bool CarriesAManagedBlock(string path)
     {
         return ManagedBlock.ExtractBody(RepoRoot.ReadText(path)) is not null;
-    }
-
-    private static string FileNameOf(string path)
-    {
-        int slash = path.LastIndexOf('/');
-        return slash < 0 ? path : path[(slash + 1)..];
     }
 }

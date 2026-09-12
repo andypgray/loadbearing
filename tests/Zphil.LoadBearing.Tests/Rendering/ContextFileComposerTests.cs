@@ -19,6 +19,12 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 /// </summary>
 public class ContextFileComposerTests
 {
+    // The billing codebase the co-location facts place against; the Web scene they share with
+    // LayerContextResolverTests is ContextFixtures.WebCodebase.
+    private static readonly CodebaseModel BillingOnly = CompilationFactory.Extract("MyApp.Legacy.Billing",
+        ("src/MyApp.Legacy.Billing/BillingCalculator.cs",
+            "namespace MyApp.Legacy.Billing; public class BillingCalculator {}"));
+
     private static readonly IArchitectureSpec WebLayerSpec = ContextFixtures.WebLayer();
 
     // A Web layer that says what it is for and that no rule anchors on: the rule ranges over the same types
@@ -32,7 +38,7 @@ public class ContextFileComposerTests
     });
 
     // A Billing layer anchored by a rule, over a codebase that holds no billing type.
-    private static readonly IArchitectureSpec BillingLayerSpec = new InlineSpec(BillingLayer);
+    private static readonly IArchitectureSpec BillingLayerSpec = new InlineSpec(ContextFixtures.BillingLayer);
 
     // A quarantined scope over a namespace no type in the codebase occupies.
     private static readonly IArchitectureSpec AbsentScopeSpec = new InlineSpec(QuarantineBilling);
@@ -54,17 +60,9 @@ public class ContextFileComposerTests
     {
         return new InlineSpec(arch =>
         {
-            BillingLayer(arch);
+            ContextFixtures.BillingLayer(arch);
             declareScope(arch);
         });
-    }
-
-    private static void BillingLayer(Arch arch)
-    {
-        Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
-        arch.Rule("layering/billing-not-web")
-            .Enforce(billing.MustNotReference(arch.Namespace("MyApp.Web.*")))
-            .Because("Billing is downstream of the web layer.");
     }
 
     private static void QuarantineBilling(Arch arch)
@@ -104,11 +102,8 @@ public class ContextFileComposerTests
     [Fact]
     public void Compose_AnchoredLayer_PlacesItsCardBesideTheRootFile()
     {
-        CodebaseModel codebase = CompilationFactory.Extract("MyApp.Web",
-            ("src/MyApp.Web/HomeController.cs", "namespace MyApp.Web; public class HomeController {}"));
-
         ContextComposition composition = ContextFileComposer.Compose(
-            ArchModelBuilder.Build(WebLayerSpec), codebase, "/sln", SpecName);
+            ArchModelBuilder.Build(WebLayerSpec), ContextFixtures.WebCodebase, "/sln", SpecName);
 
         composition.Warnings.ShouldBeEmpty();
         composition.Files.Select(file => file.Path)
@@ -125,12 +120,8 @@ public class ContextFileComposerTests
     [Fact]
     public void Compose_LayerAndScopeInOneDirectory_MergeIntoOneFileLayerCardFirst()
     {
-        CodebaseModel codebase = CompilationFactory.Extract("MyApp.Legacy.Billing",
-            ("src/MyApp.Legacy.Billing/BillingCalculator.cs",
-                "namespace MyApp.Legacy.Billing; public class BillingCalculator {}"));
-
         ContextComposition composition = ContextFileComposer.Compose(
-            ArchModelBuilder.Build(CoLocatedSpec), codebase, "/sln", SpecName);
+            ArchModelBuilder.Build(CoLocatedSpec), BillingOnly, "/sln", SpecName);
 
         // One file, not two: the second splice would clobber the first, so co-located units merge.
         composition.Files.Count.ShouldBe(2);
@@ -148,14 +139,11 @@ public class ContextFileComposerTests
     [Fact]
     public void Compose_LayerMatchingNoTypes_WarnsAndWritesNoCard()
     {
-        CodebaseModel codebase = CompilationFactory.Extract("MyApp.Web",
-            ("src/MyApp.Web/HomeController.cs", "namespace MyApp.Web; public class HomeController {}"));
-
         // The Billing layer is anchored by a rule but matches nothing, so there is no directory to place
         // its card in. The skip has to surface: silently emitting nothing is how a spec stops describing
         // its codebase without anyone noticing.
         ContextComposition composition = ContextFileComposer.Compose(
-            ArchModelBuilder.Build(BillingLayerSpec), codebase, "/sln", SpecName);
+            ArchModelBuilder.Build(BillingLayerSpec), ContextFixtures.WebCodebase, "/sln", SpecName);
 
         composition.Warnings.ShouldBe(["layer 'Billing' matched no types; no scoped context emitted"]);
         composition.Files.ShouldHaveSingleItem(); // the root file only
@@ -164,11 +152,8 @@ public class ContextFileComposerTests
     [Fact]
     public void Compose_ScopeMatchingNoTypes_WarnsAndWritesNoCard()
     {
-        CodebaseModel codebase = CompilationFactory.Extract("MyApp.Web",
-            ("src/MyApp.Web/HomeController.cs", "namespace MyApp.Web; public class HomeController {}"));
-
         ContextComposition composition = ContextFileComposer.Compose(
-            ArchModelBuilder.Build(AbsentScopeSpec), codebase, "/sln", SpecName);
+            ArchModelBuilder.Build(AbsentScopeSpec), ContextFixtures.WebCodebase, "/sln", SpecName);
 
         composition.Warnings.ShouldBe(["scope 'legacy/billing' matched no types; no scoped context emitted"]);
         composition.Files.ShouldHaveSingleItem();
@@ -200,12 +185,8 @@ public class ContextFileComposerTests
     [Fact]
     public void Compose_LayerAndCautionInOneDirectory_MergeIntoOneFileLayerCardFirst()
     {
-        CodebaseModel codebase = CompilationFactory.Extract("MyApp.Legacy.Billing",
-            ("src/MyApp.Legacy.Billing/BillingCalculator.cs",
-                "namespace MyApp.Legacy.Billing; public class BillingCalculator {}"));
-
         ContextComposition composition = ContextFileComposer.Compose(
-            ArchModelBuilder.Build(CoLocatedCautionSpec), codebase, "/sln", SpecName);
+            ArchModelBuilder.Build(CoLocatedCautionSpec), BillingOnly, "/sln", SpecName);
 
         // The layer-cards-first ordering is a property of the composer, not of which scope posture it met.
         composition.Files.Count.ShouldBe(2);
@@ -232,12 +213,9 @@ public class ContextFileComposerTests
     [Fact]
     public void Compose_DescribedLayerNoRuleAnchorsOn_RendersTheRowAndPlacesNoCard()
     {
-        CodebaseModel codebase = CompilationFactory.Extract("MyApp.Web",
-            ("src/MyApp.Web/HomeController.cs", "namespace MyApp.Web; public class HomeController {}"));
-
         // Even with the codebase paid for, the purpose buys the layer a module-map row and nothing more.
         ContextComposition composition = ContextFileComposer.Compose(
-            ArchModelBuilder.Build(DescribedUnanchoredLayerSpec), codebase, "/sln", SpecName);
+            ArchModelBuilder.Build(DescribedUnanchoredLayerSpec), ContextFixtures.WebCodebase, "/sln", SpecName);
 
         composition.Warnings.ShouldBeEmpty();
         ContextFile file = composition.Files.ShouldHaveSingleItem();

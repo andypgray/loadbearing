@@ -154,22 +154,50 @@ public sealed class FragmentSiteRemapperTests
                                       }
                                       """;
 
+    // The compiled solutions every insertion case shares, and the two derivations taken over them. A
+    // compile here binds the whole trusted-platform-assemblies closure, so each is worth building once.
+    // Declaration order is load-bearing: static field initializers run in it, both LibSources and AppSources
+    // are read by CompileSolution, and the last two fields read the two above them.
+    private static readonly IReadOnlyList<CompilationInput> Before = CompileSolution(source => source);
+
+    private static readonly IReadOnlyList<CompilationInput> AfterInsertions = CompileSolution(WithInsertedLines);
+
+    private static readonly IReadOnlyDictionary<string, LineMap> InsertionMaps = MapsBetween(Before, AfterInsertions);
+
+    private static readonly IReadOnlyList<CodebaseFragment> BeforeFragments = Before.Select(FragmentExtractor.Extract)
+        .ToList();
+
+    // One selector per site family, read twice by ShouldHaveMovedEverySiteFamily — once for the stored
+    // fragment and once for the remapped one. Spelled once so a pair can never name two different families.
+    private static readonly (string Family, Func<CodebaseFragment, IEnumerable<FragmentSite>> Sites)[] SiteFamilies =
+    [
+        ("type declaration sites", fragment => fragment.DeclaredTypes.SelectMany(type => type.DeclarationSites)),
+        ("member declaration sites", fragment => fragment.DeclaredTypes.SelectMany(type => type.DeclaredMembers)
+            .SelectMany(member => member.DeclarationSites)),
+        ("reference edge sites", fragment => fragment.Edges.SelectMany(edge => edge.Sites)),
+        ("member edge sites", fragment => fragment.MemberEdges.SelectMany(edge => edge.Sites)),
+        ("construction edge sites", fragment => fragment.ConstructorEdges.SelectMany(edge => edge.Sites)),
+        ("injection edge sites", fragment => fragment.InjectionEdges.SelectMany(edge => edge.Sites)),
+        ("catch edge sites", fragment => fragment.CatchEdges.SelectMany(edge => edge.Sites)),
+        ("unfiltered catch sites", fragment => fragment.CatchEdges.SelectMany(edge => edge.UnfilteredSites)),
+        ("swallowing catch sites", fragment => fragment.CatchEdges.SelectMany(edge => edge.SwallowingSites)),
+        ("throw edge sites", fragment => fragment.ThrowEdges.SelectMany(edge => edge.Sites)),
+        ("exposure edge sites", fragment => fragment.ExposureEdges.SelectMany(edge => edge.Sites)),
+        ("service registration sites",
+            fragment => fragment.ServiceRegistrations.SelectMany(registration => registration.Sites))
+    ];
+
     [Fact]
     public void TryRemap_LinesInsertedInEveryFile_SerializesLikeAColdWalk()
     {
         // Arrange
-        IReadOnlyList<CompilationInput> before = CompileSolution(source => source);
-        IReadOnlyList<CompilationInput> after = CompileSolution(WithInsertedLines);
-        IReadOnlyDictionary<string, LineMap> maps = MapsBetween(before, after);
-        List<CodebaseFragment> beforeEdit = before.Select(FragmentExtractor.Extract)
-            .ToList();
-        List<CodebaseFragment> afterEdit = after.Select(FragmentExtractor.Extract)
+        List<CodebaseFragment> afterEdit = AfterInsertions.Select(FragmentExtractor.Extract)
             .ToList();
 
         // Act
         var remapped = new List<CodebaseFragment>();
-        foreach (CodebaseFragment fragment in beforeEdit)
-            remapped.Add(FragmentSiteRemapper.TryRemap(fragment, maps)
+        foreach (CodebaseFragment fragment in BeforeFragments)
+            remapped.Add(FragmentSiteRemapper.TryRemap(fragment, InsertionMaps)
                 .ShouldNotBeNull());
 
         // Assert — byte for byte, per fragment, so a dropped or misordered site cannot hide in a total.
@@ -178,22 +206,19 @@ public sealed class FragmentSiteRemapperTests
             Serialize(remapped[index])
                 .ShouldBe(Serialize(afterEdit[index]));
 
-        ShouldHaveMovedEverySiteFamily(beforeEdit[0], remapped[0]);
+        ShouldHaveMovedEverySiteFamily(BeforeFragments[0], remapped[0]);
     }
 
     [Fact]
     public void TryRemap_ArtifactSites_KeepTheirOwnLines()
     {
-        // Arrange — the four sites that name a props or project file rather than a document.
-        IReadOnlyList<CompilationInput> before = CompileSolution(source => source);
-        IReadOnlyList<CompilationInput> after = CompileSolution(WithInsertedLines);
-        IReadOnlyDictionary<string, LineMap> maps = MapsBetween(before, after);
-
+        // Arrange — the four sites that name a props or project file rather than a document. The `with`
+        // copies, so the shared fragment the expression starts from is left as every other case sees it.
         var frameworksSite = new FragmentSite("/repo/Directory.Build.props", 7);
         var packableSite = new FragmentSite("/repo/Lib.csproj", 5);
         var locksSite = new FragmentSite("/repo/Lib.csproj", 6);
         var package = new FragmentPackageReference("Serilog", new FragmentSite("/repo/Directory.Packages.props", 12));
-        CodebaseFragment fragment = FragmentExtractor.Extract(before[0]) with
+        CodebaseFragment fragment = BeforeFragments[0] with
         {
             DeclaredTargetFrameworks = ["net10.0"],
             TargetFrameworksSite = frameworksSite,
@@ -205,7 +230,7 @@ public sealed class FragmentSiteRemapperTests
         };
 
         // Act
-        CodebaseFragment remapped = FragmentSiteRemapper.TryRemap(fragment, maps)
+        CodebaseFragment remapped = FragmentSiteRemapper.TryRemap(fragment, InsertionMaps)
             .ShouldNotBeNull();
 
         // Assert — no document's map can claim those paths, so the four stand still while the rest moves.
@@ -238,12 +263,12 @@ public sealed class FragmentSiteRemapperTests
     [Fact]
     public void TryRemap_IdentityMaps_ReturnTheSameFragment()
     {
-        // Arrange — a whitespace-only edit: every token keeps its line, so every map is the identity.
-        IReadOnlyList<CompilationInput> before = CompileSolution(source => source);
+        // Arrange — a whitespace-only edit: every token keeps its line, so every map is the identity. The
+        // reindented solution is this case's alone, so it stays here rather than joining the shared fields.
         IReadOnlyList<CompilationInput> after = CompileSolution(Reindented);
-        IReadOnlyDictionary<string, LineMap> maps = MapsBetween(before, after);
+        IReadOnlyDictionary<string, LineMap> maps = MapsBetween(Before, after);
         maps.Values.ShouldAllBe(map => map.IsIdentity);
-        CodebaseFragment fragment = FragmentExtractor.Extract(before[0]);
+        CodebaseFragment fragment = BeforeFragments[0];
 
         // Act
         CodebaseFragment? remapped = FragmentSiteRemapper.TryRemap(fragment, maps);
@@ -290,56 +315,8 @@ public sealed class FragmentSiteRemapperTests
 
     private static void ShouldHaveMovedEverySiteFamily(CodebaseFragment before, CodebaseFragment after)
     {
-        ShouldHaveMoved(
-            "type declaration sites",
-            before.DeclaredTypes.SelectMany(type => type.DeclarationSites),
-            after.DeclaredTypes.SelectMany(type => type.DeclarationSites));
-        ShouldHaveMoved(
-            "member declaration sites",
-            before.DeclaredTypes.SelectMany(type => type.DeclaredMembers)
-                .SelectMany(member => member.DeclarationSites),
-            after.DeclaredTypes.SelectMany(type => type.DeclaredMembers)
-                .SelectMany(member => member.DeclarationSites));
-        ShouldHaveMoved(
-            "reference edge sites",
-            before.Edges.SelectMany(edge => edge.Sites),
-            after.Edges.SelectMany(edge => edge.Sites));
-        ShouldHaveMoved(
-            "member edge sites",
-            before.MemberEdges.SelectMany(edge => edge.Sites),
-            after.MemberEdges.SelectMany(edge => edge.Sites));
-        ShouldHaveMoved(
-            "construction edge sites",
-            before.ConstructorEdges.SelectMany(edge => edge.Sites),
-            after.ConstructorEdges.SelectMany(edge => edge.Sites));
-        ShouldHaveMoved(
-            "injection edge sites",
-            before.InjectionEdges.SelectMany(edge => edge.Sites),
-            after.InjectionEdges.SelectMany(edge => edge.Sites));
-        ShouldHaveMoved(
-            "catch edge sites",
-            before.CatchEdges.SelectMany(edge => edge.Sites),
-            after.CatchEdges.SelectMany(edge => edge.Sites));
-        ShouldHaveMoved(
-            "unfiltered catch sites",
-            before.CatchEdges.SelectMany(edge => edge.UnfilteredSites),
-            after.CatchEdges.SelectMany(edge => edge.UnfilteredSites));
-        ShouldHaveMoved(
-            "swallowing catch sites",
-            before.CatchEdges.SelectMany(edge => edge.SwallowingSites),
-            after.CatchEdges.SelectMany(edge => edge.SwallowingSites));
-        ShouldHaveMoved(
-            "throw edge sites",
-            before.ThrowEdges.SelectMany(edge => edge.Sites),
-            after.ThrowEdges.SelectMany(edge => edge.Sites));
-        ShouldHaveMoved(
-            "exposure edge sites",
-            before.ExposureEdges.SelectMany(edge => edge.Sites),
-            after.ExposureEdges.SelectMany(edge => edge.Sites));
-        ShouldHaveMoved(
-            "service registration sites",
-            before.ServiceRegistrations.SelectMany(registration => registration.Sites),
-            after.ServiceRegistrations.SelectMany(registration => registration.Sites));
+        foreach ((string family, Func<CodebaseFragment, IEnumerable<FragmentSite>> sites) in SiteFamilies)
+            ShouldHaveMoved(family, sites(before), sites(after));
     }
 
     private static void ShouldHaveMoved(string family, IEnumerable<FragmentSite> before, IEnumerable<FragmentSite> after)

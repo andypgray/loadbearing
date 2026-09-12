@@ -20,6 +20,15 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 /// </summary>
 public class LayerContextResolverTests
 {
+    // The codebases the facts place against. The one-file Web scene is shared with
+    // ContextFileComposerTests as ContextFixtures.WebCodebase; these two are this suite's own.
+    private static readonly CodebaseModel BillingOnly = CompilationFactory.Extract("MyApp.Legacy.Billing",
+        ("MyApp.Legacy.Billing/BillingCalculator.cs", "namespace MyApp.Legacy.Billing; public class BillingCalculator {}"));
+
+    private static readonly CodebaseModel WebAndBilling = CompilationFactory.Extract("MyApp",
+        ("src/MyApp.Web/HomeController.cs", "namespace MyApp.Web; public class HomeController {}"),
+        ("src/MyApp.Legacy.Billing/BillingCalculator.cs", "namespace MyApp.Legacy.Billing; public class BillingCalculator {}"));
+
     private static readonly IArchitectureSpec WebLayerSpec = ContextFixtures.WebLayer();
 
     private static readonly IArchitectureSpec DescribedWebLayerSpec =
@@ -86,13 +95,7 @@ public class LayerContextResolverTests
     });
 
     // A Billing layer with one anchored rule — used to place against a codebase that has no billing types.
-    private static readonly IArchitectureSpec BillingLayerSpec = new InlineSpec(arch =>
-    {
-        Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
-        arch.Rule("layering/billing-not-web")
-            .Enforce(billing.MustNotReference(arch.Namespace("MyApp.Web.*")))
-            .Because("Billing is independent of the web layer.");
-    });
+    private static readonly IArchitectureSpec BillingLayerSpec = new InlineSpec(ContextFixtures.BillingLayer);
 
     // A hermetically quarantined Billing layer with no other rule — its only layer-anchored subject is the
     // Quarantine containment, which the resolver excludes.
@@ -137,12 +140,10 @@ public class LayerContextResolverTests
     [Fact]
     public void Resolve_DescribedLayer_CarriesItsPurposeOntoThePlacement()
     {
-        CodebaseModel codebase = CompilationFactory.Extract("MyApp.Web",
-            ("src/MyApp.Web/HomeController.cs", "namespace MyApp.Web; public class HomeController {}"));
-
         // The purpose rides from the layer definition onto the placement, which is the only route it has
         // into the card lede — the renderer is handed it, never the model.
-        LayerPlacement placement = LayerContextResolver.Resolve(ArchModelBuilder.Build(DescribedWebLayerSpec), codebase)[0];
+        LayerPlacement placement = LayerContextResolver.Resolve(
+            ArchModelBuilder.Build(DescribedWebLayerSpec), ContextFixtures.WebCodebase)[0];
 
         placement.Purpose.ShouldBe("The HTTP surface: controllers and the views they serve.");
     }
@@ -150,12 +151,10 @@ public class LayerContextResolverTests
     [Fact]
     public void Resolve_AnchoredViaExcept_StillAnchors()
     {
-        CodebaseModel codebase = CompilationFactory.Extract("MyApp.Web",
-            ("src/MyApp.Web/HomeController.cs", "namespace MyApp.Web; public class HomeController {}"));
-
         // The rule subject is web.Except(...); the Except refinement keeps the LayerNoun head, so the
         // layer still anchors and the card ranges over the whole layer directory.
-        LayerPlacement placement = LayerContextResolver.Resolve(ArchModelBuilder.Build(ExceptRefinedSpec), codebase)[0];
+        LayerPlacement placement = LayerContextResolver.Resolve(
+            ArchModelBuilder.Build(ExceptRefinedSpec), ContextFixtures.WebCodebase)[0];
 
         placement.LayerName.ShouldBe("Web");
         placement.DirectoryPath.ShouldBe("src/MyApp.Web");
@@ -164,37 +163,28 @@ public class LayerContextResolverTests
     [Fact]
     public void Resolve_NamespaceSubjectRule_LayerGetsNoPlacement()
     {
-        CodebaseModel codebase = CompilationFactory.Extract("MyApp.Web",
-            ("src/MyApp.Web/HomeController.cs", "namespace MyApp.Web; public class HomeController {}"));
-
         // A rule whose subject is arch.Namespace("MyApp.Web.*") ranges over the same types as the Web
         // layer, but its noun head is a NamespaceNoun — anchoring is by noun identity, not type set.
-        LayerContextResolver.Resolve(ArchModelBuilder.Build(NamespaceSubjectSpec), codebase)
+        LayerContextResolver.Resolve(ArchModelBuilder.Build(NamespaceSubjectSpec), ContextFixtures.WebCodebase)
             .ShouldBeEmpty();
     }
 
     [Fact]
     public void Resolve_QuarantinePostureRuleOnLayer_Excluded()
     {
-        CodebaseModel codebase = CompilationFactory.Extract("MyApp.Legacy.Billing",
-            ("MyApp.Legacy.Billing/BillingCalculator.cs", "namespace MyApp.Legacy.Billing; public class BillingCalculator {}"));
-
         // The layer is quarantined (its desugared containment subject is layer-anchored) but carries no
         // Enforce/Migrate rule — Quarantine posture is excluded, so the layer earns no card and does not
         // double-emit beside its quarantine card.
-        LayerContextResolver.Resolve(ArchModelBuilder.Build(QuarantinedLayerSpec), codebase)
+        LayerContextResolver.Resolve(ArchModelBuilder.Build(QuarantinedLayerSpec), BillingOnly)
             .ShouldBeEmpty();
     }
 
     [Fact]
     public void Resolve_CautionPostureRuleOnLayer_Excluded()
     {
-        CodebaseModel codebase = CompilationFactory.Extract("MyApp.Legacy.Billing",
-            ("MyApp.Legacy.Billing/BillingCalculator.cs", "namespace MyApp.Legacy.Billing; public class BillingCalculator {}"));
-
         // The caution card already covers this directory; a layer card beside it would say the same thing
         // twice in the same file.
-        LayerContextResolver.Resolve(ArchModelBuilder.Build(CautionedLayerSpec), codebase)
+        LayerContextResolver.Resolve(ArchModelBuilder.Build(CautionedLayerSpec), BillingOnly)
             .ShouldBeEmpty();
     }
 
@@ -214,14 +204,10 @@ public class LayerContextResolverTests
     [Fact]
     public void Resolve_FamilyOfLayersSubject_AnchorsEveryCellAtItsOwnDirectory()
     {
-        CodebaseModel codebase = CompilationFactory.Extract("MyApp",
-            ("src/MyApp.Web/HomeController.cs", "namespace MyApp.Web; public class HomeController {}"),
-            ("src/MyApp.Legacy.Billing/BillingCalculator.cs", "namespace MyApp.Legacy.Billing; public class BillingCalculator {}"));
-
         // One rule, two cards: the sentence names every cell, so it reads correctly on each — and the
         // directory is the CELL's, never the subject head's, or both cards would land in one place.
         IReadOnlyList<LayerPlacement> placements = LayerContextResolver.Resolve(
-            ArchModelBuilder.Build(FamilySubjectSpec), codebase);
+            ArchModelBuilder.Build(FamilySubjectSpec), WebAndBilling);
 
         placements.Select(placement => (placement.LayerName, placement.DirectoryPath))
             .ShouldBe([("Web", "src/MyApp.Web"), ("Billing", "src/MyApp.Legacy.Billing")]);
@@ -231,13 +217,9 @@ public class LayerContextResolverTests
     [Fact]
     public void Resolve_RefinedFamilySubject_StillAnchorsEveryCell()
     {
-        CodebaseModel codebase = CompilationFactory.Extract("MyApp",
-            ("src/MyApp.Web/HomeController.cs", "namespace MyApp.Web; public class HomeController {}"),
-            ("src/MyApp.Legacy.Billing/BillingCalculator.cs", "namespace MyApp.Legacy.Billing; public class BillingCalculator {}"));
-
         // An Except on the family produces a RefinedSelection over the same noun, exactly as it does over
         // a bare layer, so anchoring survives it — and each card still ranges over the whole cell.
-        LayerContextResolver.Resolve(ArchModelBuilder.Build(RefinedFamilySubjectSpec), codebase)
+        LayerContextResolver.Resolve(ArchModelBuilder.Build(RefinedFamilySubjectSpec), WebAndBilling)
             .Select(placement => placement.LayerName)
             .ShouldBe(["Web", "Billing"]);
     }
@@ -245,14 +227,11 @@ public class LayerContextResolverTests
     [Fact]
     public void Resolve_FamilyOfProjectsSubject_AnchorsNothing()
     {
-        CodebaseModel codebase = CompilationFactory.Extract("MyApp.Web",
-            ("src/MyApp.Web/HomeController.cs", "namespace MyApp.Web; public class HomeController {}"));
-
         // The project form names no layer, so there is no card to place — a bare project noun earns none
         // either, and a family of them is the same answer.
         ArchitectureModel model = ArchModelBuilder.Build(ProjectFamilySubjectSpec);
 
-        LayerContextResolver.Resolve(model, codebase)
+        LayerContextResolver.Resolve(model, ContextFixtures.WebCodebase)
             .ShouldBeEmpty();
         LayerContextResolver.HasAnchoredLayers(model)
             .ShouldBeFalse();
@@ -261,15 +240,12 @@ public class LayerContextResolverTests
     [Fact]
     public void Resolve_UnionSubjectContainingTheLayer_AnchorsNothing()
     {
-        CodebaseModel codebase = CompilationFactory.Extract("MyApp.Web",
-            ("src/MyApp.Web/HomeController.cs", "namespace MyApp.Web; public class HomeController {}"));
-
         // A union has no single home directory even when a Layer is one of its operands, so it anchors no
         // scoped card and the rule renders into the root block only (GRAMMAR §6). A union also carries no
         // noun, so anchoring must never be decided by reading one.
         ArchitectureModel model = ArchModelBuilder.Build(UnionSubjectSpec);
 
-        LayerContextResolver.Resolve(model, codebase)
+        LayerContextResolver.Resolve(model, ContextFixtures.WebCodebase)
             .ShouldBeEmpty();
         LayerContextResolver.HasAnchoredLayers(model)
             .ShouldBeFalse();

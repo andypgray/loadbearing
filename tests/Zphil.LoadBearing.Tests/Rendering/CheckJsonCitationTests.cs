@@ -4,9 +4,10 @@ using Xunit;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
-using Zphil.LoadBearing.Roslyn.Diagnostics;
 using Zphil.LoadBearing.Tests.Checking;
 using Zphil.LoadBearing.Tests.Extraction;
+// The suite's reader over a check document, not the CLI renderer of the same name that this file also imports.
+using CheckJson = Zphil.LoadBearing.Tests.TestSupport.CheckJson;
 
 namespace Zphil.LoadBearing.Tests.Rendering;
 
@@ -82,20 +83,6 @@ public sealed class CheckJsonCitationTests
 
     private static JsonElement Rule(CheckReport report, DocumentGrain grain)
     {
-        string document = JsonReportRenderer.Document(
-            report: report,
-            solutionDirectory: Directory.GetCurrentDirectory(),
-            solutionName: "S.sln",
-            specAssembly: "Spec.dll",
-            diffBase: null,
-            workspaceDiagnostics: [],
-            diagnostics: WorkspaceDiagnostics.None,
-            rulesFilter: [],
-            grain: grain);
-
-        return JsonDocument.Parse(document)
-            .RootElement.GetProperty("rules")
-            .EnumerateArray()
-            .Single();
+        return CheckJson.Rule(report.JsonReport(grain), "layer/no-data");
     }
 }

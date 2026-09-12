@@ -1,7 +1,6 @@
 using System.Text.Json;
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Cli.Verbs;
 using Zphil.LoadBearing.Roslyn.MsBuild;
 using Zphil.LoadBearing.Tests.Mcp.TestDoubles;
@@ -613,9 +612,11 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         string solution = CliRunner.MyAppSolution;
         var source = new DiagnosticInjectingSolutionSource(
             diagnostics, failedProjects, uncheckedProjects, restoreFailedProjects);
-        var request = new CheckRequest(
-            solution, spec, json, false, null, SolutionPaths.SolutionDirectoryOf(solution), true, null,
-            allowWorkspaceDiagnostics, sarif, null, DocumentGrain.Full);
+        CheckRequest request = CheckRequests.For(solution, spec, SolutionPaths.SolutionDirectoryOf(solution))
+            with
+            {
+                Json = json, NoCache = true, AllowWorkspaceDiagnostics = allowWorkspaceDiagnostics, Sarif = sarif
+            };
 
         return await CliResult.CapturedAsync((output, error) => new CheckRunner(output, error, source, new FakeEnvironment()).RunAsync(request, Ct));
     }

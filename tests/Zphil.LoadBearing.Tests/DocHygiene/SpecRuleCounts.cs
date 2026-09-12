@@ -64,7 +64,7 @@ internal static class SpecRuleCounts
     ///     of it rounded to.
     /// </summary>
     private static readonly Regex ClaimPattern = new(
-        @"\b(?<count>[A-Za-z][a-z]*(-[a-z]+)?|\d+) rules over this repository's real code\b",
+        $@"\b{GrandfatheredCounts.CountToken} rules over this repository's real code\b",
         RegexOptions.CultureInvariant);
 
     /// <summary>

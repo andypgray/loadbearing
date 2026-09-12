@@ -1,4 +1,4 @@
-﻿using Shouldly;
+using Shouldly;
 using Xunit;
 using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
@@ -105,11 +105,11 @@ public sealed class HumanReportRendererTests
         // A union with two empty parts names both, then says once what they share: a reader who has met the
         // sentence learns nothing from meeting it again, and the diagnosis lines are what differ.
         var result = new RuleResult(
-            EnforceRule("union/x"), RuleStatus.Failed,
+            Checker.Rule("union/x"), RuleStatus.Failed,
             [
                 Violation.EmptySubject("the first part matched nothing", "SHARED-CURE"),
                 Violation.EmptySubject("the second part matched nothing", "SHARED-CURE")
-            ], [], null, []);
+            ]);
 
         string block = result.HumanBlock();
 
@@ -144,7 +144,7 @@ public sealed class HumanReportRendererTests
         // cure that works leaves two `hint:` lines disagreeing about what to do.
         var result = new RuleResult(
             MigrateRule("data/x"), RuleStatus.Failed,
-            [Violation.EmptySubject("matched nothing", "THE-REAL-CURE")], [], null, []);
+            [Violation.EmptySubject("matched nothing", "THE-REAL-CURE")]);
 
         string block = result.HumanBlock();
 
@@ -162,7 +162,7 @@ public sealed class HumanReportRendererTests
         // and the xunit adapter's failure message is this same block.
         var result = new RuleResult(
             FixedRule("naming/x"), RuleStatus.Failed,
-            [Violation.EmptySubject("matched nothing", "THE-REAL-CURE")], [], null, []);
+            [Violation.EmptySubject("matched nothing", "THE-REAL-CURE")]);
 
         string block = result.HumanBlock();
 
@@ -178,7 +178,7 @@ public sealed class HumanReportRendererTests
         // The same question, the same answer: a predicate that threw reached no verdict about the code either,
         // so the gate is keyed on that rather than on the one kind the empty-subject case named.
         var result = new RuleResult(
-            FixedRule("naming/x"), RuleStatus.Failed, [Violation.RuleError("boom")], [], null, []);
+            FixedRule("naming/x"), RuleStatus.Failed, [Violation.RuleError("boom")]);
 
         string block = result.HumanBlock();
 
@@ -194,8 +194,7 @@ public sealed class HumanReportRendererTests
         // The control: a real finding is exactly what the fix is advice for, so the block a reader has always
         // got is unchanged. Without this row the gate could pass by withholding the fix from everything.
         var result = new RuleResult(
-            FixedRule("naming/x"), RuleStatus.Failed, [Violation.Shape(SyntheticNodes.Type("App.Orphan"), [])],
-            [], null, []);
+            FixedRule("naming/x"), RuleStatus.Failed, [Violation.Shape(SyntheticNodes.Type("App.Orphan"), [])]);
 
         result.HumanBlock()
             .ShouldContain("fix: Rename it.");
@@ -210,7 +209,7 @@ public sealed class HumanReportRendererTests
         // the gate on the identity rather than on the kinds that lack one is what covered this without anyone
         // having to remember it.
         var result = new RuleResult(
-            MigrateRule("data/x"), RuleStatus.Failed, [Violation.RuleError("boom")], [], null, []);
+            MigrateRule("data/x"), RuleStatus.Failed, [Violation.RuleError("boom")]);
 
         result.HumanBlock()
             .ShouldNotContain("baseline --init");
@@ -223,7 +222,7 @@ public sealed class HumanReportRendererTests
         // an unlocated line (HumanReportRenderer.ViolationLines) rather than a located `path:line — …` line.
         TypeNode subject = SyntheticNodes.Type("App.Orphan");
         var result = new RuleResult(
-            EnforceRule("shape/x"), RuleStatus.Failed, [Violation.Shape(subject, [])], [], null, []);
+            Checker.Rule("shape/x"), RuleStatus.Failed, [Violation.Shape(subject, [])]);
 
         string block = result.HumanBlock();
 
@@ -236,12 +235,12 @@ public sealed class HumanReportRendererTests
     {
         // The failing rule's framing, in the order a reader needs it: the reason, the page it rests on, then
         // what to do about it. A rule citing nothing renders the block it always did.
-        var cited = new ArchRule(
-            "http/reuse-httpclient", Posture.Enforce, "A new client per call exhausts sockets.",
-            "Inject IHttpClientFactory.", "s", null, null, null,
-            "https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines");
+        ArchRule cited = Checker.Rule(
+            "http/reuse-httpclient", because: "A new client per call exhausts sockets.",
+            fix: "Inject IHttpClientFactory.",
+            citation: "https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines");
         var result = new RuleResult(
-            cited, RuleStatus.Failed, [Violation.Shape(SyntheticNodes.Type("App.Orphan"), [])], [], null, []);
+            cited, RuleStatus.Failed, [Violation.Shape(SyntheticNodes.Type("App.Orphan"), [])]);
 
         string block = result.HumanBlock();
 
@@ -251,8 +250,7 @@ public sealed class HumanReportRendererTests
             + "  fix: Inject IHttpClientFactory.");
 
         var uncited = new RuleResult(
-            EnforceRule("shape/x"), RuleStatus.Failed, [Violation.Shape(SyntheticNodes.Type("App.Orphan"), [])],
-            [], null, []);
+            Checker.Rule("shape/x"), RuleStatus.Failed, [Violation.Shape(SyntheticNodes.Type("App.Orphan"), [])]);
         uncited.HumanBlock()
             .ShouldNotContain("citation:");
     }
@@ -266,7 +264,7 @@ public sealed class HumanReportRendererTests
             SyntheticNodes.Type("App.Factory"), SyntheticNodes.Type("Widgets.Widget"),
             [new SourceLocation("Factory.cs", 12)]);
         var result = new RuleResult(
-            EnforceRule("di/x"), RuleStatus.Failed, [construction], [], null, []);
+            Checker.Rule("di/x"), RuleStatus.Failed, [construction]);
 
         string block = result.HumanBlock();
 
@@ -285,7 +283,7 @@ public sealed class HumanReportRendererTests
             SyntheticNodes.Type("App.Handler"), SyntheticNodes.Type("Errors.DbError"),
             [new SourceLocation("Handler.cs", 9)]);
         var result = new RuleResult(
-            EnforceRule("ex/x"), RuleStatus.Failed, [catchViolation], [], null, []);
+            Checker.Rule("ex/x"), RuleStatus.Failed, [catchViolation]);
 
         string block = result.HumanBlock();
 
@@ -304,7 +302,7 @@ public sealed class HumanReportRendererTests
             SyntheticNodes.Type("App.Facade"), SyntheticNodes.Type("Secrets.Secret"),
             [new SourceLocation("Facade.cs", 5)]);
         var result = new RuleResult(
-            EnforceRule("ex/x"), RuleStatus.Failed, [exposeViolation], [], null, []);
+            Checker.Rule("ex/x"), RuleStatus.Failed, [exposeViolation]);
 
         string block = result.HumanBlock();
 
@@ -323,7 +321,7 @@ public sealed class HumanReportRendererTests
             SyntheticNodes.Type("App.Service"), SyntheticNodes.Type("Errors.InfraError"),
             [new SourceLocation("Service.cs", 14)]);
         var result = new RuleResult(
-            EnforceRule("ex/x"), RuleStatus.Failed, [throwViolation], [], null, []);
+            Checker.Rule("ex/x"), RuleStatus.Failed, [throwViolation]);
 
         string block = result.HumanBlock();
 
@@ -405,9 +403,8 @@ public sealed class HumanReportRendererTests
         var site = new SourceLocation("Located.cs", 7);
         TypeNode located = SyntheticNodes.Type("App.Located", site);
         var result = new RuleResult(
-            EnforceRule("shape/x"), RuleStatus.Failed,
-            [Violation.Shape(located, [site]), Violation.EmptySubject("UNLOCATED-MARKER", "HINT-MARKER")], [], null,
-            []);
+            Checker.Rule("shape/x"), RuleStatus.Failed,
+            [Violation.Shape(located, [site]), Violation.EmptySubject("UNLOCATED-MARKER", "HINT-MARKER")]);
 
         string block = result.HumanBlock();
 
@@ -536,9 +533,9 @@ public sealed class HumanReportRendererTests
     {
         var report = new CheckReport(
         [
-            new RuleResult(EnforceRule("r/pass"), RuleStatus.Passed, [], [], null, []),
-            new RuleResult(EnforceRule("r/fail"), RuleStatus.Failed, [Violation.RuleError("boom")], [], null, []),
-            new RuleResult(EnforceRule("r/skip"), RuleStatus.Skipped, [], [], "no --diff-base diff context", [])
+            new RuleResult(Checker.Rule("r/pass"), RuleStatus.Passed, []),
+            new RuleResult(Checker.Rule("r/fail"), RuleStatus.Failed, [Violation.RuleError("boom")]),
+            new RuleResult(Checker.Rule("r/skip"), RuleStatus.Skipped, [], [], "no --diff-base diff context", [])
         ]);
 
         var writer = new StringWriter { NewLine = "\n" };
@@ -557,7 +554,7 @@ public sealed class HumanReportRendererTests
         // equal to what a check's JSON report calls rulesPassed.
         var report = new CheckReport(
         [
-            new RuleResult(EnforceRule("r/pass"), RuleStatus.Passed, [], [], null, []),
+            new RuleResult(Checker.Rule("r/pass"), RuleStatus.Passed, []),
             Touched(SharedUtilitiesTripwire, CheckWarningKind.CautionedScopeTouched, "Helpers.cs")
         ]);
 
@@ -570,17 +567,12 @@ public sealed class HumanReportRendererTests
         report.RulesPassed.ShouldBe(2); // the tail's passed figure, and the warned rule is one of the two
     }
 
-    private static ArchRule EnforceRule(string id)
-    {
-        return new ArchRule(id, Posture.Enforce, "b", null, "s", null, null, null);
-    }
-
     // A rule carrying both halves of the failing rule's framing, spelled out rather than placeholders: the
     // rows below assert which of them reached the page, so a reader of a red has to be able to tell the two
     // lines apart.
     private static ArchRule FixedRule(string id)
     {
-        return new ArchRule(id, Posture.Enforce, "A reader cannot find the type.", "Rename it.", "s", null, null, null);
+        return Checker.Rule(id, because: "A reader cannot find the type.", fix: "Rename it.");
     }
 
     // A tripwire that fired: one warning per changed file, which is what the checker produces and what lets

@@ -160,7 +160,7 @@ public sealed class AdapterContractSyncTests
         Readme
     }
 
-    public static TheoryData<string> SharedClaimKeys => ToTheoryData(SharedClaims.Select(claim => claim.Key));
+    public static TheoryData<string> SharedClaimKeys => [.. SharedClaims.Select(claim => claim.Key)];
 
     [Theory]
     [MemberData(nameof(SharedClaimKeys))]
@@ -268,13 +268,5 @@ public sealed class AdapterContractSyncTests
 
         return Whitespace.Replace(plain, " ")
             .Trim();
-    }
-
-    private static TheoryData<string> ToTheoryData(IEnumerable<string> keys)
-    {
-        TheoryData<string> data = new();
-        foreach (string key in keys) data.Add(key);
-
-        return data;
     }
 }

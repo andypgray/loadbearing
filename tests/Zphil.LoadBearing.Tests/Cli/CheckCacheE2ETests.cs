@@ -307,9 +307,13 @@ public sealed class CheckCacheE2ETests
         var counting = new CountingSolutionSource();
         var runner = new CheckRunner(output, error, counting, EnvironmentFor(cacheRoot));
 
-        int exit = await runner.RunAsync(
-            new CheckRequest(solution, spec, true, false, null, SolutionPaths.SolutionDirectoryOf(solution), noCache, null, false, sarif, null, DocumentGrain.Full),
-            Ct);
+        CheckRequest request = CheckRequests.For(solution, spec, SolutionPaths.SolutionDirectoryOf(solution))
+            with
+            {
+                Json = true, NoCache = noCache, Sarif = sarif
+            };
+
+        int exit = await runner.RunAsync(request, Ct);
 
         return new CacheRun(
             exit, output.ToString(), error.ToString(), runner.LastOutcome, runner.LastReExtractedProjects, counting.AcquireCount);

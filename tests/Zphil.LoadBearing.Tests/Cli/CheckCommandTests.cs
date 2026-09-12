@@ -345,8 +345,10 @@ public sealed class CheckCommandTests
     private static CheckRequest Request(DocumentGrain grain = DocumentGrain.Full)
     {
         string workingDirectory = SolutionPaths.SolutionDirectoryOf(CliRunner.MyAppSolution);
-        return new CheckRequest(
-            CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll, true, false, null, workingDirectory, false, null,
-            false, null, null, grain);
+        return CheckRequests.For(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll, workingDirectory)
+            with
+            {
+                Json = true, Grain = grain
+            };
     }
 }

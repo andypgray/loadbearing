@@ -209,16 +209,7 @@ public sealed class CheckJsonOrderTests
     {
         // A count of nothing is a key that says nothing. The elision reports what it dropped, so with
         // nothing to drop it reports nothing — the rule every other <key>Count on these documents takes.
-        string index = JsonReportRenderer.Document(
-            report: WebOpensData,
-            solutionDirectory: Directory.GetCurrentDirectory(),
-            solutionName: "S.sln",
-            specAssembly: "Spec.dll",
-            diffBase: null,
-            workspaceDiagnostics: [],
-            diagnostics: new WorkspaceDiagnostics([], [], [], [], [], [], []),
-            rulesFilter: [],
-            grain: DocumentGrain.Index);
+        string index = WebOpensData.JsonReport(DocumentGrain.Index);
 
         index.ShouldNotContain("\"workspaceDiagnosticCount\"");
     }
@@ -226,16 +217,7 @@ public sealed class CheckJsonOrderTests
     // The two-signal document at one grain: a clean load, so nothing but the signals themselves varies.
     private static string Hinted(DocumentGrain grain)
     {
-        return JsonReportRenderer.Document(
-            report: TwoAuthoringSignals,
-            solutionDirectory: Directory.GetCurrentDirectory(),
-            solutionName: "S.sln",
-            specAssembly: "Spec.dll",
-            diffBase: null,
-            workspaceDiagnostics: [],
-            diagnostics: new WorkspaceDiagnostics([], [], [], [], [], [], []),
-            rulesFilter: [],
-            grain: grain);
+        return TwoAuthoringSignals.JsonReport(grain);
     }
 
     // The stamped document at one grain; StampedDocument is this at Full.

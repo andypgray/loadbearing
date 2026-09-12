@@ -135,10 +135,31 @@ public sealed class SourceShapeTests
     }
 
     [Fact]
+    public void Of_TrailingNewlineAppended_KeepsTheHashAndMapsToItself()
+    {
+        // Arrange — the edit insert_final_newline and every formatter pass make. The end-of-file token is
+        // zero-width and mints no site, so the line profile must not count it: counted, it would sit on the
+        // last code line before the edit and on the new empty line after it, and that one line's tokens would
+        // read as split across two — refusing a map for a file nothing moved in.
+        string withFinalNewline = Widget + "\n";
+
+        // Act
+        SourceShape before = ShapeOf(Widget);
+        SourceShape after = ShapeOf(withFinalNewline);
+
+        // Assert
+        after.Hash.ShouldBe(before.Hash);
+
+        LineMap map = SourceShape.TryMapLines(before, after)
+            .ShouldNotBeNull();
+        map.IsIdentity.ShouldBeTrue();
+    }
+
+    [Fact]
     public void Of_BlankLineInserted_KeepsTheHashAndShiftsTheMap()
     {
         // Arrange
-        string spaced = Widget.Replace("namespace Shop;", "\nnamespace Shop;", StringComparison.Ordinal);
+        string spaced = WithBlankLineAboveTheNamespace();
 
         // Act
         SourceShape before = ShapeOf(Widget);
@@ -176,116 +197,71 @@ public sealed class SourceShapeTests
     [Fact]
     public void Of_IdentifierRenamed_ChangesTheHash()
     {
-        // Arrange
         string renamed = Widget.Replace("Grow", "Expand", StringComparison.Ordinal);
 
-        // Act
-        SourceShape before = ShapeOf(Widget);
-        SourceShape after = ShapeOf(renamed);
-
-        // Assert
-        after.Hash.ShouldNotBe(before.Hash);
+        ShouldChangeTheHash(Widget, renamed);
     }
 
     [Fact]
     public void Of_StringLiteralEdited_ChangesTheHash()
     {
-        // Arrange
         string edited = Widget.Replace("\"widget\"", "\"gadget\"", StringComparison.Ordinal);
 
-        // Act
-        SourceShape before = ShapeOf(Widget);
-        SourceShape after = ShapeOf(edited);
-
-        // Assert
-        after.Hash.ShouldNotBe(before.Hash);
+        ShouldChangeTheHash(Widget, edited);
     }
 
     [Fact]
     public void Of_NumericLiteralEdited_ChangesTheHash()
     {
-        // Arrange
         string edited = Widget.Replace("_size = 3;", "_size = 4;", StringComparison.Ordinal);
 
-        // Act
-        SourceShape before = ShapeOf(Widget);
-        SourceShape after = ShapeOf(edited);
-
-        // Assert
-        after.Hash.ShouldNotBe(before.Hash);
+        ShouldChangeTheHash(Widget, edited);
     }
 
     [Fact]
     public void Of_PragmaDirectiveInserted_ChangesTheHash()
     {
-        // Arrange — the directive cannot move a fact here, and is significant anyway: the shape is
-        // deliberately conservative about everything but whitespace and comments.
+        // The directive cannot move a fact here, and is significant anyway: the shape is deliberately
+        // conservative about everything but whitespace and comments.
         string directed = "#pragma warning disable CS0414" + "\n" + Widget;
 
-        // Act
-        SourceShape before = ShapeOf(Widget);
-        SourceShape after = ShapeOf(directed);
-
-        // Assert
-        after.Hash.ShouldNotBe(before.Hash);
+        ShouldChangeTheHash(Widget, directed);
     }
 
     [Fact]
     public void Of_RegionDirectiveInserted_ChangesTheHash()
     {
-        // Arrange
         string regioned = "#region Body" + "\n" + Widget + "\n" + "#endregion";
 
-        // Act
-        SourceShape before = ShapeOf(Widget);
-        SourceShape after = ShapeOf(regioned);
-
-        // Assert
-        after.Hash.ShouldNotBe(before.Hash);
+        ShouldChangeTheHash(Widget, regioned);
     }
 
     [Fact]
     public void Of_ClassWrappedInAnIfDirective_ChangesTheHash()
     {
-        // Arrange
         string conditional = "#if DEBUG" + "\n" + Widget + "\n" + "#endif";
 
-        // Act
-        SourceShape before = ShapeOf(Widget);
-        SourceShape after = ShapeOf(conditional);
-
-        // Assert
-        after.Hash.ShouldNotBe(before.Hash);
+        ShouldChangeTheHash(Widget, conditional);
     }
 
     [Fact]
     public void Of_EditInsideDisabledText_ChangesTheHash()
     {
-        // Arrange — the edit is in text no token comes from, which is exactly why it has to be hashed:
-        // flip the condition later and those characters become facts.
+        // The edit is in text no token comes from, which is exactly why it has to be hashed: flip the
+        // condition later and those characters become facts.
         string edited = DisabledBlock.Replace("hidden = 1", "hidden = 2", StringComparison.Ordinal);
 
-        // Act
-        SourceShape before = ShapeOf(DisabledBlock);
-        SourceShape after = ShapeOf(edited);
-
-        // Assert
-        after.Hash.ShouldNotBe(before.Hash);
+        ShouldChangeTheHash(DisabledBlock, edited);
     }
 
     [Fact]
     public void Of_GeneratedBannerLeadingTheFile_ChangesTheHash()
     {
-        // Arrange — the comment's own text is not hashed, so the banner verdict is the only thing that can
-        // carry this difference into the digest.
+        // The comment's own text is not hashed, so the banner verdict is the only thing that can carry
+        // this difference into the digest.
         string banner = "// <auto-generated />" + "\n" + OneLineBody;
 
-        // Act
-        SourceShape before = ShapeOf(OneLineBody);
-        SourceShape after = ShapeOf(banner);
-
-        // Assert
-        after.Hash.ShouldNotBe(before.Hash);
+        ShouldChangeTheHash(OneLineBody, banner);
     }
 
     [Fact]
@@ -391,9 +367,48 @@ public sealed class SourceShapeTests
             .ShouldBe(secondMap.GetHashCode());
     }
 
+    [Fact]
+    public void Equals_MapsOfTwoDifferentEdits_CompareUnequal()
+    {
+        // Arrange — one text edited two ways: comments above the class shift it two lines, a blank line
+        // above the namespace shifts everything below the using one.
+        SourceShape before = ShapeOf(Widget);
+        SourceShape shiftedByTwo = ShapeOf(WithCommentsAboveTheClass());
+        SourceShape shiftedByOne = ShapeOf(WithBlankLineAboveTheNamespace());
+
+        // Act
+        LineMap twoLines = SourceShape.TryMapLines(before, shiftedByTwo)
+            .ShouldNotBeNull();
+        LineMap oneLine = SourceShape.TryMapLines(before, shiftedByOne)
+            .ShouldNotBeNull();
+
+        // Assert — inequality is the half of value equality the agreement guard reads: a file compiled under
+        // two frameworks must yield one map from both before either of that project's stored fragments may
+        // be moved, and an Equals that answered true for any non-null map would let whichever map arrived
+        // last place the other framework's sites on lines they were never on. The wiring half — two
+        // frameworks that genuinely disagree — needs a conditional in a multi-targeted fixture and a
+        // workspace load, and is deliberately not covered.
+        twoLines.ShouldNotBe(oneLine);
+    }
+
+    // The whole content of a "changes the hash" fact is its (base, mutated) pair; the assertion is the same
+    // in every one of them.
+    private static void ShouldChangeTheHash(string before, string after)
+    {
+        SourceShape beforeShape = ShapeOf(before);
+        SourceShape afterShape = ShapeOf(after);
+
+        afterShape.Hash.ShouldNotBe(beforeShape.Hash);
+    }
+
     private static string WithCommentsAboveTheClass()
     {
         return Widget.Replace("public sealed class Widget", CommentedClass, StringComparison.Ordinal);
+    }
+
+    private static string WithBlankLineAboveTheNamespace()
+    {
+        return Widget.Replace("namespace Shop;", "\nnamespace Shop;", StringComparison.Ordinal);
     }
 
     private static SourceShape ShapeOf(string text)

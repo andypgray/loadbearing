@@ -233,29 +233,41 @@ public sealed class AuthoringHintTests
         hint.ShouldContain(InertAction);
     }
 
-    [Theory]
-    [InlineData("App.Nowhere.*", NamespaceFragment)]
-    [InlineData("App.Ghost.*", NamespaceFragment)]
-    public void APartialModel_ReplacesEveryShapeCureRatherThanTrailingIt(string glob, string shapeFragment)
+    [Fact]
+    public void APartialModel_ReplacesEveryShapeCureRatherThanTrailingIt()
     {
         // Both signals and both causes: advice to check a selection against what the solution declares is
         // about the wrong thing when a project never loaded, so it is replaced rather than appended — and a
         // sentence carrying both would be two cures for one diagnosis, past the single semicolon these
         // clauses are built to keep.
+        //
+        // Every shape the chooser reads, rather than one of them twice: the replacement is unconditional,
+        // and a cure narrowed to namespace nouns would go on reading green against a glob row while a
+        // project- or typeof-shaped empty subject advised a spec fix for a load failure. That is the
+        // half-fix the member and project row below exists to prevent, one stratum over.
         var arch = new Arch();
         var partial = new IncompleteModel(PartialModelCure);
-        Selection pattern = arch.Namespace(glob);
+        (string Shape, Selection Pattern, string ShapeFragment)[] shapes =
+        [
+            ("a namespace glob", arch.Namespace("App.Nowhere.*"), NamespaceFragment),
+            ("a project name", arch.Project("App.Nowhere"), ProjectFragment),
+            ("a typeof anchor", arch.Type(typeof(AuthoringHintTests)), TypeFragment),
+            ("a narrowed types selection", arch.Types.WithSuffix("Service"), NarrowingFragment)
+        ];
 
-        string subject = AuthoringHints.ForSubject(pattern, partial);
-        string inert = AuthoringHints.ForInertTarget([pattern], partial);
+        foreach ((string shape, Selection pattern, string shapeFragment) in shapes)
+        {
+            string subject = AuthoringHints.ForSubject(pattern, partial);
+            string inert = AuthoringHints.ForInertTarget([pattern], partial);
 
-        subject.ShouldSatisfyAllConditions(
-            () => subject.ShouldBe(PartialModelCure),
-            () => subject.ShouldNotContain(shapeFragment),
-            () => subject.ShouldNotContain(SubjectAction));
-        inert.ShouldSatisfyAllConditions(
-            () => inert.ShouldBe(PartialModelCure),
-            () => inert.ShouldNotContain(InertAction));
+            subject.ShouldSatisfyAllConditions(
+                () => subject.ShouldBe(PartialModelCure, shape),
+                () => subject.ShouldNotContain(shapeFragment, shape),
+                () => subject.ShouldNotContain(SubjectAction, shape));
+            inert.ShouldSatisfyAllConditions(
+                () => inert.ShouldBe(PartialModelCure, shape),
+                () => inert.ShouldNotContain(InertAction, shape));
+        }
     }
 
     [Fact]
@@ -280,12 +292,12 @@ public sealed class AuthoringHintTests
         // because the edge it rests on was never extracted and the cure it printed was about globs.
         var partial = new IncompleteModel(PartialModelCure);
 
-        RuleResult empty = Checker.Run("namespace App.Domain { public class Foo {} }", partial, arch =>
+        RuleResult empty = Checker.Run(Sources.LayeredModel, partial, arch =>
                 arch.Rule("empty/x")
                     .Enforce(arch.Namespace("Nope.Nowhere.*").MustHaveSuffix("X"))
                     .Because("b"))
             .Single();
-        RuleResult inert = Checker.Run("namespace App.Domain { public class Foo {} }", partial, arch =>
+        RuleResult inert = Checker.Run(Sources.LayeredModel, partial, arch =>
                 arch.Rule("inert/x")
                     .Enforce(arch.Namespace("App.Domain.*").MustNotReference(arch.Namespace("App.Ghost.*")))
                     .Because("b"))
@@ -305,7 +317,7 @@ public sealed class AuthoringHintTests
         // ambiguous between this overload and the baselines one, and a cast would read as noise.
         IncompleteModel? whole = null;
 
-        RuleResult result = Checker.Run("namespace App.Domain { public class Foo {} }", whole, arch =>
+        RuleResult result = Checker.Run(Sources.LayeredModel, whole, arch =>
                 arch.Rule("empty/x")
                     .Enforce(arch.Namespace("Nope.Nowhere.*").MustHaveSuffix("X"))
                     .Because("b"))

@@ -69,36 +69,11 @@ public sealed class RenderCommandE2ETests
         "Replacement scheduled (BillingV2, ADR-019); not worth stabilizing. " +
         "Sanctioned surface: `IBillingFacade`, `BillingFacade`.";
 
-    private const string ScopeBody =
-        RenderSpecProvenance +
-        "## Quarantined scope `legacy/billing`\n\n" +
-        "This directory holds the quarantined `legacy/billing` scope: types in `MyApp.Legacy.Billing.*`. " +
-        "Here be dragons — do not spread references into it.\n\n" +
-        "Dragons: Banker's rounding happens at line-item level, NOT invoice level. " +
-        "Nightly reconciliation depends on this. Do not normalize.\n\n" +
-        "- `legacy/billing/containment` — Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or " +
-        "`BillingFacade`, must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or " +
-        "`BillingFacade`. Replacement scheduled (BillingV2, ADR-019); not worth stabilizing.\n" +
-        "- Sanctioned surface: `IBillingFacade`, `BillingFacade`.\n" +
-        "- Expand: `loadbearing explain legacy/billing/containment`.";
+    private const string ScopeBody = RenderSpecProvenance + RenderedLawText.BillingScopeCard;
 
     // MyAppRenderSpec's cautioned scope, placed in the Domain directory — the other scope posture's card,
-    // and the whole of that file: Domain anchors no rule, so nothing merges above it. It names no boundary
-    // and never tells the reader to keep out, and its lede carries the scoped selection because a caution
-    // has no containment sentence to carry it.
-    private const string DomainCautionBody =
-        RenderSpecProvenance +
-        "## Cautioned scope `domain/retry-budget`\n\n" +
-        "This directory holds the cautioned `domain/retry-budget` scope: types named `RetryPolicy`. " +
-        "Here be dragons — the weirdness below is load-bearing; read it before you edit, and do not " +
-        "tidy it away.\n\n" +
-        "Dragons: RetryPolicy's broad catch is filtered on purpose: the `when` clause is what keeps it green " +
-        "under the unfiltered-catch rule, and it is the fixture's one sanctioned broad handler. Keep the " +
-        "filter; add cases beside it, never inside it.\n\n" +
-        "- `domain/retry-budget/tripwire` — a change set touching this scope is flagged by " +
-        "`check --diff-base <ref>`. The retry budget is the one place the domain sanctions a broad catch, " +
-        "and every caller relies on the filter.\n" +
-        "- Expand: `loadbearing explain domain/retry-budget/tripwire`.";
+    // and the whole of that file: Domain anchors no rule, so nothing merges above it.
+    private const string DomainCautionBody = RenderSpecProvenance + RenderedLawText.DomainCautionCard;
 
     // The MyAppLayerSpec render targets: the root block (module map + four anchored Enforce
     // laws + the quarantined-scope law), the Web directory's merged block, and the Billing directory's merged
@@ -132,24 +107,8 @@ public sealed class RenderCommandE2ETests
         "Sanctioned surface: `IBillingFacade`, `BillingFacade`.";
 
     // Two layer cards in one directory, merged into one managed block in declaration order: Web's and the
-    // Reporting refinement's. Reporting narrows Web rather than moving anywhere, so both cards are placed
-    // at the same deepest common ancestor.
-    private const string WebCardBody =
-        LayerSpecProvenance +
-        "## Layer `Web`\n\n" +
-        "This directory holds the `Web` layer. The HTTP surface: controllers and the views they serve. " +
-        "Its architecture rules:\n\n" +
-        "- `layering/web-not-billing` — The Web layer must not reference types in `MyApp.Legacy.Billing.*`. " +
-        "The web layer must reach billing only through the sanctioned facade.\n" +
-        "- Expand any rule above with `loadbearing explain <rule-id>`.\n\n" +
-        "## Layer `Reporting`\n\n" +
-        "This directory holds the `Reporting` layer. Its architecture rules:\n\n" +
-        "- `layering/reporting-not-billing` — The Reporting layer must not reference types in " +
-        "`MyApp.Legacy.Billing.*`. The reporting slice takes its numbers from the domain, never from the " +
-        "legacy biller.\n" +
-        RenderedLawText.LeavesBullet +
-        RenderedLawText.LeavesNotCircularBullet +
-        "- Expand any rule above with `loadbearing explain <rule-id>`.";
+    // Reporting refinement's.
+    private const string WebCardBody = LayerSpecProvenance + RenderedLawText.WebLayerCards;
 
     private const string BillingMergedBody =
         LayerSpecProvenance +

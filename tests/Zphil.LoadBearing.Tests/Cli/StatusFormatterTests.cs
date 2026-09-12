@@ -21,16 +21,22 @@ namespace Zphil.LoadBearing.Tests.Cli;
 /// </summary>
 public sealed class StatusFormatterTests
 {
-    // One rule of each posture so the formatter can be pinned over real ArchRules. The three family rules
+    // One rule of each posture so the formatter can be pinned over real ArchRules. The four family rules
     // carry the two cell words and both baseline states, which is what decides whether a row gains a
-    // sub-line and what that sub-line is keyed by.
+    // sub-line and what that sub-line is keyed by. One of them declares its cells against alphabetical
+    // order, because a family whose two orders agree cannot say which of them a sub-line is in.
     private static readonly ArchitectureModel Model = Checker.Model(arch =>
     {
         Layer checking = arch.Layer("Checking", "App.Checking.*");
         Layer rendering = arch.Layer("Rendering", "App.Rendering.*");
+        Layer web = arch.Layer("Web", "App.Web.*");
+        Layer api = arch.Layer("Api", "App.Api.*");
 
         arch.Rule("layering/cuts-not-circular")
             .Migrate("old", arch.Each(checking, rendering).MustNotHaveCircularReferences())
+            .Because("b");
+        arch.Rule("layering/leaves")
+            .Migrate("old", arch.Each(web, api).MustNotReferenceEachOther())
             .Because("b");
         arch.Rule("layering/cuts-independent")
             .Enforce(arch.Each(checking, rendering).MustNotReferenceEachOther())
@@ -283,6 +289,21 @@ public sealed class StatusFormatterTests
 
         lines[1]
             .ShouldBe("  projects: App.Api 2 (4 sites), App.Web 1");
+    }
+
+    [Fact]
+    public void FamilyMigrate_CellsDeclaredAgainstAlphabeticalOrder_NamesThemAsTheFamilyDeclaresThem()
+    {
+        // The sub-line walks the spec's own cell order, which is the order a reader holds the family in —
+        // and the only order that stays stable as cells are renamed. Both the debt's arrival order and the
+        // names sorted would put Api first here, so this row is what tells the two apart.
+        IReadOnlyList<Violation> debt = [.. SitedDummies(1, 2, "Api"), .. SitedDummies(2, 2, "Web")];
+
+        IReadOnlyList<string> lines = StatusFormatter.Lines(
+            new CheckReport([Result(Model.Rule("layering/leaves"), RuleStatus.Passed, captured: true, debt: debt)]));
+
+        lines[1]
+            .ShouldBe("  layers: Web 2 (4 sites), Api 1 (2 sites)");
     }
 
     [Fact]

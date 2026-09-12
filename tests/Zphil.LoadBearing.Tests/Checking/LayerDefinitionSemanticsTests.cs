@@ -123,7 +123,7 @@ public sealed class LayerDefinitionSemanticsTests
             .Single()
             .ShouldHaveFailedWithDetail(
                 ViolationKind.EmptySubject,
-                "The subject selection operand \"types in `Invoicing.*`\" matched no solution-declared types.");
+                ConstraintEvaluator.EmptyOperandMessage("types in `Invoicing.*`"));
     }
 
     [Fact]

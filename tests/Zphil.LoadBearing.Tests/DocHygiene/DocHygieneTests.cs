@@ -143,11 +143,11 @@ public sealed class DocHygieneTests
         new(@"\bball of mud\b", RegexOptions.IgnoreCase)
     ];
 
-    public static TheoryData<string> InternalReferenceFreeDocsCases => ToTheoryData(InternalReferenceFreeDocs);
+    public static TheoryData<string> InternalReferenceFreeDocsCases => [.. InternalReferenceFreeDocs];
 
-    public static TheoryData<string> VoiceDocsCases => ToTheoryData(VoiceDocs);
+    public static TheoryData<string> VoiceDocsCases => [.. VoiceDocs];
 
-    public static TheoryData<string> BudgetDocsCases => ToTheoryData(BudgetDocs);
+    public static TheoryData<string> BudgetDocsCases => [.. BudgetDocs];
 
     [Theory]
     [MemberData(nameof(InternalReferenceFreeDocsCases))]
@@ -240,13 +240,5 @@ public sealed class DocHygieneTests
 
         // Assert
         uncovered.ShouldReportNothing("Tracked reader doc(s) are outside the budgeted set");
-    }
-
-    private static TheoryData<string> ToTheoryData(string[] docs)
-    {
-        TheoryData<string> data = new();
-        foreach (string doc in docs) data.Add(doc);
-
-        return data;
     }
 }

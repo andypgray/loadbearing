@@ -1,8 +1,8 @@
 using Shouldly;
 using Xunit;
-using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Cli.Verbs;
 using Zphil.LoadBearing.Roslyn;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Cli;
 
@@ -28,9 +28,11 @@ public sealed class CheckRunnerTests
         var output = new StringWriter();
         var runner = new CheckRunner(output, TextWriter.Null);
         string absentSolution = Path.Combine(Path.GetTempPath(), "no-such-solution.slnx");
-        var request = new CheckRequest(
-            absentSolution, null, false, false, """["HEAD"]""", Path.GetTempPath(), false, null, false, null,
-            null, DocumentGrain.Full);
+        CheckRequest request = CheckRequests.For(absentSolution, null, Path.GetTempPath())
+            with
+            {
+                DiffBase = """["HEAD"]"""
+            };
 
         var refusal = await Should.ThrowAsync<UserErrorException>(() => runner.RunAsync(request, Ct));
 

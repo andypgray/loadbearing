@@ -5,7 +5,6 @@ using Zphil.LoadBearing.Baselines;
 using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Cli.Rendering;
 using Zphil.LoadBearing.Codebase;
-using Zphil.LoadBearing.Hosting;
 using Zphil.LoadBearing.Tests.Checking;
 using Zphil.LoadBearing.Tests.Extraction;
 using Zphil.LoadBearing.Tests.TestSupport;
@@ -37,6 +36,11 @@ public sealed class SarifReportRendererTests
 
     // The diff that arms the tripwire: one changed file, inside the scope.
     private static readonly DiffContext TouchedAlpha = new("/repo", ["App.Legacy/Alpha.cs"]);
+
+    // A rule whose target selection matches no type in the codebase, so checking it produces the inert-target
+    // warning and nothing else — the one finding with no file to point at.
+    private static readonly CheckReport InertTargetReport =
+        Checker.Run("namespace App { public class Page {} }", NoGhosts);
 
     [Fact]
     public void Serialize_RedReference_EmitsErrorLevelNewBaselineStateNoSuppressions()
@@ -231,16 +235,14 @@ public sealed class SarifReportRendererTests
         var report = new CheckReport(
         [
             new RuleResult(
-                Rule("naming/empty", Posture.Enforce), RuleStatus.Failed,
+                Checker.Rule("naming/empty"), RuleStatus.Failed,
                 [
                     Violation.EmptySubject(
                         "The subject selection matched no solution-declared types.", "a cure SARIF never carries")
-                ],
-                [], null, []),
+                ]),
             new RuleResult(
-                Rule("ref/error", Posture.Enforce), RuleStatus.Failed,
-                [Violation.RuleError("a closed-generic backstop message")],
-                [], null, [])
+                Checker.Rule("ref/error"), RuleStatus.Failed,
+                [Violation.RuleError("a closed-generic backstop message")])
         ]);
 
         string json = report.ToSarif();
@@ -262,9 +264,9 @@ public sealed class SarifReportRendererTests
         var report = new CheckReport(
         [
             new RuleResult(
-                new ArchRule(
-                    "legacy/tripwire", Posture.Quarantine, "Replacement scheduled; not worth stabilizing.", null, "",
-                    null, null, null),
+                Checker.Rule(
+                    "legacy/tripwire", Posture.Quarantine, because: "Replacement scheduled; not worth stabilizing.",
+                    sentence: ""),
                 RuleStatus.Skipped, [], [], "no diff context", [])
         ]);
 
@@ -291,11 +293,11 @@ public sealed class SarifReportRendererTests
         var report = new CheckReport(
         [
             new RuleResult(
-                new ArchRule(
-                    "http/reuse-httpclient", Posture.Enforce, "A new client per call exhausts sockets.",
-                    "Inject IHttpClientFactory.", "sentence", null, null, null,
-                    "https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines"),
-                RuleStatus.Passed, [], [], null, [])
+                Checker.Rule(
+                    "http/reuse-httpclient", because: "A new client per call exhausts sockets.",
+                    fix: "Inject IHttpClientFactory.",
+                    citation: "https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines"),
+                RuleStatus.Passed, [])
         ]);
 
         JsonElement rule = report.ToSarif()
@@ -327,10 +329,10 @@ public sealed class SarifReportRendererTests
         var report = new CheckReport(
         [
             new RuleResult(
-                new ArchRule(
-                    "http/reuse-httpclient", Posture.Enforce, "A new client per call exhausts sockets.", null,
-                    "sentence", null, null, null, "https://learn.microsoft.com/dotnet/first"),
-                RuleStatus.Passed, [], [], null, [])
+                Checker.Rule(
+                    "http/reuse-httpclient", because: "A new client per call exhausts sockets.",
+                    citation: "https://learn.microsoft.com/dotnet/first"),
+                RuleStatus.Passed, [])
         ]);
 
         JsonElement help = report.ToSarif()
@@ -354,9 +356,8 @@ public sealed class SarifReportRendererTests
         var report = new CheckReport(
         [
             new RuleResult(
-                new ArchRule(
-                    "naming/x", Posture.Enforce, "because", "Rename it.", "sentence", null, null, null),
-                RuleStatus.Passed, [], [], null, [])
+                Checker.Rule("naming/x", fix: "Rename it."),
+                RuleStatus.Passed, [])
         ]);
 
         JsonElement rule = report.ToSarif()
@@ -496,14 +497,7 @@ public sealed class SarifReportRendererTests
         // assumed: an inert target is a fact about the rule's own operand — a pattern that matched no type —
         // so there is no file to point at and the result carries an empty locations array rather than a
         // fabricated one.
-        CheckReport report = Checker.Run(
-            "namespace App { public class Page {} }",
-            arch => arch.Rule("layer/no-ghosts")
-                .Enforce(arch.Namespace("App.*")
-                    .MustNotReference(arch.Namespace("Ghost.*")))
-                .Because("Nothing may reach the ghost layer."));
-
-        string json = report.ToSarif();
+        string json = InertTargetReport.ToSarif();
 
         JsonElement result = json.SarifResults()
             .ShouldHaveSingleItem();
@@ -522,18 +516,11 @@ public sealed class SarifReportRendererTests
         // code scanning, where an alert stands in front of the whole team rather than the spec's author. The
         // empty-subject cure could not join it in any case — those violations are site-less and mint no
         // result — so carrying one here would land half a family's advice and hide the rest.
-        CheckReport report = Checker.Run(
-            "namespace App { public class Page {} }",
-            arch => arch.Rule("layer/no-ghosts")
-                .Enforce(arch.Namespace("App.*")
-                    .MustNotReference(arch.Namespace("Ghost.*")))
-                .Because("Nothing may reach the ghost layer."));
-
-        report.Single()
+        InertTargetReport.Single()
             .Warnings.Single()
             .Hint.ShouldNotBeNull();
 
-        string json = report.ToSarif();
+        string json = InertTargetReport.ToSarif();
 
         json.SarifResults()
             .ShouldHaveSingleItem()
@@ -622,11 +609,13 @@ public sealed class SarifReportRendererTests
             .Because("Every caller depends on the exact behaviour.");
     }
 
-    // A metadata-only ArchRule (no constraint/migrate/scope payload) for hand-built reports — the renderer's
-    // rule catalog reads only Id, Sentence, Because, Fix, Citation, Posture, and whether it is a tripwire.
-    private static ArchRule Rule(string id, Posture posture)
+    // The rule InertTargetReport is checked against: `Ghost.*` names no type, so the rule is inert.
+    private static void NoGhosts(Arch arch)
     {
-        return new ArchRule(id, posture, "because", null, "sentence", null, null, null);
+        arch.Rule("layer/no-ghosts")
+            .Enforce(arch.Namespace("App.*")
+                .MustNotReference(arch.Namespace("Ghost.*")))
+            .Because("Nothing may reach the ghost layer.");
     }
 
     /// <summary>

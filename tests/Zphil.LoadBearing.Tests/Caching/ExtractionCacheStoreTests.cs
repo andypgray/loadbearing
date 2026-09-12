@@ -234,15 +234,7 @@ public sealed class ExtractionCacheStoreTests
     ///     One case per name in <see cref="FileStamping.StructuralProbeFileNames" />, read off the array
     ///     itself rather than restated here, so a probe added later arrives with its coverage.
     /// </summary>
-    public static TheoryData<string> StructuralProbeCases
-    {
-        get
-        {
-            var cases = new TheoryData<string>();
-            foreach (string probeFileName in FileStamping.StructuralProbeFileNames) cases.Add(probeFileName);
-            return cases;
-        }
-    }
+    public static TheoryData<string> StructuralProbeCases => [.. FileStamping.StructuralProbeFileNames];
 
     [Theory]
     [MemberData(nameof(StructuralProbeCases))]
@@ -541,43 +533,16 @@ public sealed class ExtractionCacheStoreTests
     [Fact]
     public void ReadAndValidate_StringLiteralEdit_PartialWithDependents()
     {
-        // Arrange — A's document carries a string literal, which is a token and therefore part of its shape.
-        using var solution = new SyntheticSolution();
-        solution.AddProject("A", [], ("A.cs", ClassWithLiteral("A", "before")));
-        solution.AddProject("B", ["A"], ("B.cs", TwoFieldClass("B")));
-        solution.BackdateAll();
-        ExtractionCacheStore store = solution.NewStore();
-        store.Write(store.CaptureFingerprint(solution.Projects), SitedExtraction(solution, ("A", "A.cs", [3, 4])))
-            .ShouldBeTrue();
-
-        // Act — the literal's text changes and nothing else does.
-        RewriteBackdated(solution.PathOf("A", "A.cs"), ClassWithLiteral("A", "after"));
-        CacheReadResult result = store.ReadAndValidate();
-
-        // Assert — an edit inside a token is an ordinary content change, so the dependent goes with it.
-        result.Outcome.ShouldBe(CacheOutcome.Partial);
-        result.DirtyProjects.ShouldBe(["A", "B"], true);
+        // A's document carries a string literal, which is a token and therefore part of its shape. An edit
+        // inside a token is an ordinary content change, so the dependent goes with it.
+        ShouldDirtyBothProjects(ClassWithLiteral("A", "before"), ClassWithLiteral("A", "after"));
     }
 
     [Fact]
     public void ReadAndValidate_PragmaInserted_PartialWithDependents()
     {
-        // Arrange
-        using var solution = new SyntheticSolution();
-        solution.AddProject("A", [], ("A.cs", TwoFieldClass("A")));
-        solution.AddProject("B", ["A"], ("B.cs", TwoFieldClass("B")));
-        solution.BackdateAll();
-        ExtractionCacheStore store = solution.NewStore();
-        store.Write(store.CaptureFingerprint(solution.Projects), SitedExtraction(solution, ("A", "A.cs", [3, 4])))
-            .ShouldBeTrue();
-
-        // Act — a directive, not a comment. It changes what the compiler sees, so it changes the shape.
-        PrependLines(solution.PathOf("A", "A.cs"), "#pragma warning disable CS0169");
-        CacheReadResult result = store.ReadAndValidate();
-
-        // Assert
-        result.Outcome.ShouldBe(CacheOutcome.Partial);
-        result.DirtyProjects.ShouldBe(["A", "B"], true);
+        // A directive, not a comment. It changes what the compiler sees, so it changes the shape.
+        ShouldDirtyBothProjects(TwoFieldClass("A"), "#pragma warning disable CS0169\n" + TwoFieldClass("A"));
     }
 
     [Fact]
@@ -609,23 +574,9 @@ public sealed class ExtractionCacheStoreTests
     [Fact]
     public void ReadAndValidate_TokenBearingLineSplit_PartialWithDependents()
     {
-        // Arrange
-        using var solution = new SyntheticSolution();
-        solution.AddProject("A", [], ("A.cs", TwoFieldClass("A")));
-        solution.AddProject("B", ["A"], ("B.cs", TwoFieldClass("B")));
-        solution.BackdateAll();
-        ExtractionCacheStore store = solution.NewStore();
-        store.Write(store.CaptureFingerprint(solution.Projects), SitedExtraction(solution, ("A", "A.cs", [3, 4])))
-            .ShouldBeTrue();
-
-        // Act — the same tokens, on more lines: `int x;` becomes `int` and `x;`. The shape is unchanged, but
-        // one old line's tokens now sit on two, so no line map can say where that line went.
-        RewriteBackdated(solution.PathOf("A", "A.cs"), "class A\n{\n    int\n        x;\n    int y;\n}\n");
-        CacheReadResult result = store.ReadAndValidate();
-
-        // Assert
-        result.Outcome.ShouldBe(CacheOutcome.Partial);
-        result.DirtyProjects.ShouldBe(["A", "B"], true);
+        // The same tokens, on more lines: `int x;` becomes `int` and `x;`. The shape is unchanged, but one
+        // old line's tokens now sit on two, so no line map can say where that line went.
+        ShouldDirtyBothProjects(TwoFieldClass("A"), "class A\n{\n    int\n        x;\n    int y;\n}\n");
     }
 
     [Fact]
@@ -678,9 +629,31 @@ public sealed class ExtractionCacheStoreTests
         return $"class {name}\n{{\n    string s = \"{literal}\";\n    int y;\n}}\n";
     }
 
-    // The trivial fragments carry no sites at all, so nothing in them can be seen to move. Each placement
-    // gives one project's fragment a single edge whose sites sit on the named lines of the named file — an
-    // edge is three strings and a site list, so no compilation is needed to mint a real one.
+    // A cached two-project solution — B referencing A, A's fragment sited on A.cs's two field lines — whose
+    // one document is then rewritten from the first text to the second. Every caller's rewrite reaches A's
+    // shape, so the verdict is the same: A goes dirty, and B, which relies on what A's compilation exposes,
+    // goes with it.
+    private static void ShouldDirtyBothProjects(string before, string after)
+    {
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", before));
+        solution.AddProject("B", ["A"], ("B.cs", TwoFieldClass("B")));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.Write(store.CaptureFingerprint(solution.Projects), SitedExtraction(solution, ("A", "A.cs", [3, 4])))
+            .ShouldBeTrue();
+
+        RewriteBackdated(solution.PathOf("A", "A.cs"), after);
+        CacheReadResult result = store.ReadAndValidate();
+
+        result.Outcome.ShouldBe(CacheOutcome.Partial);
+        result.DirtyProjects.ShouldBe(["A", "B"], true);
+    }
+
+    // One fragment per project, carrying only what a placement puts in it — with no placements they carry no
+    // sites at all, so nothing in them can be seen to move. Each placement gives one project's fragment a
+    // single edge whose sites sit on the named lines of the named file — an edge is three strings and a site
+    // list, so no compilation is needed to mint a real one.
     private static ExtractionResult SitedExtraction(
         SyntheticSolution solution, params (string Project, string File, int[] Lines)[] placements)
     {
@@ -728,20 +701,19 @@ public sealed class ExtractionCacheStoreTests
         RewriteBackdated(path, prefix + File.ReadAllText(path));
     }
 
+    // No placements, so every fragment is site-free — what most cases here want out of the store.
     private static ExtractionResult TrivialExtraction(SyntheticSolution solution)
     {
-        List<CodebaseFragment> fragments = solution.Projects
-            .Select(p => new CodebaseFragment(p.ProjectName, null, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
-            .ToList();
-        return new ExtractionResult(fragments, [], new WorkspaceDiagnostics(["diag"], [], [], [], [], [], []));
+        return SitedExtraction(solution);
     }
 
+    // The same, with the one load diagnostic whose replay the caller is about to read back.
     private static ExtractionResult OneFragment(SyntheticSolution solution, string diagnostic)
     {
-        List<CodebaseFragment> fragments = solution.Projects
-            .Select(p => new CodebaseFragment(p.ProjectName, null, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
-            .ToList();
-        return new ExtractionResult(fragments, [], new WorkspaceDiagnostics([diagnostic], [], [], [], [], [], []));
+        return SitedExtraction(solution) with
+        {
+            LoadDiagnostics = new WorkspaceDiagnostics([diagnostic], [], [], [], [], [], [])
+        };
     }
 
     /// <summary>

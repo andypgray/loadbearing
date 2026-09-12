@@ -22,35 +22,24 @@ public sealed class LawDiagramRendererTests
     private const string SpecName = "Shop.ArchSpec";
 
     // The legend row a drawn scope box earns, spelled once so the row that must be present in the
-    // quarantine pins and absent from the caution pin is literally the same string.
+    // quarantine pins and absent from the caution pin is literally the same string. Held as the bare
+    // sentence as well as the node below, because the caution pin looks for it in a whole rendered block,
+    // where the Mermaid wrapper is not what it is asking about.
     private const string QuarantineLegendRow =
         "Quarantine box = a contained scope; the doubled boxes are its sanctioned surface";
 
-    // The renderer's invariant legend tails. Named so an expected diagram below reads as its own nodes and
-    // edges plus "the standard legend", rather than repeating the legend at every site.
-    private static readonly string[] BanLegend =
-    [
-        "subgraph l_legend[\"Legend\"]",
-        "l_ban[\"--x = must not reference\"]",
-        "l_outside[\"Rounded box = a place named only as the target of a rule\"]",
-        "end"
-    ];
+    // The renderer's invariant legend rows. One constant per row, because a row is what a drawing earns:
+    // an expected diagram below names the rows it draws and reads as its own nodes and edges plus those.
+    private const string LegendBan = "l_ban[\"--x = must not reference\"]";
+    private const string LegendQuarantine = "l_quarantine[\"" + QuarantineLegendRow + "\"]";
+    private const string LegendOutside = "l_outside[\"Rounded box = a place named only as the target of a rule\"]";
+    private const string LegendNesting = "l_nesting[\"A box inside a box = the inner place is part of the outer\"]";
 
-    private static readonly string[] BanAndNestingLegend =
-    [
-        "subgraph l_legend[\"Legend\"]",
-        "l_ban[\"--x = must not reference\"]",
-        "l_outside[\"Rounded box = a place named only as the target of a rule\"]",
-        "l_nesting[\"A box inside a box = the inner place is part of the outer\"]",
-        "end"
-    ];
-
-    private static readonly string[] QuarantineLegend =
-    [
-        "subgraph l_legend[\"Legend\"]",
-        "l_quarantine[\"Quarantine box = a contained scope; the doubled boxes are its sanctioned surface\"]",
-        "end"
-    ];
+    // The legend tail as the renderer draws it: the subgraph header, the rows, the close.
+    private static string[] Legend(params string[] rows)
+    {
+        return ["subgraph l_legend[\"Legend\"]", .. rows, "end"];
+    }
 
     [Fact]
     public void Block_ASpecExercisingEveryConstruct_PinsTheWholeDrawing()
@@ -298,7 +287,7 @@ public sealed class LawDiagramRendererTests
                 "s_PricingFacade[[\"PricingFacade\"]]",
                 "end",
                 "",
-                .. QuarantineLegend
+                .. Legend(LegendQuarantine)
             ]);
         block.ShouldNotContain("only");
     }
@@ -325,7 +314,7 @@ public sealed class LawDiagramRendererTests
                 "s_Shop_Legacy_Pricing_Contracts[[\"Shop.Legacy.Pricing.Contracts.*\"]]",
                 "end",
                 "",
-                .. QuarantineLegend
+                .. Legend(LegendQuarantine)
             ]);
         block.ShouldNotContain("legacy/pricing/containment");
     }
@@ -475,7 +464,7 @@ public sealed class LawDiagramRendererTests
                 "s_A --x s_Z",
                 "s_A_B --x s_Z",
                 "",
-                .. BanAndNestingLegend
+                .. Legend(LegendBan, LegendOutside, LegendNesting)
             ]);
     }
 
@@ -514,7 +503,7 @@ public sealed class LawDiagramRendererTests
                 "s_Wide --x s_Z",
                 "s_Split --x s_Z",
                 "",
-                .. BanLegend
+                .. Legend(LegendBan, LegendOutside)
             ]);
     }
 
@@ -546,7 +535,7 @@ public sealed class LawDiagramRendererTests
                 "s_Web --x s_Z",
                 "s_Web --x s_Y",
                 "",
-                .. BanLegend
+                .. Legend(LegendBan, LegendOutside)
             ]);
     }
 
@@ -579,7 +568,7 @@ public sealed class LawDiagramRendererTests
                 "s_Core --x s_Z",
                 "s_Core --x s_Y",
                 "",
-                .. BanLegend
+                .. Legend(LegendBan, LegendOutside)
             ]);
     }
 
@@ -611,7 +600,7 @@ public sealed class LawDiagramRendererTests
                 "",
                 "s_Model --x s_Z",
                 "",
-                .. BanAndNestingLegend
+                .. Legend(LegendBan, LegendOutside, LegendNesting)
             ]);
     }
 
@@ -648,12 +637,7 @@ public sealed class LawDiagramRendererTests
                 "",
                 "s_Core --x s_Z",
                 "",
-                "subgraph l_legend[\"Legend\"]",
-                "l_ban[\"--x = must not reference\"]",
-                "l_quarantine[\"" + QuarantineLegendRow + "\"]",
-                "l_outside[\"Rounded box = a place named only as the target of a rule\"]",
-                "l_nesting[\"A box inside a box = the inner place is part of the outer\"]",
-                "end"
+                .. Legend(LegendBan, LegendQuarantine, LegendOutside, LegendNesting)
             ]);
     }
 
@@ -686,7 +670,7 @@ public sealed class LawDiagramRendererTests
                 "",
                 "s_Shop_Core_Legacy --x s_Z",
                 "",
-                .. BanAndNestingLegend
+                .. Legend(LegendBan, LegendOutside, LegendNesting)
             ]);
     }
 
@@ -714,7 +698,7 @@ public sealed class LawDiagramRendererTests
                 "",
                 "s_Web --x s_Z",
                 "",
-                .. BanLegend
+                .. Legend(LegendBan, LegendOutside)
             ]);
     }
 
@@ -743,7 +727,7 @@ public sealed class LawDiagramRendererTests
                 "",
                 "s_Core --x s_Z",
                 "",
-                .. BanLegend
+                .. Legend(LegendBan, LegendOutside)
             ]);
     }
 
@@ -779,7 +763,7 @@ public sealed class LawDiagramRendererTests
                 "s_Shipping --x s_Z",
                 "s_MyApp_Web --x s_Y",
                 "",
-                .. BanAndNestingLegend
+                .. Legend(LegendBan, LegendOutside, LegendNesting)
             ]);
     }
 
