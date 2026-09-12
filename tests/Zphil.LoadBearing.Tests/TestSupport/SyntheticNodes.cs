@@ -45,6 +45,20 @@ internal static class SyntheticNodes
     }
 
     /// <summary>
+    ///     A codebase carrying <paramref name="types" /> and the reference <paramref name="edges" /> among
+    ///     them, and nothing else — for the rows whose subject is an edge the extractor cannot mint from
+    ///     real source, every one of its edge factories being fed from syntax.
+    /// </summary>
+    /// <remarks>
+    ///     <c>ProjectFacts.Solution</c> is the project-stratum equivalent, and the split is by which
+    ///     stratum a row is about rather than by anything the constructor cares for.
+    /// </remarks>
+    internal static CodebaseModel Referencing(IReadOnlyList<TypeNode> types, params ReferenceEdge[] edges)
+    {
+        return new CodebaseModel(types, edges, [], [], [], [], [], [], [], [], [], []);
+    }
+
+    /// <summary>
     ///     <paramref name="count" /> stand-in violations carrying no site at all, which is what makes
     ///     them the right default: the site total prints only when it exceeds the pair count, so a rule
     ///     built from these prints the line it printed before the measure existed.

@@ -292,28 +292,28 @@ public static class ArchChecker
             matched.Add(key);
             BaselineEntry entry = stored!;
 
-            if (!entry.IsEdge || entry.SiteCount is not { } allowance)
+            // The four-way call has one owner, shared with the baseline verb that writes what this
+            // reports: two hand-rolled copies of it drift the first time either side is widened, and
+            // BaselineRatchet carries the reading of every arm.
+            switch (BaselineRatchet.Classify(entry, violation.Sites.Count))
             {
-                // A subject entry carries no measure at all — its sites are declarations (GRAMMAR §4.3) —
-                // so it is grandfathered and says nothing. Only an *edge* entry with no count is uncounted,
-                // which is the state a write can clear; counting subject entries here would leave a naming
-                // rule's whole section reading "uncounted" with nothing an author could do about it.
-                if (entry.IsEdge) uncounted++;
-                grandfatheredPairs.Add((violation, entry));
-                continue;
+                case RatchetState.Grown:
+                    // Red, and into the same list as everything else red, so one comparer orders them all
+                    // and a grown pair's sites interleave in report order rather than trailing the block.
+                    grown.Add(violation, entry);
+                    red.Add(violation);
+                    continue;
+                case RatchetState.Uncounted:
+                    uncounted++;
+                    break;
+                case RatchetState.Shrunk:
+                    shrunk++;
+                    break;
+                case RatchetState.NotMeasured:
+                case RatchetState.Held:
+                    break;
             }
 
-            int observed = violation.Sites.Count;
-            if (observed > allowance)
-            {
-                // Red, and into the same list as everything else red, so one comparer orders them all and
-                // a grown pair's sites interleave in report order rather than trailing the block.
-                grown.Add(violation, entry);
-                red.Add(violation);
-                continue;
-            }
-
-            if (observed < allowance) shrunk++;
             grandfatheredPairs.Add((violation, entry));
         }
 

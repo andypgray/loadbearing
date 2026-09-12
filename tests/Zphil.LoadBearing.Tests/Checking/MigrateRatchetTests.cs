@@ -5,6 +5,7 @@ using Zphil.LoadBearing.Checking;
 using Zphil.LoadBearing.Codebase;
 using Zphil.LoadBearing.Tests.Checking.Targets;
 using Zphil.LoadBearing.Tests.Extraction;
+using Zphil.LoadBearing.Tests.TestSupport;
 
 namespace Zphil.LoadBearing.Tests.Checking;
 
@@ -53,12 +54,33 @@ public sealed class MigrateRatchetTests
 
     private static readonly CodebaseModel ThreeCatchHandlerModel = CompilationFactory.Extract(ThreeCatchHandler);
 
+    // The one forbidden edge again, this time as a model carrying it with no site at all — the state a
+    // legacy file's uncounted entry describes, arrived at from the run's end instead of the file's.
+    private static readonly CodebaseModel UnsitedControllerEdge = UnsitedEdge();
+
     // The same source's rule: every type in App must carry the Handler suffix.
     private static void HandlerNaming(Arch arch)
     {
         arch.Rule("naming/x")
             .Migrate("Types are inconsistently named.", arch.Namespace("App.*").MustHaveSuffix("Handler"))
             .Because("Handler discovery is convention-based.");
+    }
+
+    // The same forbidden reference the controller fixtures carry, selected by suffix rather than by
+    // namespace: a hand-built node declares no namespace, so only a name-keyed selection reaches one.
+    private static void NoDbFromControllers(Arch arch)
+    {
+        arch.Rule("data/x")
+            .Migrate("old", arch.Types.WithSuffix("Controller").MustNotReference(arch.Types.WithSuffix("Db")))
+            .Because("b");
+    }
+
+    private static CodebaseModel UnsitedEdge()
+    {
+        TypeNode source = SyntheticNodes.Type("App.Web.OldController");
+        TypeNode target = SyntheticNodes.Type("App.Data.Db");
+
+        return SyntheticNodes.Referencing([source, target], new ReferenceEdge(source, target, []));
     }
 
     // The empty-subject spec both no-match rows run: a controller cone no type occupies.
@@ -232,6 +254,26 @@ public sealed class MigrateRatchetTests
         result.ShouldHaveGrandfathered(1);
         result.ShouldHaveGrown(0);
         result.ShouldHaveUncounted(1);
+    }
+
+    [Fact]
+    public void Check_EdgeSeenWithNoSites_IsGrandfatheredAndCountsNeitherShrunkNorUncounted()
+    {
+        // An edge the run saw with no file:line evidence is the same state as an entry written before counts
+        // existed: grandfathered at pair grain, with nothing to measure and nothing to report. Read as a
+        // reduction instead, it would offer 'baseline --accept-reductions' a count of zero to record, which
+        // an entry may not carry. The model is hand-built because no extraction reaches this state — every
+        // edge factory is fed from syntax — and the verdict path has to agree with the write path anyway.
+        BaselineIndex index = Checker.Baselines("data/x", OldControllerToDb.WithSiteCount(2));
+
+        RuleResult result = Checker.Run(UnsitedControllerEdge, index, NoDbFromControllers)
+            .Single();
+
+        result.ShouldHavePassed();
+        result.ShouldHaveGrandfathered(1);
+        result.ShouldHaveGrown(0);
+        result.ShouldHaveShrunk(0);
+        result.ShouldHaveUncounted(0);
     }
 
     [Fact]

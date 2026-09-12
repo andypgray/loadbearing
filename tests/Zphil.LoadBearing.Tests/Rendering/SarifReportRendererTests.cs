@@ -17,13 +17,14 @@ namespace Zphil.LoadBearing.Tests.Rendering;
 ///     <c>baselineState: new</c> result with no suppressions; a violation touched at several sites in one
 ///     file gets consecutive per-file fingerprint ordinals; site-less EmptySubject/RuleError violations
 ///     contribute no results (metadata only); a Quarantine tripwire's empty law sentence omits
-///     <c>shortDescription</c>; and a grandfathered violation suppresses as a <c>note</c> whose
-///     justification is the baseline entry's <c>because</c> when present, else the generic
-///     <c>grandfathered in {path}</c> fallback — the latter exercising the checker's baseline-attribution
-///     recovery; and a grown pair emits <c>error</c> / <c>baselineState: updated</c> with no suppression at
-///     all. A check warning is the one result that is not a violation: <c>warning</c> level at the file it
-///     names, on a rule whose descriptor declares that level too. The full-report byte shape is pinned
-///     separately by the <c>violated-check.sarif</c> golden.
+///     <c>shortDescription</c>; and a grandfathered violation lands as a <c>note</c> carrying its attribution
+///     twice, as the suppression's justification and again as its message's tail, from the baseline entry's
+///     <c>because</c> when present, else the generic <c>grandfathered in {path}</c> fallback — the latter
+///     exercising the checker's baseline-attribution recovery; and a grown pair emits <c>error</c> /
+///     <c>baselineState: updated</c> with neither suppression nor attribution. A check warning is the one
+///     result that is not a violation: <c>warning</c> level at the file it names, on a rule whose descriptor
+///     declares that level too. The full-report byte shape is pinned separately by the
+///     <c>violated-check.sarif</c> golden.
 /// </summary>
 public sealed class SarifReportRendererTests
 {
@@ -421,10 +422,7 @@ public sealed class SarifReportRendererTests
         result.GetProperty("level")
             .GetString()
             .ShouldBe("warning");
-        result.GetProperty("message")
-            .GetProperty("text")
-            .GetString()
-            .ShouldNotBeNull()
+        MessageText(result)
             .ShouldContain("App.Legacy/Alpha.cs");
         JsonElement location = result.GetProperty("locations")
             .EnumerateArray()
@@ -522,33 +520,34 @@ public sealed class SarifReportRendererTests
 
         string json = InertTargetReport.ToSarif();
 
-        json.SarifResults()
-            .ShouldHaveSingleItem()
-            .GetProperty("message")
-            .GetProperty("text")
-            .GetString()
+        JsonElement warning = json.SarifResults()
+            .ShouldHaveSingleItem();
+
+        MessageText(warning)
             .ShouldBe("This rule is inert: its target selection matched no types.");
     }
 
     [Fact]
-    public void Serialize_GrandfatheredWithoutAttribution_SuppressesWithGenericBaselinePathJustification()
+    public void Serialize_GrandfatheredWithoutAttribution_FallsBackToTheBaselinePathInSuppressionAndMessage()
     {
-        // A grandfathered Migrate violation whose baseline entry has no `because`: the suppression falls back to
-        // the generic `grandfathered in {conventional baseline path}` justification (note level, unchanged state).
+        // A grandfathered Migrate violation whose baseline entry has no `because`: the attribution falls back to
+        // the generic `grandfathered in {conventional baseline path}` form (note level, unchanged state), and
+        // reaches the message as well as the suppression.
         BaselineIndex index = Checker.Baselines("data/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
         CheckReport report = Checker.Run(Sources.OneController, index, Sources.NoDataAccess);
 
         string json = report.ToSarif();
 
-        ShouldSuppressEveryNoteWith(json, "grandfathered in arch/baselines/data/x.json");
+        ShouldAttributeEveryNoteWith(json, "grandfathered in arch/baselines/data/x.json");
     }
 
     [Fact]
-    public void Serialize_GrandfatheredWithBecause_SuppressesWithAttributionJustification()
+    public void Serialize_GrandfatheredWithBecause_CarriesTheEntrysBecauseInSuppressionAndMessage()
     {
         // The step-1 Core path: RuleBaseline.TryMatch recovers the stored entry's attribution (identity equality
         // excludes Because), and RuleResult.GrandfatheredEntries carries it index-aligned into the report, so the
-        // suppression justification is the operator's own `because`, not the generic fallback.
+        // attribution is the operator's own `because`, not the generic fallback. Prefixed rather than bare
+        // because the one string is also the message's tail, where it has to say what it is.
         const string because = "Legacy Active Record; scheduled for removal in Q3.";
         BaselineEntry entry = BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db")
             .WithBecause(because);
@@ -556,7 +555,7 @@ public sealed class SarifReportRendererTests
 
         string json = report.ToSarif();
 
-        ShouldSuppressEveryNoteWith(json, because);
+        ShouldAttributeEveryNoteWith(json, $"grandfathered: {because}");
     }
 
     [Fact]
@@ -566,7 +565,8 @@ public sealed class SarifReportRendererTests
         // not `new`: code scanning already has an alert for this pair from the run that baselined it, and
         // `new` would ask for a second one. Unsuppressed, because the finding IS that the suppression the
         // entry granted no longer covers what is there — a note carrying the operator's own justification
-        // would close the alert on the strength of the attribution the growth just outgrew.
+        // would close the alert on the strength of the attribution the growth just outgrew. The message says
+        // so too: a reader standing over the alert sees the violation and no grandfathering beside it.
         BaselineEntry entry = BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db")
             .WithSiteCount(1)
             .WithBecause("Legacy Active Record; scheduled for removal in Q3.");
@@ -586,6 +586,8 @@ public sealed class SarifReportRendererTests
                 .ShouldBe("updated");
             result.TryGetProperty("suppressions", out _)
                 .ShouldBeFalse();
+            MessageText(result)
+                .ShouldBe("App.Web.OldController references App.Data.Db");
         }
     }
 
@@ -620,10 +622,12 @@ public sealed class SarifReportRendererTests
 
     /// <summary>
     ///     Asserts the render carries at least one grandfathered result, and that every one of them is an
-    ///     <c>unchanged</c> note bearing a single external suppression justified by
-    ///     <paramref name="justification" />.
+    ///     <c>unchanged</c> note landing <paramref name="attribution" /> in both places it belongs: the
+    ///     justification of its single external suppression, and the parenthetical tail of its message —
+    ///     the second being the landing a code-scanning alert shows. One helper over the pair, because a
+    ///     rendering asserted on its own is a rendering that can be dropped on its own.
     /// </summary>
-    private static void ShouldSuppressEveryNoteWith(string json, string justification)
+    private static void ShouldAttributeEveryNoteWith(string json, string attribution)
     {
         IReadOnlyList<JsonElement> notes = Notes(json);
         notes.ShouldNotBeEmpty();
@@ -640,7 +644,9 @@ public sealed class SarifReportRendererTests
                 .ShouldBe("external");
             suppression.GetProperty("justification")
                 .GetString()
-                .ShouldBe(justification);
+                .ShouldBe(attribution);
+            MessageText(note)
+                .ShouldEndWith($" ({attribution})");
         }
     }
 
@@ -651,6 +657,14 @@ public sealed class SarifReportRendererTests
             .Where(r => r.GetProperty("level")
                 .GetString() == "note")
             .ToList();
+    }
+
+    // The alert's title, which is the one field every code-scanning UI shows.
+    private static string MessageText(JsonElement result)
+    {
+        return result.GetProperty("message")
+            .GetProperty("text")
+            .GetString()!;
     }
 
     private static string Fingerprint(JsonElement result)

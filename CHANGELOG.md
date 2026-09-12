@@ -38,8 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   than the referencing type's — the referencing type is often in no cell at all. Cells appear in the
   order the family declares them, and a cell with nothing left is absent rather than reading zero.
   Nothing else moves: the row above is unchanged, `check` output, SARIF and the baseline file are
-  untouched, the burndown `schemaVersion` stays 2, and the split is derived on every render and
+  untouched, the burndown `schemaVersion` stays 2, and the split is derived on every check and
   stored nowhere, so redrawing the cells regroups the same entries with no file to migrate.
+  `RuleResult.RatchetCells` carries the split on the model itself rather than in the renderer that
+  prints it, so anything holding a check result can ask where a family's debt sits.
 
 - **Both authoring signals carry their cure.** A rule whose subject matched nothing, and a rule whose
   forbidden target matched nothing, now say what to change beside what went wrong. The check report
@@ -323,6 +325,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   read.
 
 ### Changed
+
+- **A grandfathered site's attribution now reaches the code-scanning alert.** `check --sarif` has
+  always marked a grandfathered site as a `note` at `baselineState: unchanged`, carrying an external
+  suppression whose justification is the baseline entry's `--because` (or a `grandfathered in <path>`
+  fallback). GitHub code scanning reads a fixed set of a result's properties — `level`, `message`,
+  `locations` and `partialFingerprints` among them — and ignores the rest, `suppressions` and
+  `baselineState` included, so both were dropped on upload: the tolerated sites of a green `Migrate`
+  rule arrived as open note-level alerts with nothing on them saying why they were tolerated. The same
+  attribution now also closes the result's message, which is the line an alert shows, so the reason a
+  site sits on the ratchet travels with it. An attributed entry reads
+  `... (grandfathered: Legacy Active Record; scheduled for removal in Q3.)` and an unattributed one
+  `... (grandfathered in arch/baselines/data-access/no-inline-sql.json)`. The suppression and
+  `baselineState` stay for consumers that honour them; red violations, grown pairs, check warnings and
+  every other document are byte for byte as before, and no exit code or CI step changes.
 
 - **The law diagram draws a region inside the place it refines.** Nesting on that drawing is glob
   implication, so a layer anchored on its project rather than a namespace glob carries no globs and

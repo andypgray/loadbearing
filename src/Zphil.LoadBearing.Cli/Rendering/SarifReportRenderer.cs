@@ -21,14 +21,15 @@ namespace Zphil.LoadBearing.Cli.Rendering;
 ///     one result per violation <em>site</em> — a red violation as <c>error</c> / <c>baselineState: new</c>
 ///     with no suppression, a grandfathered violation as <c>note</c> / <c>baselineState: unchanged</c>
 ///     carrying an external suppression whose justification is the baseline entry's <c>because</c> (or a
-///     generic <c>grandfathered in {path}</c> fallback), and a grown pair — one carrying more sites than its
-///     entry records — as <c>error</c> / <c>baselineState: updated</c>, unsuppressed, because the entry that
-///     suppressed it no longer covers what is there. EmptySubject and RuleError violations are
-///     site-less and so contribute no results (they still gate via the CLI exit code). A check warning is
-///     the one result that is not a violation: <c>warning</c> level at the file it names, on a rule whose
-///     descriptor declares that level too, so a scope tripwire stops advertising an error it can never
-///     raise. Every path is solution-relative against the <c>SRCROOT</c> URI base — no absolute path is
-///     ever emitted.
+///     generic <c>grandfathered in {path}</c> fallback) and that same attribution again in its message text,
+///     because a code-scanning alert reads the message and drops both the suppression and the baseline state,
+///     and a grown pair — one carrying more sites than its entry records — as <c>error</c> /
+///     <c>baselineState: updated</c>, unsuppressed, because the entry that suppressed it no longer covers
+///     what is there. EmptySubject and RuleError violations are site-less and so contribute no results (they
+///     still gate via the CLI exit code). A check warning is the one result that is not a violation:
+///     <c>warning</c> level at the file it names, on a rule whose descriptor declares that level too, so a
+///     scope tripwire stops advertising an error it can never raise. Every path is solution-relative against
+///     the <c>SRCROOT</c> URI base — no absolute path is ever emitted.
 ///     Serialization is the shared <see cref="LoadBearingJson.Options" />, so the SARIF golden and the JSON
 ///     golden cannot drift in escaping or casing. Pinned by the golden <c>Cli/Golden/violated-check.sarif</c>.
 /// </remarks>
@@ -281,6 +282,9 @@ internal static class SarifReportRenderer
     // A grown pair is red with the rest, and its state is `updated` rather than `new`: code scanning already
     // has an alert for this pair from the run that baselined it, and `new` would ask for a second one.
     // Unsuppressed, because the whole finding is that the suppression the entry granted no longer covers it.
+    // A grandfathered site's attribution is one string minted here and landing twice — as the suppression's
+    // justification, and again in the message — because the message is the only one of the two a code-scanning
+    // alert shows, that channel reading a result's level and message and ignoring the suppression entirely.
     // Warnings come last per rule, where the human report puts them, and they are the one result kind that is
     // not a violation at all — see WarningResult.
     private static IReadOnlyList<SarifResult> BuildResults(CheckReport report, PathFormat.Relativizer relativizer)
@@ -300,9 +304,10 @@ internal static class SarifReportRenderer
             {
                 Violation violation = result.Grandfathered[i];
                 BaselineEntry entry = result.GrandfatheredEntries[i];
-                string justification = entry.Because ?? $"grandfathered in {result.Rule.BaselinePath}";
-                IReadOnlyList<SarifSuppression> suppressions = [new("external", justification)];
-                results.AddRange(SiteResults(result.Rule.Id, violation, NoteLevel, "unchanged", suppressions, relativizer));
+                string attribution = entry.Because is { } because
+                    ? $"grandfathered: {because}"
+                    : $"grandfathered in {result.Rule.BaselinePath}";
+                results.AddRange(SiteResults(result.Rule.Id, violation, NoteLevel, "unchanged", attribution, relativizer));
             }
 
             foreach (CheckWarning warning in result.Warnings) results.Add(WarningResult(result.Rule.Id, warning));
@@ -350,19 +355,25 @@ internal static class SarifReportRenderer
     // One result per site. The partial fingerprint keys the alert as (ruleId, v1|source|target|subject|rel|ord)
     // — the identity slots from BaselineIdentity() (empty slots allowed), and a per-file ordinal reset for each
     // violation, so multiple sites of one violation in one file stay distinct while code motion does not churn it.
+    // A non-null attribution is what grandfathered means here, and it mints the suppression and the message's
+    // parenthetical together, so the two renderings of one fact cannot be landed separately by a later edit.
     private static IEnumerable<SarifResult> SiteResults(
         string ruleId,
         Violation violation,
         string level,
         string baselineState,
-        IReadOnlyList<SarifSuppression>? suppressions,
+        string? attribution,
         PathFormat.Relativizer relativizer)
     {
         BaselineEntry? identity = violation.BaselineIdentity();
         string source = identity?.Source ?? string.Empty;
         string target = identity?.Target ?? string.Empty;
         string subject = identity?.Subject ?? string.Empty;
-        var message = new SarifMessage(MessageText(violation));
+        string body = MessageText(violation);
+        var message = new SarifMessage(attribution is null ? body : $"{body} ({attribution})");
+        IReadOnlyList<SarifSuppression>? suppressions = attribution is null
+            ? null
+            : [new SarifSuppression("external", attribution)];
         var ordinals = new Dictionary<string, int>(StringComparer.Ordinal);
 
         foreach (SourceLocation site in violation.Sites)

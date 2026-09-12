@@ -120,14 +120,14 @@ Each test's display name is its rule ID, so a broken rule is named in the run su
             .Fix("Move the SQL into a repository; see BookingRepository.");
 ```
 
-Its twelve baselined sites keep the rule green at the command line and still reach code scanning, as note-level results marked suppressed, so the burndown is visible to anyone reviewing without ever failing a build. One result object from a fresh run:
+Its twelve baselined sites keep the rule green at the command line and still reach code scanning, as note-level alerts, so the burndown is visible to anyone reviewing without ever failing a build. Code scanning reads a result's `level` and message and ignores both the suppression and the baseline state, so each site repeats its baseline attribution in the message, which is the line the alert shows. One result object from a fresh run:
 
 ```json
 {
   "ruleId": "data-access/no-inline-sql",
   "level": "note",
   "message": {
-    "text": "Meridian.Web.Controllers.CustomsController references Microsoft.Data.SqlClient.SqlCommand"
+    "text": "Meridian.Web.Controllers.CustomsController references Microsoft.Data.SqlClient.SqlCommand (grandfathered in arch/baselines/data-access/no-inline-sql.json)"
   },
   "locations": [
     {
@@ -155,7 +155,7 @@ Its twelve baselined sites keep the rule green at the command line and still rea
 }
 ```
 
-A rule that is genuinely red lands the same shape at `error` level, with `"baselineState": "new"` and no `suppressions` array, so a reviewer can tell house debt from a fresh breach at a glance. Reproduce the file from a checkout:
+A rule that is genuinely red lands the same shape at `error` level, with `"baselineState": "new"` and no `suppressions` array. In code scanning a reviewer tells house debt from a fresh breach by severity; a consumer that honours `baselineState` or `suppressions` can use either. Reproduce the file from a checkout:
 
 ```bash
 dotnet build examples/Meridian/Meridian.slnx

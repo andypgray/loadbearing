@@ -96,7 +96,7 @@ internal static class StatusJsonRenderer
 
     private static IReadOnlyList<RatchetCellJson>? ToCells(RuleResult result)
     {
-        return RatchetCells.Of(result)
+        return result.RatchetCells
             ?.Cells.Select(cell => new RatchetCellJson(cell.Name, cell.Remaining, cell.RemainingSites))
             .ToList();
     }

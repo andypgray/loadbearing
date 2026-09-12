@@ -203,15 +203,16 @@ internal sealed class BaselineRunner(
         // back the first candidate of an identity, and where two violations share one the allowance this
         // valve records has to cover the larger. --add is the only route by which a count may rise, so
         // recording the whole observed figure here is what makes growth attributable rather than silent.
-        BaselineEntry recorded = current.First(entry => entry.Equals(identity));
-        BaselineEntry attributed = recorded.WithBecause(request.Because!);
+        (BaselineEntry Identity, int Sites) folded = current.First(entry => entry.Identity.Equals(identity));
+        BaselineEntry attributed = Counted(folded.Identity, folded.Sites)
+            .WithBecause(request.Because!);
 
         Dictionary<string, IReadOnlyList<BaselineEntry>> sections = MutableSections(existing);
 
         if (existingEntries.FirstOrDefault(entry => entry.Equals(identity)) is { } stored)
         {
             sections[ruleId] = existingEntries.Select(e => e.Equals(identity) ? attributed : e).ToList();
-            output.WriteLine($"{ruleId}: entry already baselined — {ReRecorded(stored, attributed)}");
+            output.WriteLine($"{ruleId}: entry already baselined — {ReRecorded(stored, folded.Sites)}");
         }
         else
         {
@@ -231,12 +232,13 @@ internal sealed class BaselineRunner(
     // site count it says so and names both ends of the move — an operator who meant only to restate the
     // attribution should be able to read that the allowance went up. An entry with no measure to move keeps
     // the plain sentence: a subject entry carries none, and neither does an edge with no sited evidence.
-    private static string ReRecorded(BaselineEntry stored, BaselineEntry attributed)
+    private static string ReRecorded(BaselineEntry stored, int observedSites)
     {
-        if (attributed.SiteCount is not { } observed) return "attribution updated.";
+        RatchetState state = BaselineRatchet.Classify(stored, observedSites);
+        if (state is RatchetState.NotMeasured) return "attribution updated.";
 
-        string from = stored.SiteCount is { } previous ? $"{previous}" : "uncounted";
-        return $"attribution updated and site count re-recorded ({from} → {observed}).";
+        string from = state is RatchetState.Uncounted ? "uncounted" : $"{stored.SiteCount!.Value}";
+        return $"attribution updated and site count re-recorded ({from} → {observedSites}).";
     }
 
     // A read document's sections as a map this run may write into: every section rides through untouched,
@@ -327,7 +329,7 @@ internal sealed class BaselineRunner(
 
     // --init: grandfather an uncaptured rule's current state (empty = zero debt); leave captured rules be.
     private bool InitRule(
-        string ruleId, IReadOnlyList<BaselineEntry> current,
+        string ruleId, IReadOnlyList<(BaselineEntry Identity, int Sites)> current,
         IReadOnlyList<BaselineEntry>? existingEntries, Dictionary<string, IReadOnlyList<BaselineEntry>> sections)
     {
         if (existingEntries is { } captured)
@@ -336,7 +338,8 @@ internal sealed class BaselineRunner(
             return false;
         }
 
-        sections[ruleId] = current;
+        sections[ruleId] = current.Select(observed => Counted(observed.Identity, observed.Sites))
+            .ToList();
         output.WriteLine($"{ruleId}: captured {current.Count} grandfathered {Plurals.Noun(current.Count, "violation")}.");
         return true;
     }
@@ -348,7 +351,7 @@ internal sealed class BaselineRunner(
     // Recording a count on an entry that had none is a tightening too, and it is the route by which a file
     // written before the measure existed becomes a counted one.
     private bool AcceptReductions(
-        string ruleId, IReadOnlyList<BaselineEntry> current,
+        string ruleId, IReadOnlyList<(BaselineEntry Identity, int Sites)> current,
         IReadOnlyList<BaselineEntry>? existingEntries, Dictionary<string, IReadOnlyList<BaselineEntry>> sections)
     {
         if (existingEntries is not { } captured)
@@ -357,9 +360,9 @@ internal sealed class BaselineRunner(
             return false;
         }
 
-        // Keyed by identity, so a captured entry's current twin — the one carrying what this run observed —
-        // is one lookup away. CurrentEntries folded duplicate identities, so the keys are unique.
-        Dictionary<BaselineEntry, BaselineEntry> observed = current.ToDictionary(entry => entry);
+        // Keyed by identity, so what this run observed under a captured entry is one lookup away.
+        // CurrentEntries folded duplicate identities, so the keys are unique.
+        Dictionary<BaselineEntry, int> observed = current.ToDictionary(entry => entry.Identity, entry => entry.Sites);
         var existingSet = new HashSet<BaselineEntry>(captured);
 
         var kept = new List<BaselineEntry>();
@@ -370,33 +373,35 @@ internal sealed class BaselineRunner(
         {
             // Identity intersection first: an entry no current violation matches is the reduction being
             // accepted, and it simply does not survive into the section.
-            if (!observed.TryGetValue(entry, out BaselineEntry? now)) continue;
+            if (!observed.TryGetValue(entry, out int sites)) continue;
 
-            if (now.SiteCount is not { } sites)
+            // The same owner the verdict path reads, so what this mode may tighten and what 'check' counts
+            // as tightenable are one discrimination rather than two that agree until one of them moves.
+            switch (BaselineRatchet.Classify(entry, sites))
             {
-                kept.Add(entry); // nothing to measure — a subject entry, or an edge with no sited evidence
-            }
-            else if (entry.SiteCount is not { } allowance)
-            {
-                kept.Add(entry.WithSiteCount(sites));
-                recorded++;
-            }
-            else if (sites < allowance)
-            {
-                kept.Add(entry.WithSiteCount(sites));
-                lowered++;
-            }
-            else
-            {
-                // At or above the allowance the entry is stored untouched. Above it, the mode's direction is
-                // the whole reason: raising a count is growth, and growth is attributed or it does not happen.
-                if (sites > allowance) grew++;
-                kept.Add(entry);
+                case RatchetState.Uncounted:
+                    kept.Add(entry.WithSiteCount(sites));
+                    recorded++;
+                    break;
+                case RatchetState.Shrunk:
+                    kept.Add(entry.WithSiteCount(sites));
+                    lowered++;
+                    break;
+                case RatchetState.Grown:
+                    // Stored untouched, and the mode's direction is the whole reason: raising a count is
+                    // growth, and growth is attributed or it does not happen.
+                    grew++;
+                    kept.Add(entry);
+                    break;
+                case RatchetState.NotMeasured:
+                case RatchetState.Held:
+                    kept.Add(entry);
+                    break;
             }
         }
 
         int removed = captured.Count - kept.Count;
-        int additions = current.Count(entry => !existingSet.Contains(entry));
+        int additions = current.Count(entry => !existingSet.Contains(entry.Identity));
 
         sections[ruleId] = kept;
         // "nothing to accept" is the whole mode's verdict, so every kind of acceptance clears it: a run that
@@ -418,13 +423,14 @@ internal sealed class BaselineRunner(
         return true;
     }
 
-    // A ratcheted rule's current baseline entries (from an empty-baseline check), or null when the rule is
-    // unbaselinable: any EmptySubject/RuleError violation makes the whole rule so (its identity is not stable).
-    // Each edge entry records the sites observed under its identity, max-folded across duplicates: a symbol ID
-    // names a name rather than a node (GRAMMAR §4.3), so two violations can share one identity, and the
-    // allowance a write records has to cover the larger of them. Folding is also what collapses those
-    // duplicates to the single line the file has always meant them to be.
-    private static IReadOnlyList<BaselineEntry>? CurrentEntries(RuleResult result)
+    // A ratcheted rule's current violations as (identity, sites observed under it) from an empty-baseline
+    // check, or null when the rule is unbaselinable: any EmptySubject/RuleError violation makes the whole
+    // rule so (its identity is not stable). The count is max-folded across duplicates: a symbol ID names a
+    // name rather than a node (GRAMMAR §4.3), so two violations can share one identity, and the allowance a
+    // write records has to cover the larger of them. Folding is also what collapses those duplicates to the
+    // single line the file has always meant them to be. The raw count rather than a Counted entry, because
+    // zero sites and no measure are different questions and only BaselineRatchet may answer the second.
+    private static IReadOnlyList<(BaselineEntry Identity, int Sites)>? CurrentEntries(RuleResult result)
     {
         var observed = new Dictionary<BaselineEntry, int>();
         var order = new List<BaselineEntry>();
@@ -438,7 +444,7 @@ internal sealed class BaselineRunner(
             observed[identity] = Math.Max(sites, violation.Sites.Count);
         }
 
-        return order.Select(identity => Counted(identity, observed[identity])).ToList();
+        return order.Select(identity => (Identity: identity, Sites: observed[identity])).ToList();
     }
 
     // The entry as a write records it: an edge entry carrying the sites observed under its identity, or the

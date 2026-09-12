@@ -892,7 +892,7 @@
           "ruleId": "layering/projects-reached-only-by-themselves",
           "level": "note",
           "message": {
-            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController"
+            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController (grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json)"
           },
           "locations": [
             {
@@ -922,7 +922,7 @@
           "ruleId": "layering/projects-reached-only-by-themselves",
           "level": "note",
           "message": {
-            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController"
+            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController (grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json)"
           },
           "locations": [
             {
@@ -952,7 +952,7 @@
           "ruleId": "layering/projects-reached-only-by-themselves",
           "level": "note",
           "message": {
-            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController"
+            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController (grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json)"
           },
           "locations": [
             {
@@ -982,7 +982,7 @@
           "ruleId": "layering/projects-reached-only-by-themselves",
           "level": "note",
           "message": {
-            "text": "MyApp.Domain.OrderService references MyApp.Web.WebTextExtensions"
+            "text": "MyApp.Domain.OrderService references MyApp.Web.WebTextExtensions (grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json)"
           },
           "locations": [
             {
@@ -1012,7 +1012,7 @@
           "ruleId": "layering/projects-reached-only-by-themselves",
           "level": "note",
           "message": {
-            "text": "MyApp.Web.HomeController references MyApp.Legacy.Billing.IBillingFacade"
+            "text": "MyApp.Web.HomeController references MyApp.Legacy.Billing.IBillingFacade (grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json)"
           },
           "locations": [
             {
@@ -1042,7 +1042,7 @@
           "ruleId": "layering/projects-reached-only-by-themselves",
           "level": "note",
           "message": {
-            "text": "MyApp.Web.HomeController references MyApp.Legacy.Billing.IBillingFacade"
+            "text": "MyApp.Web.HomeController references MyApp.Legacy.Billing.IBillingFacade (grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json)"
           },
           "locations": [
             {
@@ -1072,7 +1072,7 @@
           "ruleId": "layering/projects-reached-only-by-themselves",
           "level": "note",
           "message": {
-            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator"
+            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator (grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json)"
           },
           "locations": [
             {
@@ -1102,7 +1102,7 @@
           "ruleId": "layering/projects-reached-only-by-themselves",
           "level": "note",
           "message": {
-            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator"
+            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator (grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json)"
           },
           "locations": [
             {
@@ -1132,7 +1132,7 @@
           "ruleId": "layering/projects-reached-only-by-themselves",
           "level": "note",
           "message": {
-            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.RoundingMode"
+            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.RoundingMode (grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json)"
           },
           "locations": [
             {
@@ -1258,7 +1258,7 @@
           "ruleId": "data-access/no-inline-sql",
           "level": "note",
           "message": {
-            "text": "MyApp.Web.InvoiceController references System.Data.DataTable"
+            "text": "MyApp.Web.InvoiceController references System.Data.DataTable (grandfathered in arch/baselines/data-access/no-inline-sql.json)"
           },
           "locations": [
             {
@@ -1288,7 +1288,7 @@
           "ruleId": "data-access/no-inline-sql",
           "level": "note",
           "message": {
-            "text": "MyApp.Web.InvoiceController references System.Data.DataTable"
+            "text": "MyApp.Web.InvoiceController references System.Data.DataTable (grandfathered in arch/baselines/data-access/no-inline-sql.json)"
           },
           "locations": [
             {
@@ -1906,7 +1906,7 @@
           "ruleId": "layering/services-behind-contracts",
           "level": "note",
           "message": {
-            "text": "MyApp.Domain.OrderService"
+            "text": "MyApp.Domain.OrderService (grandfathered in arch/baselines/layering/services-behind-contracts.json)"
           },
           "locations": [
             {

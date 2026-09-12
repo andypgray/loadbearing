@@ -129,4 +129,4 @@ Run the same `check` in the pipeline, and pass `--diff-base <the pull request's 
 loadbearing check Zphil.LoadBearing.slnx --spec arch/Zphil.LoadBearing.ArchSpec/Zphil.LoadBearing.ArchSpec.csproj --diff-base origin/main --sarif loadbearing.sarif
 ```
 
-Without a ref every quarantine tripwire is skipped, not clean, so the scope you fenced because it is dangerous to edit is the one thing CI never mentions. The checkout has to be deep enough for `origin/main` to resolve. `--sarif` takes the run to code scanning, where a red rule is an error-level alert and a tripwire touch is a warning-level one.
+Without a ref every quarantine tripwire is skipped, not clean, so the scope you fenced because it is dangerous to edit is the one thing CI never mentions. The checkout has to be deep enough for `origin/main` to resolve. `--sarif` takes the run to code scanning, where a red rule becomes an error-level alert, a tripwire touch a warning-level alert, and a grandfathered site a note whose message names the baseline entry that blessed it.

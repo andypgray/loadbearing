@@ -96,7 +96,7 @@ internal static class StatusFormatter
     // holding all but one pair of the debt is the difference between a morning's work and a migration.
     private static string? CellsLine(RuleResult result)
     {
-        if (RatchetCells.Of(result) is not { } split) return null;
+        if (result.RatchetCells is not { } split) return null;
 
         IEnumerable<string> cells = split.Cells
             .Select(cell => $"{cell.Name} {cell.Remaining}{Sites(cell.Remaining, cell.RemainingSites)}");

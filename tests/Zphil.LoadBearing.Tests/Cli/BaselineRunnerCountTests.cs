@@ -252,6 +252,23 @@ public sealed class BaselineRunnerCountTests : IDisposable
     }
 
     [Fact]
+    public void AcceptReductions_EntryObservedWithNoSites_LeavesItAloneRatherThanLoweringToZero()
+    {
+        // An edge the run saw with no file:line evidence has nothing to measure, exactly as an entry written
+        // before counts existed has: it is grandfathered at pair grain and the mode leaves it be. Read as a
+        // reduction instead, this would record a count of zero — which an entry may not carry, so the mode
+        // would throw on the very file it was pointed at.
+        string content = BaselineComposer.Compose(RuleId, Pair.WithSiteCount(2));
+        string path = WriteBaseline(content);
+
+        string echo = AcceptReductions([ObservedResult(observed: [0])]);
+
+        echo.ShouldContain("data-access/ledger-behind-repository: nothing to accept.");
+        Read(path)
+            .ShouldBe(content);
+    }
+
+    [Fact]
     public void AcceptReductions_NothingMoved_KeepsTheNothingToAcceptVerdictAlone()
     {
         // The verdict every kind of acceptance has to clear, on a run where none of them fired: no entry
@@ -275,7 +292,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         // A symbol ID names a name, not a node (GRAMMAR §4.3), so one pair can arrive as two violations —
         // here the same controller compiled into two projects, reaching a ledger of the same full name in
         // each. Synthetic nodes, because the shape is about identity rather than about any real codebase.
-        RuleResult result = SharedIdentityResult(observed: [2, 3]);
+        RuleResult result = ObservedResult(observed: [2, 3]);
 
         string echo = Init([result]);
 
@@ -394,9 +411,11 @@ public sealed class BaselineRunnerCountTests : IDisposable
             .Because("b"));
     }
 
-    // Two reference violations of the same rule whose endpoints wear the same symbol IDs under different
-    // project attributions — distinct nodes, one baseline identity — carrying the site counts named.
-    private static RuleResult SharedIdentityResult(int[] observed)
+    // Reference violations of the rule under one baseline identity, carrying the site counts named. Their
+    // endpoints wear the same symbol IDs under different project attributions, so two of them are distinct
+    // nodes folding to one entry — and one of them is an observation real source cannot make, which is the
+    // only way to put a sightless edge in front of a mode that would otherwise never see one.
+    private static RuleResult ObservedResult(int[] observed)
     {
         List<Violation> violations = observed
             .Select((sites, index) => Violation.Reference(

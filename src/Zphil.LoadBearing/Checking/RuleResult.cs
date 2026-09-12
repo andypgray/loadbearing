@@ -43,6 +43,7 @@ public sealed class RuleResult
         SkipReason = skipReason;
         Grandfathered = grandfathered ?? Array.Empty<Violation>();
         GrandfatheredSiteCount = Grandfathered.Sum(violation => violation.Sites.Count);
+        RatchetCells = RatchetCellSplit.Of(rule, Grandfathered);
         StaleBaselineEntries = ratchet.Stale;
         ShrunkBaselineEntries = ratchet.Shrunk;
         UncountedBaselineEntries = ratchet.Uncounted;
@@ -98,6 +99,17 @@ public sealed class RuleResult
     ///     it is available whether or not any baseline entry has a recorded count of its own.
     /// </summary>
     public int GrandfatheredSiteCount { get; }
+
+    /// <summary>
+    ///     Gets this rule's remaining tolerated debt grouped by the cell each violation falls in, or
+    ///     null when there is nothing to group: the rule takes no baseline, its subject is not a family,
+    ///     or nothing is left to burn down. <see cref="GrandfatheredSiteCount" /> says how much debt
+    ///     remains and never where it sits, which on a family is the next question;
+    ///     <c>loadbearing status</c> prints this under the rule's row.
+    /// </summary>
+    // Both status channels read this one property — the human row's sub-line and the burndown
+    // document's cells array — so a reader cannot find the two disagreeing about the same run.
+    public RatchetCellSplit? RatchetCells { get; }
 
     /// <summary>
     ///     Gets how many entries in the rule's captured baseline no current violation matched — debt that
