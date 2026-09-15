@@ -40,6 +40,7 @@
              library references these, its consumers keep the metapackage. Since 4.0.0 that is the whole
              consumer side: the runner ships inside the metapackage as Microsoft.Testing.Platform, so
              there is no separate runner package to name. -->
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
         <PackageReference Include="xunit.v3.extensibility.core" Version="4.0.0" />
         <PackageReference Include="xunit.v3.assert" Version="4.0.0" />
     </ItemGroup>
