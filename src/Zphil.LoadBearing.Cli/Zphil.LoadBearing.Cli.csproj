@@ -40,6 +40,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.12" />
         <PackageReference Include="System.CommandLine" Version="2.0.11" />
         <!-- The `mcp` subcommand's stdio server chassis. The four packages are exact-pinned to
              current versions, all present in the local NuGet cache. -->
